@@ -1,26 +1,543 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* 内容扫描路径 - 相对于项目根目录 */
+@source "./app/**/*.{ts,tsx}";
+@source "./lib/**/*.{ts,tsx}";
+@source "./components/**/*.{ts,tsx}";
+@source "./pages/**/*.{ts,tsx}";
+
+/* Tailwind v4 主题配置 */
+@theme {
+  /* 自定义颜色 */
+  --color-ink-50: #f5f7fa;
+  --color-ink-100: #e4e7eb;
+  --color-ink-800: #2c3e50;
+  --color-ink-900: #1a252f;
+  
+  --color-paper-50: #fdfbf7;
+  --color-paper-100: #f5f1e8;
+  
+  --color-cinnabar-500: #c0392b;
+  --color-cinnabar-600: #a93226;
+  
+  /* 字体配置 */
+  --font-serif: "Noto Serif SC", SimSun, serif;
+  --font-sans: "Noto Sans SC", system-ui, sans-serif;
+  
+  /* 圆角配置 */
+  --radius: 0.3rem;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* 背景色：宣纸白/米白 */
+    --background: 38 15% 98%; /* #fdfbf7 */
+    /* 前景色：墨黑 */
+    --foreground: 210 29% 24%; /* #2c3e50 */
+    
+    /* 卡片背景：米白/宣纸色，带轻微暖调 */
+    --card: 38 20% 99%; /* 比背景稍白一点 */
+    --card-foreground: 210 29% 24%;
+    
+    /* 主要按钮：黛蓝/墨蓝 */
+    --primary: 210 29% 24%;
+    --primary-foreground: 38 15% 98%;
+    
+    /* 次要按钮：淡墨色 */
+    --secondary: 210 10% 95%;
+    --secondary-foreground: 210 29% 24%;
+    
+    /* 强调/破坏性操作：朱砂红 */
+    --destructive: 6 63% 46%; /* #c0392b */
+    --destructive-foreground: 0 0% 100%;
+    
+    /* 静音/禁用状态 */
+    --muted: 38 15% 95%;
+    --muted-foreground: 210 10% 50%;
+    
+    /* 强调色（用于 hover 等） */
+    --accent: 38 15% 95%;
+    --accent-foreground: 210 29% 24%;
+    
+    /* 弹出层 */
+    --popover: 38 20% 99%;
+    --popover-foreground: 210 29% 24%;
+    
+    /* 边框颜色：淡墨色，更柔和 */
+    --border: 210 10% 88%;
+    --input: 210 10% 88%;
+    --ring: 210 29% 24%;
+  }
+
+  .dark {
+    /* 夜间模式：深色宣纸背景 */
+    --background: 210 29% 8%;
+    --foreground: 38 15% 95%;
+    
+    --card: 210 29% 12%;
+    --card-foreground: 38 15% 95%;
+    
+    --primary: 38 15% 95%;
+    --primary-foreground: 210 29% 24%;
+    
+    --secondary: 210 29% 15%;
+    --secondary-foreground: 38 15% 95%;
+    
+    --destructive: 6 63% 46%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --muted: 210 29% 15%;
+    --muted-foreground: 210 10% 70%;
+    
+    --accent: 210 29% 15%;
+    --accent-foreground: 38 15% 95%;
+    
+    --popover: 210 29% 12%;
+    --popover-foreground: 38 15% 95%;
+    
+    --border: 210 29% 20%;
+    --input: 210 29% 20%;
+    --ring: 38 15% 95%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Noto Serif SC', 'SimSun', serif;
+  }
+  
+  /* 移动端优化 */
+  @media (max-width: 768px) {
+    body {
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+    
+    /* 防止移动端横向滚动 */
+    * {
+      max-width: 100vw;
+    }
+    
+    /* 优化移动端触摸体验 */
+    button, a {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+      touch-action: manipulation;
+    }
+    
+    /* 确保图片在移动端正确缩放 */
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    
+    /* 优化输入框在移动端的显示 */
+    input, textarea, select {
+      font-size: 16px; /* 防止 iOS 自动缩放 */
+    }
+    
+    /* 优化滚动容器 */
+    .overflow-y-auto, .overflow-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  
+  /* 超小屏幕优化 */
+  @media (max-width: 375px) {
+    body {
+      font-size: 14px;
+    }
+  }
 }
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* 导航栏背景样式 */
+  .nav-bg-pattern {
+    background-image: url(/images/backgrounds/topbg.png);
+    background-position: top;
+    background-repeat: repeat-x;
+    background-size: auto 1.5rem;
+  }
+  
+  /* 宣纸背景样式（用于页面背景） */
+  .paper-bg-pattern {
+    background-image: url(/images/backgrounds/he-wu.png);
+    background-position: center;
+    background-repeat: repeat;
+    background-size: auto 200px;
+  }
+  /* 宣纸纹理背景 - 使用极低透明度的云纹/回形纹，更"隐" */
+  .paper-texture {
+    /* background-color: #f7f7f9; */
+    background-color: #fdfbf7;
+    background-image: 
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.008'%3E%3Cpath d='M50 50c0-13.8-11.2-25-25-25S0 36.2 0 50s11.2 25 25 25 25-11.2 25-25zm25 0c0-13.8-11.2-25-25-25s-25 11.2-25 25 11.2 25 25 25 25-11.2 25-25z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.008'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  
+  /* 印章样式 - 方印/椭圆印，双边框效果，金石气 */
+  .seal-stamp {
+    border: 2px solid #C82E31;
+    color: #C82E31;
+    border-radius: 2px; /* 微圆角，接近直角 */
+    transform: rotate(-8deg);
+    padding: 5px 10px;
+    font-family: "STFangsong", "FangSong", "STSong", "SimSun", serif;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.98), rgba(255, 250, 240, 0.95));
+    box-shadow: 
+      0 2px 6px rgba(200, 46, 49, 0.25),
+      inset 0 1px 2px rgba(255, 255, 255, 0.8);
+    display: inline-block;
+    font-weight: bold;
+    letter-spacing: 2px;
+    font-size: 12px;
+    line-height: 1.2;
+    position: relative;
+  }
+  
+  /* 方印样式 */
+  .seal-stamp-square {
+    border-radius: 2px;
+  }
+  
+  /* 待验印章 - 赭石色/土黄色 */
+  .seal-stamp-pending {
+    border-color: #B8860B; /* 土黄色/赭石色 */
+    color: #8B6914; /* 深一点的土黄色 */
+  }
+  
+  /* 双边框效果 - 使用伪元素创建内边框 */
+  .seal-stamp::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    border: 1px solid rgba(200, 46, 49, 0.4);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+  
+  .seal-stamp-pending::before {
+    border-color: rgba(184, 134, 11, 0.4);
+  }
+  
+  /* 卦象容器样式 */
+  .hexagram-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+  }
+  
+  .gua-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  /* 卦象容器样式 - 去框化，降低背景透明度 */
+  .gua-container {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    position: relative;
+    overflow: visible;
+  }
+  
+  /* 动爻标记 - 空心红圈 */
+  .changing-line-marker {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border: 2px solid #C82E31;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: 0 0 2px rgba(200, 46, 49, 0.3);
+  }
+  
+  /* 动爻文字印章 */
+  .changing-line-seal {
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid #C82E31;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: #C82E31;
+    font-family: "KaiTi", "STKaiti", "楷体", serif;
+    font-weight: bold;
+    box-shadow: 0 1px 2px rgba(200, 46, 49, 0.2);
+  }
+  
+  /* 卡片阴影 - 暖色扩散阴影 */
+  .card-shadow {
+    box-shadow: 0 4px 20px rgba(163, 148, 128, 0.1);
+  }
+  
+  .card-shadow-hover {
+    box-shadow: 0 6px 24px rgba(163, 148, 128, 0.15);
+  }
+  
+  /* 排名图标样式 */
+  .rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  
+  .rank-1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #8B6914;
+    box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+  }
+  
+  .rank-2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
+    color: #505050;
+    box-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
+  }
+  
+  .rank-3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+    color: #5C3A1A;
+    box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+  }
+  
+  .rank-4 {
+    background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+    color: #374151;
+    box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3);
+  }
+  
+  /* 进度条样式 - 墨蓝色 */
+  .accuracy-progress {
+    height: 3px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  
+  .accuracy-progress-fill {
+    height: 100%;
+    background: linear-gradient(to right, #334155, #1e293b); /* 墨蓝色 */
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  
+  /* 隐藏滚动条但保持滚动功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* 毛玻璃效果 */
+  .backdrop-blur-md {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  /* Tab 下划线样式 - 毛笔笔触效果 */
+  .tab-underline {
+    position: relative;
+  }
+  
+  .tab-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 10%;
+    right: 10%;
+    height: 2.5px;
+    background: linear-gradient(to right, 
+      transparent 0%, 
+      #C82E31 15%, 
+      #C82E31 85%, 
+      transparent 100%
+    );
+    border-radius: 2px;
+    box-shadow: 
+      0 1px 3px rgba(200, 46, 49, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    /* 模拟毛笔笔触的渐变边缘 */
+    opacity: 0.95;
+  }
+}
+
+/* 动画定义 */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
+/* ShinyText 动画 */
+@keyframes shine {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.animate-shine {
+  animation: shine 5s linear infinite;
+}
+
+/* 铜钱3D动画 */
+.perspective-800 {
+  perspective: 800px;
+}
+
+.coin-3d {
+  width: 5.25rem;
+  height: 5.25rem;
+  transform-style: preserve-3d;
+  will-change: transform;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.coin-3d:nth-child(1) { animation-delay: 0s; }
+.coin-3d:nth-child(2) { animation-delay: 1.5s; }
+.coin-3d:nth-child(3) { animation-delay: 0.8s; }
+
+.coin-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@keyframes float {
+  0% { 
+    transform: translateY(0px); 
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+  50% { 
+    transform: translateY(-6px); 
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));
+  }
+  100% { 
+    transform: translateY(0px); 
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+}
+
+.coins-animated .coin-3d {
+  animation: coin-toss-3d 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) forwards;
+}
+
+.coins-animated .coin-3d:nth-child(1) {
+  animation-delay: 0s;
+  --rot-axis-x: 4;
+  --rot-axis-y: 2;
+}
+
+.coins-animated .coin-3d:nth-child(2) {
+  animation-delay: 0.1s;
+  --rot-axis-x: 3;
+  --rot-axis-y: 5;
+}
+
+.coins-animated .coin-3d:nth-child(3) {
+  animation-delay: 0.2s;
+  --rot-axis-x: 5;
+  --rot-axis-y: 3;
+}
+
+@keyframes coin-toss-3d {
+  0% {
+    transform: translateY(0) scale(1) rotateX(0) rotateY(0);
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+  40% {
+    transform: translateY(-5rem) scale(1.3) rotateX(calc(180deg * var(--rot-axis-x))) rotateY(calc(180deg * var(--rot-axis-y)));
+    filter: drop-shadow(0 20px 15px rgba(0,0,0,0.1));
+  }
+  80% {
+    transform: translateY(0) scale(1) rotateX(calc(360deg * var(--rot-axis-x))) rotateY(calc(360deg * var(--rot-axis-y)));
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+  }
+  90% {
+    transform: translateY(-0.5rem) scale(1.02) rotateX(calc(360deg * var(--rot-axis-x) + 10deg)) rotateY(calc(360deg * var(--rot-axis-y) + 10deg));
+    filter: drop-shadow(0 5px 12px rgba(0,0,0,0.2));
+  }
+  100% {
+    transform: translateY(0) scale(1) rotateX(calc(360deg * var(--rot-axis-x))) rotateY(calc(360deg * var(--rot-axis-y)));
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+}
+
+  /* 爻象显示样式 - 与小程序端保持一致 */
+  .changing-lines {
+    background: rgba(248, 230, 217, 0.5);
+  }
+  
+  /* 竖排宋体 - 用于卦名显示 */
+  .vertical-serif {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 0.15em;
+    font-family: "Noto Serif SC", "Songti SC", serif;
+  }
+
+  /* 卡片悬浮效果 - 模拟宣纸浮起，增强纸张质感 */
+  .paper-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  
+  .paper-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(200, 46, 49, 0.25); /* 悬浮微红边框 */
+  }

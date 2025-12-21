@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 易知 - 六爻占卜 Web 端
 
-## Getting Started
+基于 Next.js + Tailwind CSS 构建的六爻占卜 Web 独立站 PC 端。
 
-First, run the development server:
+## 功能特性
+
+- ✅ 六爻占卜功能
+  - 手动摇卦
+  - 自动摇卦
+  - 手工起卦
+- ✅ 卦象结果展示
+  - 本卦、变卦显示
+  - 四柱干支信息
+  - 动爻标识
+- ✅ 农历日期转换
+- ✅ 节气计算
+
+## 技术栈
+
+- **框架**: Next.js 16 (App Router)
+- **语言**: TypeScript
+- **样式**: Tailwind CSS 4
+- **UI 组件**: shadcn/ui (新中式学术风主题)
+- **状态管理**: Zustand
+- **富文本编辑器**: Tiptap
+- **图表**: Recharts
+- **日期处理**: Day.js
+- **易学算法**: lunar-javascript
+- **后端**: Supabase (PostgreSQL + Auth)
+
+## 项目结构
+
+```
+web/
+├── app/                    # Next.js App Router 页面
+│   ├── page.tsx           # 首页（占卜功能）
+│   ├── result/            # 结果页面
+│   └── layout.tsx         # 根布局
+├── lib/                    # 核心库文件
+│   ├── components/        # 组件
+│   │   ├── ui/           # shadcn/ui 基础组件
+│   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
+│   │   │   ├── input.tsx
+│   │   │   └── ...
+│   │   └── ExampleUsage.tsx # 组件使用示例
+│   ├── constants/         # 常量定义
+│   │   ├── hexagrams.ts   # 六十四卦数据
+│   │   └── divination.ts  # 占卜相关常量
+│   ├── stores/           # 状态管理
+│   │   └── divinationStore.ts # 排盘数据管理
+│   ├── utils/             # 工具函数
+│   │   ├── cn.ts          # 类名合并工具
+│   │   ├── date.ts        # 日期格式化
+│   │   ├── images.ts      # 图片路径管理
+│   │   ├── lunar.ts       # 农历、干支计算
+│   │   ├── solarTerms.ts  # 节气计算
+│   │   ├── divinationLines.ts # 爻线处理
+│   │   └── hexagramNames.ts   # 卦名处理
+│   └── services/          # 服务层
+│       └── supabaseClient.ts # Supabase 客户端
+└── public/                 # 静态资源
+    └── images/            # 图片资源
+        ├── backgrounds/   # 背景图片
+        ├── icons/        # 图标图片
+        ├── illustrations/ # 插画/装饰图片
+        ├── hexagram/     # 卦象相关图片
+        ├── logos/        # Logo 图片
+        └── ui/           # UI 组件图片
+```
+
+## 环境配置
+
+1. 复制环境变量文件：
+```bash
+cp .env.example .env.local
+```
+
+2. 配置环境变量：
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## 安装依赖
+
+```bash
+npm install
+# 或
+pnpm install
+```
+
+## 开发
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 构建
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## 待实现功能
 
-To learn more about Next.js, take a look at the following resources:
+- [ ] 咨询师页面
+- [ ] 社区功能
+- [ ] 消息功能
+- [ ] 个人中心
+- [ ] 占卜记录管理
+- [ ] AI 解读功能
+- [ ] 笔记功能
+- [ ] 用户认证
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## UI 主题
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+项目采用**新中式学术风**设计主题：
 
-## Deploy on Vercel
+- **色彩系统**: 宣纸白、浅米色、墨蓝、朱砂红
+- **字体**: 思源宋体（标题）、思源黑体（正文）
+- **组件库**: shadcn/ui（基于 Radix UI + Tailwind CSS）
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+详细配置说明请查看：
+- [SHADCN_SETUP.md](./SHADCN_SETUP.md) - 配置说明
+- [COMPONENTS_GUIDE.md](./COMPONENTS_GUIDE.md) - 组件使用指南
+- [SETUP_COMPLETE.md](./SETUP_COMPLETE.md) - 配置完成总结
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 注意事项
+
+- 本项目基于原 Taro 小程序项目迁移而来
+- 保留了核心的六爻占卜逻辑和工具函数
+- UI 已适配 PC 端，使用 Tailwind CSS + shadcn/ui 进行样式设计
+- 数据存储使用 localStorage（后续可迁移到 Supabase）
+- 所有 UI 组件都可以直接修改源码进行定制

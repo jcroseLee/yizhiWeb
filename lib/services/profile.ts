@@ -1,5 +1,5 @@
-import { getSupabaseClient } from './supabaseClient'
 import { getCurrentUser } from './auth'
+import { getSupabaseClient } from './supabaseClient'
 
 export interface UserProfile {
   id: string
@@ -431,6 +431,10 @@ export async function uploadAvatar(file: File): Promise<string | null> {
 
     if (error) {
       console.error('Error uploading avatar:', error)
+      // Provide helpful error message for missing bucket
+      if (error.message?.includes('Bucket not found') || error.message?.includes('bucket')) {
+        throw new Error('存储桶未创建。请在 Supabase Dashboard 中创建 "avatars" 存储桶，或运行数据库迁移。')
+      }
       throw error
     }
 
@@ -1071,13 +1075,14 @@ export async function saveDivinationRecord(payload: {
   }
 
   try {
-    // 将 lines 数组转换为数据库格式（确保格式正确）
-    const linesArray = payload.lines.map(line => {
-      // 标准化格式：'-----' 或 '-- --'
-      if (line === '---O---' || line === '-----') return '-----'
-      if (line === '---X---' || line === '-- --') return '-- --'
-      return line
-    })
+    // 直接保存原始格式，不要转换
+    // 规则：
+    // - '-----' = 少阳（阳爻，静）
+    // - '-- --' = 少阴（阴爻，静）
+    // - '---X---' = 老阴（阴爻，动）
+    // - '---O---' = 老阳（阳爻，动）
+    // 必须保留动爻标记（X和O），不能转换为静爻格式
+    const linesArray = payload.lines
 
     const { data, error } = await supabase
       .from('divination_records')

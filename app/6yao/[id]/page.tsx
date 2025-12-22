@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  ArrowRight, BookOpen,
+  ArrowRight,
   Calendar,
   ChevronDown, ChevronUp,
   CloudFog, Download,
@@ -22,6 +22,7 @@ import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getDivinationRecordById, saveDivinationRecord } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
+import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
 import { calculateChangedLineDetails, calculateLineDetails, getExtendedShenSha, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature, type LineDetail, type ShenShaItem } from '@/lib/utils/liuyaoDetails'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
 import { solarTermTextFrom } from '@/lib/utils/solarTerms'
@@ -50,13 +51,8 @@ const formatDateTime = (iso: string) => {
   return `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const buildChangedLines = (lines: string[], flags: boolean[]) =>
-  lines.map((line, index) => {
-    if (!flags[index]) return line
-    if (line.includes('X')) return '-- --' 
-    if (line.includes('O')) return '-----' 
-    return line.includes('-----') ? '-- --' : '-----'
-  })
+// 使用统一的工具函数
+const buildChangedLines = buildChangedLinesUtil
 
 const getFullHexagramName = (binaryKey: string, shortName: string): string => {
   return HEXAGRAM_FULL_NAMES[binaryKey] || shortName
@@ -86,7 +82,7 @@ const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged = fals
   if (isChanged) {
     const textClass = line.isChanging
       ? 'flex flex-col justify-center h-full text-sm animate-in fade-in slide-in-from-left-2 text-stone-800 ml-4'
-      : 'flex flex-col justify-center h-full text-sm opacity-60 grayscale blur-[0.5px] ml-4' // 未动之爻虚化
+      : 'flex flex-col justify-center h-full text-sm opacity-60 grayscale ml-4' // 未动之爻虚化
     
     return (
       <div className="flex flex-col h-14 border-b border-dashed border-stone-100/50 justify-center">
@@ -309,7 +305,7 @@ function ResultPageContent() {
 
     const originalNature = getHexagramNature(payload.result.originalKey, payload.result.original.name)
     const changedNature = getHexagramNature(payload.result.changedKey, payload.result.changed.name)
-    
+
     const originalFullInfo = getHexagramFullInfo(payload.result.originalKey)
     const changedFullInfo = getHexagramFullInfo(payload.result.changedKey)
 
@@ -383,6 +379,7 @@ function ResultPageContent() {
     lineDetails, changedLineDetails, originalLineDisplayReversed, changedLineDisplayReversed,
     originalNature, changedNature, originalFullInfo, changedFullInfo, fuShenMap, guaShen, guaShenLineIndex
   } = calculatedData
+  console.log('originalLineDisplayReversed', originalLineDisplayReversed)
 
   return (
     <>
@@ -647,34 +644,29 @@ function ResultPageContent() {
                     <Share2 className="w-4 h-4" /> {saving ? '保存中...' : '发布到社区'}
                  </Button>
                  <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9"><Download className="w-4 h-4" /> 分享结果图</Button>
-                 <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9"><BookOpen className="w-4 h-4" /> 导出排盘数据</Button>
+                 {/* <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9"><BookOpen className="w-4 h-4" /> 导出排盘数据</Button> */}
                </div>
             </Card>
 
             <div className="mt-8 text-center">
-               <Button 
-                 variant="outline" 
-                 className="w-full border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-white gap-2 h-9 text-xs" 
-                 onClick={() => {
-                   if (from === 'community') {
-                     // 从社区页面跳转过来的，返回上一页（社区帖子详情页）
-                     router.back()
-                   } else {
-                     // 从排盘工具页跳转过来的，返回排盘工具页
-                     router.push('/6yao')
-                   }
-                 }}
-               >
-                 {from === 'community' ? (
-                   <>
-                     <ArrowRight className="w-3.5 h-3.5 rotate-180" /> 返回帖子
-                   </>
-                 ) : (
-                   <>
-                     <RotateCcw className="w-3.5 h-3.5" /> 重新排盘
-                   </>
+               <div className="flex flex-col gap-2">
+                 {(from === 'community' || from === 'profile') && (
+                   <Button 
+                     variant="outline" 
+                     className="w-full border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-white gap-2 h-9 text-xs" 
+                     onClick={() => router.back()}
+                   >
+                     <ArrowRight className="w-3.5 h-3.5 rotate-180" /> 返回上一页
+                   </Button>
                  )}
-               </Button>
+                 <Button 
+                   variant="outline" 
+                   className="w-full border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-white gap-2 h-9 text-xs" 
+                   onClick={() => router.push('/6yao')}
+                 >
+                   <RotateCcw className="w-3.5 h-3.5" /> 重新排盘
+                 </Button>
+               </div>
                <p className="text-[10px] text-stone-300 mt-4 font-serif tracking-widest">易知 · 诚心问道 · 必有回响</p>
             </div>
           </div>

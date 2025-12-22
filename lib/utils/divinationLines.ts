@@ -21,7 +21,7 @@ export const interpretLineValue = (lineValue: string | null) => {
         barType: 'yang' as LineBarType,
         isChanging: true
       };
-    case '-- --':
+    case '-----':
       return {
         status: '少阳',
         barType: 'yang' as LineBarType,
@@ -33,7 +33,7 @@ export const interpretLineValue = (lineValue: string | null) => {
         barType: 'yin' as LineBarType,
         isChanging: true
       };
-    case '-----':
+    case '-- --':
     default:
       return {
         status: '少阴',

@@ -856,7 +856,9 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
             {/* 全息排盘面板 */}
             {fullGuaData && (
-              <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+              <div className="sticky top-24 z-10">
+                <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+              </div>
             )}
 
             {/* Recommendations */}

@@ -4,6 +4,7 @@ import GuaBlock from '@/lib/components/GuaBlock'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
+import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { togglePostFavorite, togglePostLike } from '@/lib/services/community'
@@ -41,6 +42,114 @@ const styles = `
     overflow: hidden;
   }
 `
+
+// -----------------------------------------------------------------------------
+// 工具函数
+// -----------------------------------------------------------------------------
+
+/**
+ * 从HTML中提取纯文本摘要（支持 SSR）
+ */
+export function extractTextFromHTML(html: string, maxLength: number = 100): string {
+  if (!html) return ''
+  
+  // 在客户端使用 DOM API，在服务端使用正则表达式
+  if (typeof window !== 'undefined') {
+    // 客户端：使用 DOM API
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = html
+    let text = tempDiv.textContent || tempDiv.innerText || ''
+    text = text.replace(/\s+/g, ' ').trim()
+    if (text.length > maxLength) {
+      text = text.substring(0, maxLength) + '...'
+    }
+    return text
+  } else {
+    // 服务端：使用正则表达式移除 HTML 标签
+    let text = html
+      .replace(/<[^>]*>/g, '') // 移除所有 HTML 标签
+      .replace(/&nbsp;/g, ' ') // 替换 &nbsp;
+      .replace(/&amp;/g, '&') // 替换 &amp;
+      .replace(/&lt;/g, '<') // 替换 &lt;
+      .replace(/&gt;/g, '>') // 替换 &gt;
+      .replace(/&quot;/g, '"') // 替换 &quot;
+      .replace(/&#39;/g, "'") // 替换 &#39;
+      .replace(/\s+/g, ' ') // 移除多余的空白字符
+      .trim()
+    
+    if (text.length > maxLength) {
+      text = text.substring(0, maxLength) + '...'
+    }
+    return text
+  }
+}
+
+/**
+ * 针对求测帖：去掉"关联排盘/问题"等前缀，只保留背景描述
+ */
+export function extractHelpBackground(html: string, maxLength: number = 100): string {
+  let text = extractTextFromHTML(html, 1000)
+  text = text
+    .replace(/\*\*关联排盘[^*]*\*\*/g, '')
+    .replace(/\*\*问题[^*]*\*\*/g, '')
+    .replace(/关联排盘[:：][^\n]*/g, '')
+    .replace(/问题[:：][^\n]*/g, '')
+    .replace(/卦(名|象)[:：][^\n]*/g, '')
+  // 过滤掉可能的空行
+  text = text
+    .split(/\n/)
+    .map(l => l.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+  if (text.length > maxLength) {
+    return text.substring(0, maxLength) + '...'
+  }
+  return text
+}
+
+/**
+ * 获取卦象信息 - 与社区页面保持一致
+ */
+export function getGuaInfo(divinationRecord: {
+  original_key?: string
+  lines?: string[]
+  changing_flags?: boolean[]
+} | null | undefined) {
+  if (!divinationRecord) return null
+
+  // 优先使用 original_key 构建（与社区页面一致）
+  const originalKey = String(divinationRecord.original_key || '').replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
+  
+  if (originalKey.length !== 6) return null
+
+  // 获取卦名（使用共享的常量）
+  const guaName = HEXAGRAM_FULL_NAMES[originalKey] || '未知卦'
+
+  // 构建 lines 数组（从下往上：初爻=0，上爻=5，但显示时需要从上往下）
+  // GuaBlock 从上往下显示，所以需要反转
+  const lines: boolean[] = []
+  for (let i = 0; i < 6; i++) {
+    lines.push(originalKey[i] === '1')
+  }
+  // 反转顺序，从上爻到初爻（GuaBlock 从上往下显示）
+  lines.reverse()
+
+  // 获取变爻索引（changing_flags 是从下往上：第0位是初爻，第5位是上爻）
+  const changingLines: number[] = []
+  const changingFlags = divinationRecord.changing_flags || []
+  for (let i = 0; i < changingFlags.length && i < 6; i++) {
+    if (changingFlags[i]) {
+      changingLines.push(i)
+    }
+  }
+
+  return {
+    guaName,
+    lines,
+    changingLines,
+  }
+}
 
 // -----------------------------------------------------------------------------
 // 类型定义 (保持不变)

@@ -19,6 +19,7 @@ export interface GuaLineDetail {
   isShi: boolean          
   isYing: boolean         
   isMoving: boolean       // 是否为动爻
+  fuShen?: string         // 伏神（如果有）
 }
 
 export interface FullGuaData {
@@ -38,6 +39,9 @@ export interface FullGuaData {
   originalGong: string    
   changedName?: string    
   changedGong?: string    
+  fuShenMap?: Record<number, string>  // 伏神映射：爻位索引 -> 伏神字符串
+  guaShen?: string        // 卦身（如果有）
+  guaShenLineIndex?: number | null  // 卦身所在爻位索引
   lines: {
     original: GuaLineDetail
     changed?: {           
@@ -54,10 +58,10 @@ export interface FullGuaData {
 // -----------------------------------------------------------------------------
 const PillarBlock = ({ label, value }: { label: string, value: string }) => (
   <div className="flex flex-col items-center">
-    <div className="w-9 h-9 rounded-lg bg-white border border-stone-200/60 flex items-center justify-center font-serif font-bold text-stone-800 text-sm shadow-[0_2px_4px_rgba(0,0,0,0.02)] mb-1.5">
+    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-white to-amber-50 border border-gray-200/80 flex items-center justify-center font-serif font-bold text-stone-900 text-sm shadow-[0_2px_6px_rgba(200,46,49,0.08)] mb-1.5">
       {value}
     </div>
-    <span className="text-[10px] text-stone-400 scale-90 font-medium">{label}</span>
+    <span className="text-[10px] text-stone-500 scale-90 font-medium">{label}</span>
   </div>
 )
 
@@ -127,13 +131,13 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
     // 定义列宽配置：
     // 1. 六兽 (28px)
     // 2. 本卦六亲 (32px)
-    // 3. 本卦爻线 (54px)
-    // 4. 本卦纳甲 (36px)
+    // 3. 本卦纳甲 (36px)
+    // 4. 本卦爻线 (54px)
     // 5. 箭头 (20px)
     // 6. 变卦六亲 (32px)
     // 7. 变卦爻线 (44px)
     // 8. 变卦纳甲 (36px)
-    const gridCols = "grid-cols-[28px_32px_54px_36px_20px_32px_44px_36px]"
+    const gridCols = "grid-cols-[22px_32px_46px_54px_20px_32px_44px_36px]"
     
     return (
       <div 
@@ -150,33 +154,47 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
           {org.liuQin}
         </div>
         
-        {/* 3. 本卦爻线 + 世应 */}
+        {/* 3. 本卦纳甲 (左对齐) */}
+        <div className="flex flex-col justify-center leading-none pl-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] font-bold text-stone-700 mb-[3px] font-serif">{org.ganZhi}</span>
+            <span className="text-[9px] text-stone-400 scale-95 origin-left mb-0.5">{org.wuXing}</span>
+          </div>
+          {/* 伏神显示 */}
+          {org.fuShen && (
+            <span className="text-[9px] text-[#C82E31] font-serif scale-90 origin-left mt-0.5 leading-tight">
+              伏:{org.fuShen}
+            </span>
+          )}
+          {/* 卦身显示 */}
+          {data.guaShen && data.guaShenLineIndex === lineIndex && (
+            <span className="text-[9px] text-stone-500 font-serif scale-90 origin-left mt-0.5 leading-tight">
+              身:{data.guaShen}
+            </span>
+          )}
+        </div>
+        
+        {/* 4. 本卦爻线 + 世应 */}
         <div className="relative px-1 h-full flex items-center">
           {renderLineGraphic(org.type, isMoving)}
           
-          {/* 世应标记: 绝对定位在爻线左侧，使用红/灰底色区分 */}
+          {/* 世应标记: 绝对定位在爻线右侧，使用红/灰底色区分 */}
           {org.isShi && (
-            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 text-[8px] bg-[#C82E31] text-white px-[3px] py-[1px] rounded-[2px] leading-none z-10 shadow-sm font-serif">
+            <span className="absolute -right-1.5 top-1/2 -translate-y-1/2 text-[9px] bg-[#C82E31] text-white px-[3px] py-px rounded-[2px] leading-none z-10 shadow-sm font-serif">
               世
             </span>
           )}
           {org.isYing && (
-            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 text-[8px] bg-stone-200 text-stone-500 px-[3px] py-[1px] rounded-[2px] leading-none z-10 font-serif">
+            <span className="absolute -right-1.5 top-1/2 -translate-y-1/2 text-[9px] bg-stone-200 text-stone-500 px-[3px] py-px rounded-[2px] leading-none z-10 font-serif">
               应
             </span>
           )}
         </div>
         
-        {/* 4. 本卦纳甲 (左对齐) */}
-        <div className="flex flex-col justify-center leading-none pl-1">
-          <span className="text-[11px] font-bold text-stone-700 mb-[3px] font-serif">{org.ganZhi}</span>
-          <span className="text-[9px] text-stone-400 scale-95 origin-left">{org.wuXing}</span>
-        </div>
-        
         {/* 5. 动爻箭头 (仅动爻显示) */}
         <div className="flex justify-center items-center">
           {isMoving ? (
-            <MoveRight size={14} className="text-[#C82E31]/80" />
+            <MoveRight size={14} className="text-[#C82E31]/80 ml-0.5" />
           ) : (
             // 静态占位线，保持视觉分割
             <div className="w-px h-3 bg-stone-100" />
@@ -242,28 +260,28 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
   return (
     <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden w-full relative">
       {/* 顶部：时间与四柱 (信息增强版) */}
-      <div className="bg-[#FAF9F6] p-4 border-b border-stone-100 relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-stone-200/50 via-stone-100 to-transparent"></div>
+      <div className="bg-linear-to-br from-amber-50 via-white to-amber-50/30 p-4 border-b border-stone-100 relative">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-[#C82E31]/60 via-[#C82E31]/40 to-transparent"></div>
         
         {/* 第一行：公历与空亡 */}
         <div className="flex justify-between items-start mb-2.5">
           <div>
-            <div className="text-[10px] text-stone-400 mb-0.5 font-medium tracking-wide">起卦时间</div>
-            <div className="text-sm font-mono font-bold text-stone-800 tracking-tight">{data.dateStr}</div>
+            <div className="text-[10px] text-stone-500 mb-0.5 font-medium tracking-wide">起卦时间</div>
+            <div className="text-sm font-mono font-bold text-stone-900 tracking-tight">{data.dateStr}</div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] text-stone-400 mb-0.5 font-medium tracking-wide">空亡 (日)</div>
-            <div className="text-xs font-serif text-stone-600 bg-white border border-stone-100 px-2 py-0.5 rounded-md shadow-sm">{data.kongWang || '--'}</div>
+            <div className="text-[10px] text-stone-500 mb-0.5 font-medium tracking-wide">空亡 (日)</div>
+            <div className="text-xs font-serif text-[#635858]  border px-2 py-0.5 rounded-md shadow-sm font-bold">{data.kongWang || '--'}</div>
           </div>
         </div>
         
         {/* 第二行：农历与节气 */}
-        <div className="flex items-center flex-wrap gap-y-1 gap-x-2 mb-5 text-xs font-serif text-stone-500">
-          <span className="bg-stone-100/50 px-1.5 rounded">{data.lunarYear}</span>
-          <span className="font-bold text-stone-700">{data.lunarDateStr}</span>
-          <span>{data.lunarHour}</span>
+        <div className="flex items-center flex-wrap gap-y-1 gap-x-2 mb-5 text-xs font-serif">
+          <span className="bg-amber-100/80 text-amber-900 px-1.5 rounded font-medium">{data.lunarYear}</span>
+          <span className="font-bold text-stone-800">{data.lunarDateStr}</span>
+          {/* <span className="text-stone-600">{data.lunarHour}</span> */}
           <span className="text-stone-300">|</span>
-          <span className="text-[#C82E31] bg-red-50 px-1.5 rounded">{data.solarTerm}</span>
+          <span className="text-[#C82E31] px-1.5 rounded font-bold">{data.solarTerm}</span>
         </div>
         
         {/* 第三行：四柱排盘 */}

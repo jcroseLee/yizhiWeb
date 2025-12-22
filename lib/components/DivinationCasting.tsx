@@ -23,8 +23,8 @@ interface DivinationCastingProps {
 type LineType = '少阳' | '少阴' | '老阳' | '老阴'
 
 const LINE_CONFIG: Record<LineType, { value: string; isChanging: boolean }> = {
-  '少阳': { value: '-- --', isChanging: false },
-  '少阴': { value: '-----', isChanging: false },
+  '少阳': { value: '-----', isChanging: false },  // 少阳 = 阳爻（实线）
+  '少阴': { value: '-- --', isChanging: false },  // 少阴 = 阴爻（虚线）
   '老阳': { value: '---O---', isChanging: true },
   '老阴': { value: '---X---', isChanging: true }
 }

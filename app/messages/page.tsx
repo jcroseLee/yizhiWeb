@@ -546,7 +546,7 @@ export default function MessagesPage() {
       <div className="flex flex-col h-full bg-[#F5F5F5]">
         <div className="h-16 border-b border-stone-200 flex items-center justify-between px-6 bg-[#F5F5F5] shrink-0">
           <div className="flex items-center gap-3">
-            <Avatar className="w-8 h-8"><AvatarImage src={otherUser?.avatar_url || ''} /><AvatarFallback className="bg-stone-200 text-stone-600 text-xs">{otherUser?.nickname?.[0] || 'U'}</AvatarFallback></Avatar>
+            <Avatar className="w-8 h-8"><AvatarImage src={otherUser?.avatar_url || undefined} /><AvatarFallback className="bg-stone-200 text-stone-600 text-xs">{otherUser?.nickname?.[0] || 'U'}</AvatarFallback></Avatar>
             <h2 className="text-lg font-bold text-stone-800 font-serif">{otherUser?.nickname || '用户'}</h2>
           </div>
           <DropdownMenu>
@@ -572,7 +572,7 @@ export default function MessagesPage() {
                   {showTime && <div className="flex justify-center my-4"><span className="text-xs text-stone-300 bg-stone-100 px-2 py-0.5 rounded">{formatMessageTime(msg.created_at)}</span></div>}
                   <div className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
                     <Avatar className="w-9 h-9 border border-stone-200">
-                      <AvatarImage src={msg.sender?.avatar_url || ''} />
+                      <AvatarImage src={msg.sender?.avatar_url || undefined} />
                       <AvatarFallback className={`text-xs ${isMe ? 'bg-stone-800 text-white' : 'bg-white text-stone-600'}`}>{isMe ? '我' : msg.sender?.nickname?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%] max-md:max-w-[85%]`}>
@@ -645,7 +645,7 @@ export default function MessagesPage() {
                 {sortedConversations.map(chat => (
                   <div key={chat.other_user_id} onClick={() => handleSelectConversation(chat, 'private')} className={`flex items-center gap-3 p-3.5 mx-2 my-0.5 rounded-lg cursor-pointer transition-colors group ${activeChatId === chat.other_user_id ? 'bg-[#C6C6C6]' : 'hover:bg-[#EAEAEA]'}`}>
                     <div className="relative">
-                      <Avatar className="w-10 h-10 rounded-lg"><AvatarImage src={chat.other_user?.avatar_url || ''} /><AvatarFallback className="bg-stone-200">{chat.other_user?.nickname?.[0]}</AvatarFallback></Avatar>
+                      <Avatar className="w-10 h-10 rounded-lg"><AvatarImage src={chat.other_user?.avatar_url || undefined} /><AvatarFallback className="bg-stone-200">{chat.other_user?.nickname?.[0]}</AvatarFallback></Avatar>
                       {chat.unread_count > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#FA5151] text-white rounded-full text-[10px] flex items-center justify-center border border-[#F7F7F7]">{chat.unread_count}</span>}
                       {chat.is_pinned && <Pin className="absolute -bottom-1 -left-1 w-3 h-3 text-stone-400 bg-white rounded-full p-0.5" />}
                     </div>

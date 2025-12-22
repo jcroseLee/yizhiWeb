@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import DailyFortuneCard from './components/DailyFortuneCard'
-import PostCard from './components/PostCard'
+import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo } from './components/PostCard'
 import PostCardSkeleton from './components/PostCardSkeleton'
 import PostComposer from './components/PostComposer'
 import TrendingTopicsCard from './components/TrendingTopicsCard'
@@ -61,66 +61,6 @@ const CHANNELS = [
   { id: 'chat', label: '茶寮', icon: Coffee }, // 闲聊
 ]
 
-// 完整卦名映射（根据二进制键）
-const HEXAGRAM_FULL_NAMES: Record<string, string> = {
-  "111111": "乾为天",
-  "000000": "坤为地",
-  "100010": "水雷屯",
-  "010001": "山水蒙",
-  "111010": "水天需",
-  "010111": "天水讼",
-  "000010": "地水师",
-  "010000": "水地比",
-  "111011": "风天小畜",
-  "110111": "天泽履",
-  "111000": "地天泰",
-  "000111": "天地否",
-  "111101": "天火同人",
-  "101111": "火天大有",
-  "001000": "地山谦",
-  "000100": "雷地豫",
-  "100110": "泽雷随",
-  "011001": "山风蛊",
-  "110000": "地泽临",
-  "000011": "风地观",
-  "101001": "火雷噬嗑",
-  "100101": "山火贲",
-  "000001": "山地剥",
-  "100000": "地雷复",
-  "111001": "天雷无妄",
-  "100111": "山天大畜",
-  "100001": "山雷颐",
-  "011110": "泽风大过",
-  "010010": "坎为水",
-  "101101": "离为火",
-  "011100": "泽山咸",
-  "001110": "雷风恒",
-  "111100": "天山遁",
-  "001111": "雷天大壮",
-  "100011": "火地晋",
-  "000101": "地火明夷",
-  "101011": "风火家人",
-  "110101": "火泽睽",
-  "010100": "水山蹇",
-  "001010": "雷水解",
-  "110001": "山泽损",
-  "001011": "风雷益",
-  "111110": "泽天夬",
-  "011111": "天风姤",
-  "010110": "泽水困",
-  "011010": "水风井",
-  "001001": "震为雷",
-  "100100": "艮为山",
-  "011011": "风山渐",
-  "110110": "雷泽归妹",
-  "101100": "雷火丰",
-  "001101": "火山旅",
-  "110010": "风泽中孚",
-  "010011": "雷山小过",
-  "101010": "水火既济",
-  "010101": "火水未济"
-}
-
 // 格式化时间
 function formatTime(dateString: string): string {
   const date = new Date(dateString)
@@ -137,63 +77,6 @@ function formatTime(dateString: string): string {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-// 从 HTML 中提取纯文本摘要（支持 SSR）
-function extractTextFromHTML(html: string, maxLength: number = 100): string {
-  if (!html) return ''
-  
-  // 在客户端使用 DOM API，在服务端使用正则表达式
-  if (typeof window !== 'undefined') {
-    // 客户端：使用 DOM API
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = html
-    let text = tempDiv.textContent || tempDiv.innerText || ''
-    text = text.replace(/\s+/g, ' ').trim()
-    if (text.length > maxLength) {
-      text = text.substring(0, maxLength) + '...'
-    }
-    return text
-  } else {
-    // 服务端：使用正则表达式移除 HTML 标签
-    let text = html
-      .replace(/<[^>]*>/g, '') // 移除所有 HTML 标签
-      .replace(/&nbsp;/g, ' ') // 替换 &nbsp;
-      .replace(/&amp;/g, '&') // 替换 &amp;
-      .replace(/&lt;/g, '<') // 替换 &lt;
-      .replace(/&gt;/g, '>') // 替换 &gt;
-      .replace(/&quot;/g, '"') // 替换 &quot;
-      .replace(/&#39;/g, "'") // 替换 &#39;
-      .replace(/\s+/g, ' ') // 移除多余的空白字符
-      .trim()
-    
-    if (text.length > maxLength) {
-      text = text.substring(0, maxLength) + '...'
-    }
-    return text
-  }
-}
-
-// 针对求测帖：去掉“关联排盘/问题”等前缀，只保留背景描述
-function extractHelpBackground(html: string, maxLength: number = 100): string {
-  let text = extractTextFromHTML(html, 1000)
-  text = text
-    .replace(/\*\*关联排盘[^*]*\*\*/g, '')
-    .replace(/\*\*问题[^*]*\*\*/g, '')
-    .replace(/关联排盘[:：][^\n]*/g, '')
-    .replace(/问题[:：][^\n]*/g, '')
-    .replace(/卦(名|象)[:：][^\n]*/g, '')
-  // 过滤掉可能的空行
-  text = text
-    .split(/\n/)
-    .map(l => l.trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim()
-  if (text.length > maxLength) {
-    return text.substring(0, maxLength) + '...'
-  }
-  return text
-}
-
 // 从 divination_record 提取卦象信息
 interface DivinationRecord {
   original_key?: string
@@ -202,43 +85,8 @@ interface DivinationRecord {
   changing_flags?: boolean[]
 }
 
-function extractGuaInfo(divinationRecord: DivinationRecord | null | undefined) {
-  if (!divinationRecord) return null
-
-  // 获取 original_key（二进制字符串，从下往上：第0位是初爻，第5位是上爻）
-  const originalKey = String(divinationRecord.original_key || '').replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
-  
-  if (originalKey.length !== 6) return null
-
-  // 获取卦名
-  const guaName = HEXAGRAM_FULL_NAMES[originalKey] || '未知卦'
-
-  // 构建 lines 数组（从下往上：初爻=0，上爻=5，但显示时需要从上往下）
-  // GuaBlock 从上往下显示，所以需要反转
-  const lines: boolean[] = []
-  for (let i = 0; i < 6; i++) {
-    lines.push(originalKey[i] === '1')
-  }
-  // 反转顺序，从上爻到初爻（GuaBlock 从上往下显示）
-  lines.reverse()
-
-  // 获取变爻索引（changing_flags 是从下往上：第0位是初爻，第5位是上爻）
-  // 需要转换为从上往下的索引（GuaBlock 从上往下显示）
-  const changingLines: number[] = []
-  const changingFlags = divinationRecord.changing_flags || []
-  for (let i = 0; i < changingFlags.length && i < 6; i++) {
-    if (changingFlags[i]) {
-      // 从下往上的索引 i 转换为从上往下的索引
-      changingLines.push(5 - i)
-    }
-  }
-
-  return {
-    guaName,
-    lines,
-    changingLines,
-  }
-}
+// 使用 PostCard 导出的 getGuaInfo 函数
+const extractGuaInfo = getGuaInfo
 
 // 将 section 映射到 type
 function mapSectionToType(

@@ -1,6 +1,7 @@
 import type { FullGuaData, GuaLineDetail } from '@/app/community/components/GuaPanelDual'
 import { Solar } from 'lunar-javascript'
-import { calculateChangedLineDetails, calculateLineDetails, getHexagramFullInfo, getHexagramNature } from './liuyaoDetails'
+import { buildChangedLines, isYangLine, lineToNumber } from './divinationLineUtils'
+import { calculateChangedLineDetails, calculateLineDetails, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature } from './liuyaoDetails'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from './lunar'
 import { solarTermTextFrom } from './solarTerms'
 
@@ -68,10 +69,8 @@ const getLineType = (line: BackendLine | undefined, isMoving: boolean, lineStr?:
   if (line?.yinYang === 'yang') isYang = true
   else if (line?.yinYang === 'yin') isYang = false
   else if (lineStr) {
-    // 3. 尝试解析字符串
-    const compact = lineStr.replace(/\s/g, '')
-    if (compact.includes('-----') || compact.includes('---O---')) isYang = true
-    else if (compact.includes('--') || compact.includes('---X---')) isYang = false
+    // 3. 使用统一的工具函数判断
+    isYang = isYangLine(lineStr)
   }
 
   if (isMoving) return isYang ? 3 : 2
@@ -141,24 +140,20 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
       
     const lineStrings = Array.isArray(backendRecord.lines) ? backendRecord.lines : []
     
-    // 辅助函数：解析爻线字符串为数值（与标准定义保持一致）
-    // 标准定义：'-- --' = 少阳（阳爻），'-----' = 少阴（阴爻）
-    // 数字映射：7 = 少阳（阳爻），8 = 少阴（阴爻），6 = 老阴，9 = 老阳
+    // 使用统一的工具函数解析爻线字符串为数值
     const parseLineToNumber = (line: string | undefined | null): number => {
       if (!line) return 7
+      // 支持纯数字字符串
       if (/^[6789]$/.test(line.trim())) {
-        return parseInt(line.trim(), 10)
+        return parseInt(line.trim(), 10) as 6 | 7 | 8 | 9
       }
+      // 从字符串中提取数字
       if (/\d/.test(line)) {
         const n = parseInt(line.replace(/\D/g, ''), 10)
-        if (!Number.isNaN(n)) return n
+        if (!Number.isNaN(n) && [6, 7, 8, 9].includes(n)) return n as 6 | 7 | 8 | 9
       }
-      if (line.includes('X') || line.includes('老阴') || line.includes('交')) return 6
-      if (line.includes('O') || line.includes('老阳') || line.includes('重')) return 9
-      // 修正：'-- --' = 少阳（阳爻）= 7，'-----' = 少阴（阴爻）= 8
-      if (line.includes('-- --') || line.includes('少阳') || line.includes('单')) return 7
-      if (line.includes('-----') || line.includes('少阴') || line.includes('拆')) return 8
-      return 7
+      // 使用统一的工具函数
+      return lineToNumber(line)
     }
     
     const getHexKey = (lines: number[]) => {
@@ -213,17 +208,18 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
     // 8. 计算爻线详情 - 使用与排盘结果页相同的计算方法
     const lineDetails = calculateLineDetails(originalKey, lineStrings, dayStem)
     
-    // 计算变卦详情 - 使用与排盘结果页相同的 buildChangedLines 逻辑
-    // 老阴(X)变少阳('-- --')，老阳(O)变少阴('-----')
-    const changedLinesStr = lineStrings.map((line, idx) => {
-      if (!changingFlags[idx]) return line
-      if (line.includes('X')) return '-- --' // 老阴变少阳（阳爻）
-      if (line.includes('O')) return '-----' // 老阳变少阴（阴爻）
-      // 其他情况：如果是长实线('-----')变短实线('-- --')，短实线('-- --')变长实线('-----')
-      return line.includes('-----') ? '-- --' : '-----'
-    })
+    // 计算变卦详情 - 使用统一的工具函数
+    const changedLinesStr = buildChangedLines(lineStrings, changingFlags)
     const changedLineDetails = calculateChangedLineDetails(
       changedKey, changedLinesStr, originalKey, lineStrings, changingFlags
+    )
+
+    // 9. 计算伏神和卦身
+    const { fuShenMap, guaShen, guaShenLineIndex } = getFuShenAndGuaShen(
+      originalKey,
+      lineDetails,
+      originalNature.nature || '乾宫',
+      originalNature.element || '金'
     )
 
     const lines: FullGuaData['lines'] = []
@@ -253,6 +249,7 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
         isShi: detail?.isShi || false,
         isYing: detail?.isYing || false,
         isMoving: isMoving, // 使用 changingFlags 作为数据源
+        fuShen: fuShenMap[i], // 添加伏神
       }
 
       // 为所有爻生成变卦信息（如果有变卦的话），完整展示变卦的所有6个爻
@@ -288,6 +285,9 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
       originalGong,
       changedName,
       changedGong,
+      fuShenMap,
+      guaShen,
+      guaShenLineIndex,
       lines,
     }
   } catch (error) {

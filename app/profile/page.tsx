@@ -10,36 +10,26 @@ import {
   Edit2,
   HelpCircle,
   Loader2,
-  MessageSquare,
   Trash2,
   TrendingUp,
-  UserPlus,
   Users
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
-import PostCard from '@/app/community/components/PostCard'
+import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo } from '@/app/community/components/PostCard'
 import { EditProfileDialog } from '@/lib/components/EditProfileDialog'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/lib/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 import { RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId } from '@/lib/constants/divination'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
-import { deletePost, getUserPosts, type Post } from '@/lib/services/community'
+import { deletePost, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
   calculateLevel,
   checkIn,
@@ -49,12 +39,16 @@ import {
   hasCheckedInToday,
   type CoinTransaction
 } from '@/lib/services/growth'
-import { getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
-import Link from 'next/link'
+import { deleteDivinationRecord, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { CircularProgress } from './components/CircularProgress'
+import { CoinRulesDialog } from './components/CoinRulesDialog'
+import { DeletePostDialog } from './components/DeletePostDialog'
+import { DeleteRecordDialog } from './components/DeleteRecordDialog'
+import { ExpRulesDialog } from './components/ExpRulesDialog'
 import ProfileSkeleton from './components/ProfileSkeleton'
 import { StatCard } from './components/StatCard'
+import { UserCard } from './components/UserCard'
 
 // -----------------------------------------------------------------------------
 // 样式定义  background-color: #fdfbf7;
@@ -78,6 +72,11 @@ const styles = `
   }
 `
 
+// -----------------------------------------------------------------------------
+// 工具函数
+// -----------------------------------------------------------------------------
+
+
 // --- 主页面组件 ---
 export default function ProfilePage() {
   return (
@@ -98,6 +97,7 @@ function ProfilePageContent() {
   const [favoritePosts, setFavoritePosts] = useState<Post[]>([])
   const [likedPosts, setLikedPosts] = useState<Post[]>([])
   const [postTab, setPostTab] = useState<'mine' | 'fav' | 'liked'>('mine')
+  const [loadingPosts, setLoadingPosts] = useState(false)
   const [divinationRecords, setDivinationRecords] = useState<DivinationRecord[]>([])
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -175,6 +175,18 @@ function ProfilePageContent() {
         setCoinTransactions(transactions)
         setActivityData(dailyActivity)
         setFollowStats(followStatsData)
+        
+        // 预加载收藏和点赞的帖子
+        try {
+          const [favPosts, likedPostsData] = await Promise.all([
+            getUserFavoritePosts({ limit: 50 }),
+            getUserLikedPosts({ limit: 50 })
+          ])
+          setFavoritePosts(favPosts)
+          setLikedPosts(likedPostsData)
+        } catch (error) {
+          console.error('Error loading favorite/liked posts:', error)
+        }
       } catch (e) {
         console.error(e)
       } finally {
@@ -202,6 +214,29 @@ function ProfilePageContent() {
       setLoadingFollows(false)
     }
   }
+
+  // 当切换帖子标签时自动加载
+  useEffect(() => {
+    const loadPostsForTab = async (tab: 'mine' | 'fav' | 'liked') => {
+      if (loadingPosts) return
+      setLoadingPosts(true)
+      try {
+        if (tab === 'fav' && favoritePosts.length === 0) {
+          const posts = await getUserFavoritePosts({ limit: 50 })
+          setFavoritePosts(posts)
+        } else if (tab === 'liked' && likedPosts.length === 0) {
+          const posts = await getUserLikedPosts({ limit: 50 })
+          setLikedPosts(posts)
+        }
+      } catch (error) {
+        console.error('Error loading posts:', error)
+        toast({ title: '加载失败', variant: 'destructive' })
+      } finally {
+        setLoadingPosts(false)
+      }
+    }
+    loadPostsForTab(postTab)
+  }, [postTab, loadingPosts, favoritePosts.length, likedPosts.length, toast])
 
   // 处理取消关注（在我关注的列表中）
   const handleUnfollow = async (userId: string) => {
@@ -274,18 +309,17 @@ function ProfilePageContent() {
         return
       }
 
+      // 确保从数据库读取的 key 格式正确
       const originalKey = String(fullRecord.original_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
       const changedKey = String(fullRecord.changed_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
       
-      let originalHexagram = getHexagramResult(originalKey)
-      let changedHexagram = getHexagramResult(changedKey)
+      // 始终根据 key 重新计算 hexagram，确保顺序正确
+      // 这样可以避免数据库中 JSON 数据顺序可能反了的问题
+      const originalHexagram = getHexagramResult(originalKey)
+      const changedHexagram = getHexagramResult(changedKey)
       
-      if (fullRecord.original_json && typeof fullRecord.original_json === 'object' && 'name' in fullRecord.original_json) {
-        originalHexagram = fullRecord.original_json as { name: string; interpretation: string }
-      }
-      if (fullRecord.changed_json && typeof fullRecord.changed_json === 'object' && 'name' in fullRecord.changed_json) {
-        changedHexagram = fullRecord.changed_json as { name: string; interpretation: string }
-      }
+      // 如果数据库中有保存的 JSON 数据，可以用于补充信息（如 interpretation），但卦名以 key 计算为准
+      // 这样可以确保 original 和 changed 的顺序与 key 一致
 
       const changingLines: number[] = []
       fullRecord.changing_flags.forEach((isChanging, index) => {
@@ -314,7 +348,7 @@ function ProfilePageContent() {
       const resultsListStr = localStorage.getItem(RESULTS_LIST_STORAGE_KEY)
       let resultsList: StoredResultWithId[] = []
       if (resultsListStr) {
-        try { resultsList = JSON.parse(resultsListStr) } catch (e) { resultsList = [] }
+        try { resultsList = JSON.parse(resultsListStr) } catch { resultsList = [] }
       }
       
       resultsList = resultsList.filter(r => r.id !== resultId)
@@ -322,15 +356,34 @@ function ProfilePageContent() {
       localStorage.setItem(RESULTS_LIST_STORAGE_KEY, JSON.stringify(resultsList))
       localStorage.setItem('latestDivinationResult', JSON.stringify(payload))
 
-      router.push(`/6yao/${resultId}`)
-    } catch (error) {
+      router.push(`/6yao/${resultId}?from=profile`)
+    } catch {
       toast({ title: '加载失败', description: '请稍后重试', variant: 'destructive' })
     }
   }
 
-  // Delete handlers... (省略，保持不变)
+  // Delete handlers
   const handleDeleteClick = (id: string) => { setRecordToDelete(id); setDeleteDialogOpen(true) }
-  const handleConfirmDelete = async () => { /* ... */ }
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return
+    setDeleting(true)
+    try {
+      const result = await deleteDivinationRecord(recordToDelete)
+      if (result.success) {
+        setDivinationRecords(prev => prev.filter(r => r.id !== recordToDelete))
+        toast({ title: '删除成功', variant: 'default' })
+      } else {
+        toast({ title: '删除失败', description: result.message, variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Error deleting record:', error)
+      toast({ title: '删除失败', description: '请稍后重试', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+      setDeleteDialogOpen(false)
+      setRecordToDelete(null)
+    }
+  }
   const handleDeletePostClick = (id: string) => { setPostToDelete(id); setDeletePostDialogOpen(true) }
   const handleConfirmDeletePost = async () => { 
       if (!postToDelete) return
@@ -338,8 +391,10 @@ function ProfilePageContent() {
       try {
         await deletePost(postToDelete)
         setUserPosts(prev => prev.filter(p => p.id !== postToDelete))
+        setFavoritePosts(prev => prev.filter(p => p.id !== postToDelete))
+        setLikedPosts(prev => prev.filter(p => p.id !== postToDelete))
         toast({ title: '删除成功', variant: 'default' })
-      } catch (error) {
+      } catch {
         toast({ title: '删除失败', variant: 'destructive' })
       } finally {
         setDeletingPost(false); setDeletePostDialogOpen(false); setPostToDelete(null)
@@ -524,7 +579,7 @@ function ProfilePageContent() {
               value={stats.publishedCases} 
               label="发布案例" 
               colorClass="text-[#C82E31] bg-red-50 rounded-xl"
-              onClick={() => router.push('/6yao')}
+              onClick={() => router.push('/6yao?from=profile')}
               isEmpty={stats.publishedCases === 0}
               actionText="去排盘"
             />
@@ -613,75 +668,55 @@ function ProfilePageContent() {
                 </div>
               </div>
 
-              {/* 帖子列表渲染逻辑 */}
-              {userPosts.length > 0 ? (
-                <div className="space-y-4">
-                  {userPosts.map(post => {
+              {/* 根据当前标签显示对应的帖子列表 */}
+              {(() => {
+                const currentPosts = postTab === 'mine' ? userPosts : postTab === 'fav' ? favoritePosts : likedPosts
+                const isEmpty = currentPosts.length === 0
+                const emptyMessage = postTab === 'mine' 
+                  ? '暂无内容，去发布第一篇帖子吧' 
+                  : postTab === 'fav' 
+                  ? '还没有收藏任何帖子' 
+                  : '还没有点赞任何帖子'
+
+                if (loadingPosts && isEmpty) {
+                  return (
+                    <div className="flex items-center justify-center py-20">
+                      <Loader2 className="h-6 w-6 animate-spin text-[#C82E31]" />
+                    </div>
+                  )
+                }
+
+                if (isEmpty) {
+                  return (
+                    <div className="text-center py-16 bg-stone-50/50 rounded-xl border border-dashed border-stone-200">
+                      <p className="text-stone-400 text-sm">
+                        {postTab === 'mine' ? (
+                          <>暂无内容，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/community/publish')}>发布</span>第一篇帖子吧</>
+                        ) : (
+                          emptyMessage
+                        )}
+                      </p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {currentPosts.map(post => {
                     // 判断是否为求测帖子
                     const isHelp = 
                       ((post.type || post.section || 'chat') as 'help' | 'theory' | 'debate' | 'chat') === 'help' ||
                       !!post.divination_record_id ||
                       (post.bounty && post.bounty > 0)
 
-                    // 从HTML中提取纯文本摘要
-                    const extractTextFromHTML = (html: string, maxLength: number = 100): string => {
-                      if (!html) return ''
-                      let text = html
-                        .replace(/<[^>]*>/g, '') // 移除所有 HTML 标签
-                        .replace(/&nbsp;/g, ' ') // 替换 &nbsp;
-                        .replace(/&amp;/g, '&') // 替换 &amp;
-                        .replace(/&lt;/g, '<') // 替换 &lt;
-                        .replace(/&gt;/g, '>') // 替换 &gt;
-                        .replace(/&quot;/g, '"') // 替换 &quot;
-                        .replace(/&#39;/g, "'") // 替换 &#39;
-                        .replace(/\s+/g, ' ') // 移除多余的空白字符
-                        .trim()
-                      
-                      if (text.length > maxLength) {
-                        text = text.substring(0, maxLength) + '...'
-                      }
-                      return text
-                    }
-
-                    // 针对求测帖：去掉"关联排盘/问题"等前缀，只保留背景描述
-                    const extractHelpBackground = (html: string, maxLength: number = 100): string => {
-                      let text = extractTextFromHTML(html, 1000)
-                      text = text
-                        .replace(/\*\*关联排盘[^*]*\*\*/g, '')
-                        .replace(/\*\*问题[^*]*\*\*/g, '')
-                        .replace(/关联排盘[:：][^\n]*/g, '')
-                        .replace(/问题[:：][^\n]*/g, '')
-                        .replace(/卦(名|象)[:：][^\n]*/g, '')
-                      // 过滤掉可能的空行
-                      text = text
-                        .split(/\n/)
-                        .map(l => l.trim())
-                        .filter(Boolean)
-                        .join(' ')
-                        .trim()
-                      if (text.length > maxLength) {
-                        return text.substring(0, maxLength) + '...'
-                      }
-                      return text
-                    }
-
+                    // 提取内容摘要
                     const rawContent = post.content_html || post.content || ''
                     const excerpt = isHelp 
                       ? extractHelpBackground(rawContent, 100)
                       : extractTextFromHTML(rawContent, 100)
 
                     // 获取卦象信息
-                    const guaInfo = post.divination_record ? {
-                      guaName: post.divination_record.original_key === '111111' ? '乾为天' : 
-                               post.divination_record.original_key === '000000' ? '坤为地' : 
-                               '卦象',
-                      lines: post.divination_record.lines?.map((line: string) => 
-                        line === '-----' || line === '---O---'
-                      ) as boolean[] | undefined,
-                      changingLines: post.divination_record.changing_flags?.map((flag: boolean, index: number) => 
-                        flag ? index + 1 : null
-                      ).filter((x: number | null): x is number => x !== null) || [],
-                    } : null
+                    const guaInfo = getGuaInfo(post.divination_record)
 
                     return (
                       <div key={post.id} className="relative group">
@@ -732,18 +767,20 @@ function ProfilePageContent() {
                     </div>
                     )
                   })}
-                </div>
-              ) : (
-                <div className="text-center py-16 bg-stone-50/50 rounded-xl border border-dashed border-stone-200">
-                  <p className="text-stone-400 text-sm">暂无内容，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/community/publish')}>发布</span>第一篇帖子吧</p>
-                </div>
-              )}
+                  </div>
+                )
+              })()}
             </TabsContent>
 
             {/* 排盘记录 Tab */}
             <TabsContent value="divinations" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {divinationRecords.map((record) => (
+              {divinationRecords.length === 0 ? (
+                <div className="text-center py-16 bg-stone-50/50 rounded-xl border border-dashed border-stone-200">
+                  <p className="text-stone-400 text-sm">暂无排盘记录，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/6yao')}>排盘</span>开始你的易学之旅吧</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {divinationRecords.map((record) => (
                   <div 
                     key={record.id}
                     onClick={() => handleRecordClick(record)}
@@ -778,8 +815,9 @@ function ProfilePageContent() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* 关注 Tab */}
@@ -847,7 +885,7 @@ function ProfilePageContent() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {followingUsers.map((user) => (
-                        <UserCard key={user.id} user={user} onUnfollow={handleUnfollow} />
+                        <UserCard key={user.id} user={user} onUnfollow={handleUnfollow} onFollowChange={handleFollowChange} />
                       ))}
                     </div>
                   )}
@@ -989,416 +1027,34 @@ function ProfilePageContent() {
 
         </div>
 
-        {/* Dialogs (Edit, Delete, etc.) - 保持原有逻辑 */}
+        {/* Dialogs */}
         <EditProfileDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} profile={profile} onUpdate={() => window.location.reload()} />
         
-        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <DialogContent className="bg-white">
-            <DialogHeader><DialogTitle>确认删除</DialogTitle><DialogDescription>此操作不可恢复，确定要删除这条记录吗？</DialogDescription></DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
-              <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>{deleting ? '删除中...' : '确认删除'}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DeleteRecordDialog 
+          open={deleteDialogOpen} 
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleConfirmDelete}
+          deleting={deleting}
+        />
 
-        <Dialog open={deletePostDialogOpen} onOpenChange={setDeletePostDialogOpen}>
-          <DialogContent className="bg-white">
-            <DialogHeader><DialogTitle>确认删除帖子</DialogTitle><DialogDescription>此操作不可恢复。</DialogDescription></DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeletePostDialogOpen(false)}>取消</Button>
-              <Button variant="destructive" onClick={handleConfirmDeletePost} disabled={deletingPost}>{deletingPost ? '删除中...' : '确认删除'}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DeletePostDialog 
+          open={deletePostDialogOpen} 
+          onOpenChange={setDeletePostDialogOpen}
+          onConfirm={handleConfirmDeletePost}
+          deleting={deletingPost}
+        />
 
-        {/* 易币规则对话框 */}
-        <Dialog open={coinRulesDialogOpen} onOpenChange={setCoinRulesDialogOpen}>
-          <DialogContent className="bg-white max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-amber-500" />
-                易币规则说明
-              </DialogTitle>
-              <DialogDescription>了解如何获得和使用易币</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              {/* 什么是易币 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-2">什么是易币？</h4>
-                <p className="text-sm text-stone-600 leading-relaxed">
-                  易币是平台内的虚拟货币，可用于参与社区活动、获取高级功能等。通过完成日常任务和参与社区互动可以获得易币。
-                </p>
-              </div>
+        <CoinRulesDialog 
+          open={coinRulesDialogOpen} 
+          onOpenChange={setCoinRulesDialogOpen}
+        />
 
-              {/* 如何获得易币 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-3">如何获得易币？</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-amber-700">1</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">每日签到</div>
-                      <div className="text-xs text-stone-600">每天首次签到可获得易币奖励，连续签到有额外奖励</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-amber-700">2</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">发布内容</div>
-                      <div className="text-xs text-stone-600">发布帖子、排盘记录等优质内容可获得易币奖励</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-amber-700">3</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">参与互动</div>
-                      <div className="text-xs text-stone-600">评论、点赞、帮助他人等互动行为可获得易币</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-amber-700">4</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">完成任务</div>
-                      <div className="text-xs text-stone-600">完成平台任务、参与活动可获得易币奖励</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 易币用途 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-3">易币用途</h4>
-                <ul className="space-y-2 text-sm text-stone-600">
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-1">•</span>
-                    <span>参与社区悬赏问答</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-1">•</span>
-                    <span>解锁高级功能和服务</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-1">•</span>
-                    <span>兑换平台权益和礼品</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* 注意事项 */}
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <h4 className="text-sm font-semibold text-amber-800 mb-2">注意事项</h4>
-                <ul className="space-y-1 text-xs text-amber-700">
-                  <li>• 易币不可转让或提现</li>
-                  <li>• 易币余额长期有效，不会过期</li>
-                  <li>• 请遵守平台规则，违规行为可能导致易币扣除</li>
-                </ul>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setCoinRulesDialogOpen(false)}>我知道了</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* 经验值规则对话框 */}
-        <Dialog open={expRulesDialogOpen} onOpenChange={setExpRulesDialogOpen}>
-          <DialogContent className="bg-white max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-[#C82E31]" />
-                修业值（经验值）规则说明
-              </DialogTitle>
-              <DialogDescription>了解如何获得修业值和等级提升</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              {/* 什么是修业值 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-2">什么是修业值？</h4>
-                <p className="text-sm text-stone-600 leading-relaxed">
-                  修业值（经验值）是衡量你在易学道路上修行进度的指标。通过完成各种任务和活动可以获得修业值，积累修业值可以提升等级，解锁更多功能和权益。
-                </p>
-              </div>
-
-              {/* 如何获得修业值 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-3">如何获得修业值？</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-red-700">1</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">每日签到</div>
-                      <div className="text-xs text-stone-600">每天首次签到可获得 +10 修业值，连续签到7天额外获得 +50 修业值</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-red-700">2</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">浏览内容</div>
-                      <div className="text-xs text-stone-600">浏览帖子、排盘记录等内容可获得 +5 修业值</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-red-700">3</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">点赞互动</div>
-                      <div className="text-xs text-stone-600">为他人内容点赞可获得 +2 修业值</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-red-700">4</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">发布案例</div>
-                      <div className="text-xs text-stone-600">发布排盘记录可获得 +20 修业值</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-stone-50 rounded-lg">
-                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-red-700">5</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-stone-800 mb-1">发表断语</div>
-                      <div className="text-xs text-stone-600">在社区发表推演断语可获得 +10 修业值</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 等级说明 */}
-              <div>
-                <h4 className="text-base font-bold text-stone-800 mb-3">等级体系</h4>
-                <div className="space-y-2 text-sm text-stone-600">
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.0 游客</strong> - 0 修业值</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.1 初涉易途</strong> - 1 修业值（灰边框）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.2 登堂入室</strong> - 100 修业值（铜边框）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.3 渐入佳境</strong> - 500 修业值（银边框）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.4 触类旁通</strong> - 2000 修业值（银边框+流光）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.5 融会贯通</strong> - 5000 修业值（金边框）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.6 出神入化</strong> - 10000 修业值（金边框+纹饰）</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-[#C82E31] mt-1">•</span>
-                    <span><strong>Lv.7 一代宗师</strong> - 20000 修业值（动态特效边框）</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 注意事项 */}
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <h4 className="text-sm font-semibold text-red-800 mb-2">注意事项</h4>
-                <ul className="space-y-1 text-xs text-red-700">
-                  <li>• 修业值不可转让或交易</li>
-                  <li>• 修业值永久有效，不会过期</li>
-                  <li>• 等级提升后不可降级</li>
-                  <li>• 请遵守平台规则，违规行为可能导致修业值扣除</li>
-                </ul>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setExpRulesDialogOpen(false)}>我知道了</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ExpRulesDialog 
+          open={expRulesDialogOpen} 
+          onOpenChange={setExpRulesDialogOpen}
+        />
 
       </div>
     </>
-  )
-}
-
-// 用户卡片组件
-interface UserCardProps {
-  user: UserProfile
-  onUnfollow?: (userId: string) => void
-  showFollowButton?: boolean
-  onFollowChange?: () => void
-}
-
-const UserCard = ({ user, onUnfollow, showFollowButton = false, onFollowChange }: UserCardProps) => {
-  const { toast } = useToast()
-  const router = useRouter()
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
-  const userLevel = calculateLevel(user.exp || 0)
-  const titleName = getTitleName(user.title_level || 1)
-
-  useEffect(() => {
-    getCurrentUser().then(setCurrentUser)
-  }, [])
-
-  useEffect(() => {
-    const checkFollowStatus = async () => {
-      if (showFollowButton) {
-        try {
-          const { isFollowingUser } = await import('@/lib/services/profile')
-          const status = await isFollowingUser(user.id)
-          setIsFollowing(status)
-        } catch (error) {
-          console.error('Error checking follow status:', error)
-        }
-      }
-    }
-    checkFollowStatus()
-  }, [user.id, showFollowButton])
-
-  const handleFollowToggle = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isLoading) return
-
-    try {
-      setIsLoading(true)
-      const { toggleFollowUser } = await import('@/lib/services/profile')
-      const newStatus = await toggleFollowUser(user.id)
-      setIsFollowing(newStatus)
-      if (onFollowChange) {
-        onFollowChange()
-      }
-      toast({ 
-        title: newStatus ? '已关注' : '已取消关注',
-        description: newStatus ? `现在可以查看 ${user.nickname || '该用户'} 的动态了` : ''
-      })
-    } catch (error) {
-      console.error('Error toggling follow:', error)
-      const errorMessage = error instanceof Error ? error.message : '操作失败'
-      toast({ title: '操作失败', description: errorMessage, variant: 'destructive' })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleUnfollowClick = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (onUnfollow) {
-      onUnfollow(user.id)
-    }
-  }
-
-  const handleMessageClick = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!currentUser) {
-      toast({ title: '请先登录', variant: 'destructive' })
-      router.push(`/login?redirect=${encodeURIComponent(`/messages?userId=${user.id}`)}`)
-      return
-    }
-    if (currentUser.id === user.id) {
-      toast({ title: '不能给自己发私信', variant: 'destructive' })
-      return
-    }
-    router.push(`/messages?userId=${user.id}`)
-  }
-
-  return (
-    <Link href={`/u/${user.id}`} className="block group">
-      <Card className="bg-white border border-stone-200 hover:border-[#C82E31]/30 hover:shadow-md transition-all">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-12 h-12 border-2 border-white shadow-sm group-hover:ring-2 group-hover:ring-[#C82E31]/20 transition-all">
-              <AvatarImage src={user.avatar_url || ''} />
-              <AvatarFallback className="bg-stone-100 text-stone-400 font-serif">
-                {user.nickname?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-stone-800 group-hover:text-[#C82E31] transition-colors truncate">
-                  {user.nickname || '未命名用户'}
-                </h3>
-                <Badge className="text-[10px] bg-stone-800 text-white px-1.5 py-0.5 rounded font-mono">
-                  Lv.{userLevel}
-                </Badge>
-                {titleName && (
-                  <Badge variant="outline" className="text-[10px] text-amber-700 bg-amber-50 border-amber-200">
-                    {titleName}
-                  </Badge>
-                )}
-              </div>
-              {user.motto && (
-                <p className="text-xs text-stone-500 line-clamp-1 font-serif italic">{user.motto}</p>
-              )}
-            </div>
-            <div className="flex gap-2 shrink-0">
-              {currentUser && currentUser.id !== user.id && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-8 border-stone-200 text-stone-600 hover:bg-stone-50"
-                  onClick={handleMessageClick}
-                  title="发送私信"
-                >
-                  <MessageSquare size={12} className="mr-1" />
-                </Button>
-              )}
-              {onUnfollow ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-8"
-                  onClick={handleUnfollowClick}
-                >
-                  取消关注
-                </Button>
-              ) : showFollowButton ? (
-                <Button
-                  variant={isFollowing ? 'outline' : 'default'}
-                  size="sm"
-                  className={`text-xs h-8 ${isFollowing ? 'bg-stone-100 text-stone-600 hover:bg-stone-200' : 'bg-[#C0392B] text-white hover:bg-[#A93226]'}`}
-                  onClick={handleFollowToggle}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : isFollowing ? (
-                    '已关注'
-                  ) : (
-                    <>
-                      <UserPlus size={12} className="mr-1" /> 关注
-                    </>
-                  )}
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
   )
 }

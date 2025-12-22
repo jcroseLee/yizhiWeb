@@ -20,6 +20,7 @@ import {
 import { RESULT_STORAGE_KEY, RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId } from '@/lib/constants/divination'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useAlert } from '@/lib/utils/alert'
+import { buildChangedLines, linesToBinaryString } from '@/lib/utils/divinationLineUtils'
 import { getGanZhiInfo } from '@/lib/utils/lunar'
 
 // Components
@@ -217,15 +218,10 @@ export default function ToolsPage() {
     setLines(castLines)
     setChangingFlags(castChangingFlags)
     
-    // 计算结果逻辑
-    const binaryLines = castLines.map(line => (line === '-----' || line === '---X---') ? '0' : '1').join('')
-    const changedLines = castLines.map((line, index) => {
-      if (!castChangingFlags[index]) return line
-      if (line === '---X---') return '-- --'
-      if (line === '---O---') return '-----'
-      return line === '-----' ? '-- --' : '-----'
-    })
-    const changedBinaryLines = changedLines.map(line => (line === '-----' || line === '---X---') ? '0' : '1').join('')
+    // 计算结果逻辑 - 使用统一的工具函数
+    const binaryLines = linesToBinaryString(castLines)
+    const changedLines = buildChangedLines(castLines, castChangingFlags)
+    const changedBinaryLines = linesToBinaryString(changedLines)
 
     const result = {
       originalKey: binaryLines,

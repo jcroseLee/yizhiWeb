@@ -1,4 +1,5 @@
 import { HEX_64_DATA, LIU_SHEN_ORDER, LIU_SHEN_START, NAJIA_RULES, ZHI_WX } from '@/lib/constants/liuyaoConstants'
+import { lineToNumber } from './divinationLineUtils'
 
 const ANIMAL_SHORT_NAMES: Record<string, string> = {
   '青龙': '龙', '朱雀': '雀', '勾陈': '勾', '螣蛇': '蛇', '白虎': '虎', '玄武': '玄'
@@ -25,26 +26,20 @@ export type ShenShaItem = { name: string; value: string }
 export type HexagramNature = { nature: string; element: string }
 export type HexagramFullInfo = { fullName: string | null; soulType: string }
 
-// 解析工具
-// 标准定义：'-- --' = 少阳（阳爻），'-----' = 少阴（阴爻）
-// 数字映射：7 = 少阳（阳爻），8 = 少阴（阴爻），6 = 老阴，9 = 老阳
+// 解析工具 - 使用统一的工具函数，保留向后兼容
 function parseLineToNumber(line: string | undefined | null): number {
-  if (!line) return 7 // 默认少阳，可根据需求改为0或抛错
-  // 增加对单纯数字字符串的支持 "6", "9"
+  if (!line) return 7 // 默认少阳
+  // 支持纯数字字符串
   if (/^[6789]$/.test(line.trim())) {
-    return parseInt(line.trim(), 10)
+    return parseInt(line.trim(), 10) as 6 | 7 | 8 | 9
   }
+  // 从字符串中提取数字
   if (/\d/.test(line)) {
     const n = parseInt(line.replace(/\D/g, ''), 10)
-    if (!Number.isNaN(n)) return n
+    if (!Number.isNaN(n) && [6, 7, 8, 9].includes(n)) return n as 6 | 7 | 8 | 9
   }
-  // 关键词匹配
-  if (line.includes('X') || line.includes('老阴') || line.includes('交')) return 6
-  if (line.includes('O') || line.includes('老阳') || line.includes('重')) return 9
-  // 修正：'-- --' = 少阳（阳爻）= 7，'-----' = 少阴（阴爻）= 8
-  if (line.includes('-- --') || line.includes('少阳') || line.includes('单')) return 7
-  if (line.includes('-----') || line.includes('少阴') || line.includes('拆')) return 8
-  return 7
+  // 使用统一的工具函数
+  return lineToNumber(line)
 }
 
 // 核心修复：六亲算法
@@ -373,78 +368,121 @@ export const getFuShenAndGuaShen = (
   gongElement: string // 传入宫位五行，如"金"
 ) => {
   const hexData = HEX_64_DATA[hexagramKey]
-  if (!hexData) return { fuShenMap: {}, guaShen: '' }
+  // 必须确保 HEX_64_DATA 包含世爻(shi)的位置信息 (1-6)
+  if (!hexData || !lineDetails || lineDetails.length !== 6) {
+    return { fuShenMap: {}, guaShen: '', guaShenLineIndex: null }
+  }
   
-  const lowerBin = hexagramKey.substring(0, 3)
-  const lowerNajia = NAJIA_RULES[lowerBin]?.inner || NAJIA_RULES['111'].inner
+  // ==========================================
+  // 1. 修正后的卦身计算 (Gua Shen)
+  // ==========================================
+  // 卦身排布口诀：阳世则从子月起，阴世则从午月生
+  // 阳世序列：子、寅、辰、午、申、戌
+  // 阴世序列：午、申、戌、子、寅、辰
   
-  // 1. 计算卦身
-  const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
-  const lowerFirstZhi = lowerNajia.z[0]
-  const lowerFirstZhiIndex = zhiOrder.indexOf(lowerFirstZhi)
-  const guaShenZhiIndex = (lowerFirstZhiIndex + 5) % 12
-  const guaShenZhi = zhiOrder[guaShenZhiIndex]
+  const yangShiSeq = ['子', '寅', '辰', '午', '申', '戌'] // 阳世序列
+  const yinShiSeq = ['午', '申', '戌', '子', '寅', '辰'] // 阴世序列
   
+  // 获取世爻的位置（注意：hexData[2] 是世爻位置，通常是 1-6，数组索引是 0-5）
+  const shiPos = hexData[2] || 1
+  const shiIndex = shiPos - 1 // 转换为数组索引（0-5）
+  
+  // 确定世爻位的阴阳属性
+  // hexagramKey 字符串顺序为：索引0=初爻 ... 索引5=上爻
+  // 1=阳，0=阴
+  const shiYaoYinYang = hexagramKey[shiIndex] || '1'
+  
+  // 根据世爻的阴阳属性选择对应的序列
+  const guaShenZhi = shiYaoYinYang === '1' 
+    ? yangShiSeq[shiIndex] 
+    : yinShiSeq[shiIndex]
+  
+  // 在本卦中查找卦身是否存在
   let guaShen = ''
   let guaShenLineIndex: number | null = null
   for (let i = 0; i < lineDetails.length; i++) {
     if (lineDetails[i].branch === guaShenZhi) {
       guaShen = `${lineDetails[i].relationShort}${lineDetails[i].branch}${lineDetails[i].element}`
       guaShenLineIndex = i
-      break
+      break // 通常只取出现的第一个，或者根据具体流派取离世爻最近的
     }
   }
   
-  // 2. 计算伏神
+  // ==========================================
+  // 2. 计算伏神 (Fu Shen)
+  // ==========================================
   const existingRelations = new Set(lineDetails.map(d => d.relation))
   const allRelations = ['父母', '兄弟', '子孙', '妻财', '官鬼']
+  // 找出本卦中缺失的六亲
   const missingRelations = allRelations.filter(r => !existingRelations.has(r))
-  
-  // 确定本宫卦 Key
-  const gongToPure: Record<string, string> = {
-    '乾宫': '111111', '坤宫': '000000', '震宫': '100100', '巽宫': '011011',
-    '坎宫': '010010', '离宫': '101101', '艮宫': '001001', '兑宫': '110110',
-  }
-  
-  const pureKey = gongToPure[gongNature] || '111111'
-  
-  // 计算本宫卦六亲
-  const pureLowerBin = pureKey.substring(0, 3)
-  const pureUpperBin = pureKey.substring(3, 6)
-  const pureDetails: Array<{ relation: string; branch: string; element: string }> = []
-  
-  const promotes: Record<string, string> = { '金': '水', '水': '木', '木': '火', '火': '土', '土': '金' }
-  const controls: Record<string, string> = { '金': '木', '木': '土', '土': '水', '水': '火', '火': '金' }
 
-  for (let i = 0; i < 6; i++) {
-    const isUpper = i >= 3
-    const localIdx = i % 3
-    const trigramBin = isUpper ? pureUpperBin : pureLowerBin
-    const najiaObj = NAJIA_RULES[trigramBin] || NAJIA_RULES['111']
-    const najiaData = isUpper ? najiaObj.outer : najiaObj.inner
-    const zhi = najiaData.z[localIdx]
-    const wuxing = ZHI_WX[zhi] || '水'
-    
-    let relation = '兄弟'
-    if (gongElement === wuxing) relation = '兄弟'
-    else if (promotes[gongElement] === wuxing) relation = '子孙'
-    else if (promotes[wuxing] === gongElement) relation = '父母'
-    else if (controls[gongElement] === wuxing) relation = '妻财'
-    else if (controls[wuxing] === gongElement) relation = '官鬼'
-    
-    pureDetails.push({ relation, branch: zhi, element: wuxing })
-  }
-  
   const fuShenMap: Record<number, string> = {}
-  for (const missingRel of missingRelations) {
-    for (let i = 0; i < pureDetails.length; i++) {
-      if (pureDetails[i].relation === missingRel) {
-        const relShort = missingRel === '父母' ? '父' : missingRel === '兄弟' ? '兄' : missingRel === '子孙' ? '孙' : missingRel === '妻财' ? '财' : '官'
-        fuShenMap[i] = `${relShort} ${pureDetails[i].branch}${pureDetails[i].element}`
-        break
+
+  // 如果有缺失的六亲，才去查本宫卦
+  if (missingRelations.length > 0) {
+    // 确定本宫卦 Key (二进制 0为阴 1为阳)
+    // 这里的 Key 必须对应八纯卦：乾坎艮震巽离坤兑
+    const gongToPure: Record<string, string> = {
+      '乾宫': '111111', // 乾为天
+      '坤宫': '000000', // 坤为地
+      '震宫': '100100', // 震为雷 (初爻阳)
+      '巽宫': '011011', // 巽为风 (初爻阴)
+      '坎宫': '010010', // 坎为水 (初爻阴，二爻阳)
+      '离宫': '101101', // 离为火 (初爻阳，二爻阴)
+      '艮宫': '001001', // 艮为山 (三爻阳)
+      '兑宫': '110110', // 兑为泽 (三爻阴)
+    }
+  
+    const pureKey = gongToPure[gongNature] || '111111'
+    
+    // 解析本宫卦的纳甲信息
+    // 注意：binary 字符串索引 0-2 为下卦，3-5 为上卦 (假设字符串是 初爻->上爻)
+    const pureLowerBin = pureKey.substring(0, 3)
+    const pureUpperBin = pureKey.substring(3, 6)
+    const pureDetails: Array<{ relation: string; branch: string; element: string }> = []
+  
+    const promotes: Record<string, string> = { '金': '水', '水': '木', '木': '火', '火': '土', '土': '金' }
+    const controls: Record<string, string> = { '金': '木', '木': '土', '土': '水', '水': '火', '火': '金' }
+
+    for (let i = 0; i < 6; i++) {
+      const isUpper = i >= 3
+      const localIdx = i % 3
+      const trigramBin = isUpper ? pureUpperBin : pureLowerBin
+      
+      // 安全获取纳甲规则
+      const najiaObj = NAJIA_RULES[trigramBin] || NAJIA_RULES['111']
+      if (!najiaObj) continue
+
+      const najiaData = isUpper ? najiaObj.outer : najiaObj.inner
+      const zhi = najiaData.z[localIdx]
+      const wuxing = ZHI_WX[zhi] || '水' // 使用外部 ZHI_WX，如果不存在则默认'水'
+      
+      // 根据本宫的五行属性重新定六亲
+      let relation = '兄弟'
+      if (gongElement === wuxing) relation = '兄弟'
+      else if (promotes[gongElement] === wuxing) relation = '子孙'
+      else if (promotes[wuxing] === gongElement) relation = '父母'
+      else if (controls[gongElement] === wuxing) relation = '妻财'
+      else if (controls[wuxing] === gongElement) relation = '官鬼'
+      
+      pureDetails.push({ relation, branch: zhi, element: wuxing })
+    }
+    
+    // 映射伏神：将缺失的六亲映射到本卦对应的爻位上
+    for (const missingRel of missingRelations) {
+      // 在本宫卦中从初爻向上寻找
+      for (let i = 0; i < pureDetails.length; i++) {
+        if (pureDetails[i].relation === missingRel) {
+          const relShort = missingRel === '父母' ? '父' : missingRel === '兄弟' ? '兄' : missingRel === '子孙' ? '孙' : missingRel === '妻财' ? '财' : '官'
+          // i 是本宫卦的第几爻，伏神就伏在主卦的第 i 爻下
+          fuShenMap[i] = `${relShort} ${pureDetails[i].branch}${pureDetails[i].element}`
+          // 找到第一个即停止（通常伏神只取一个最旺或最靠下的）
+          break
+        }
       }
     }
   }
   
+  // 如果本卦中找不到卦身，guaShen 为空字符串，表示卦身不上卦
   return { fuShenMap, guaShen: guaShen || '', guaShenLineIndex }
 }

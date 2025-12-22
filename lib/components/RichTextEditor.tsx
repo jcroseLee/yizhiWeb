@@ -198,6 +198,10 @@ export default function RichTextEditor({
           })
 
         if (fallbackError) {
+          // Provide helpful error message for missing buckets
+          if (fallbackError.message?.includes('Bucket not found') || fallbackError.message?.includes('bucket')) {
+            throw new Error('存储桶未创建。请在 Supabase Dashboard 中创建 "posts" 和 "avatars" 存储桶，或运行数据库迁移。')
+          }
           throw fallbackError
         }
 

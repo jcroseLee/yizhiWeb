@@ -55,6 +55,10 @@ export async function uploadPostCover(file: File): Promise<string | null> {
 
       if (fallbackError) {
         console.error('Error uploading cover image:', fallbackError)
+        // Provide helpful error message for missing buckets
+        if (fallbackError.message?.includes('Bucket not found') || fallbackError.message?.includes('bucket')) {
+          throw new Error('存储桶未创建。请在 Supabase Dashboard 中创建 "posts" 和 "avatars" 存储桶，或运行数据库迁移。')
+        }
         throw fallbackError
       }
 
@@ -701,6 +705,244 @@ export async function getUserPosts(options?: {
     return {
       ...post,
       author,
+      is_liked: likedPostIds.includes(post.id),
+      is_favorited: favoritedPostIds.includes(post.id),
+      divination_record: divinationRecord,
+    }
+  })
+}
+
+/**
+ * 获取用户收藏的帖子列表
+ */
+export async function getUserFavoritePosts(options?: {
+  limit?: number
+  offset?: number
+}): Promise<Post[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const {
+    limit = 50,
+    offset = 0,
+  } = options || {}
+
+  // 先获取用户收藏的帖子ID列表
+  const { data: favorites, error: favoritesError } = await supabase
+    .from('post_favorites')
+    .select('post_id')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (favoritesError) {
+    console.error('Error fetching favorite posts:', favoritesError)
+    throw favoritesError
+  }
+
+  if (!favorites || favorites.length === 0) {
+    return []
+  }
+
+  const postIds = favorites.map(f => f.post_id)
+
+  // 查询帖子详情，同时获取关联的排盘记录
+  const { data: posts, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      *,
+      divination_records (
+        id,
+        original_key,
+        changed_key,
+        lines,
+        changing_flags
+      )
+    `)
+    .in('id', postIds)
+    .order('created_at', { ascending: false })
+
+  if (postsError) {
+    console.error('Error fetching posts:', postsError)
+    throw postsError
+  }
+
+  if (!posts || posts.length === 0) {
+    return []
+  }
+
+  // 获取所有唯一的 user_id
+  const userIds = [...new Set(posts.map((post: any) => post.user_id).filter(Boolean))]
+
+  // 批量查询用户信息
+  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .in('id', userIds)
+
+    if (profiles) {
+      profiles.forEach((profile: any) => {
+        profilesMap.set(profile.id, profile)
+      })
+    }
+  }
+
+  // 获取当前用户点赞的帖子ID列表
+  let likedPostIds: string[] = []
+  let favoritedPostIds: string[] = postIds
+  const [likesResult] = await Promise.all([
+    supabase
+      .from('post_likes')
+      .select('post_id')
+      .eq('user_id', currentUser.id)
+      .in('post_id', postIds),
+  ])
+
+  likedPostIds = likesResult.data?.map(l => l.post_id) || []
+
+  // 格式化数据并合并用户信息
+  return posts.map((post: any) => {
+    // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
+    let divinationRecord = null
+    if (post.divination_records) {
+      if (Array.isArray(post.divination_records)) {
+        divinationRecord = post.divination_records.length > 0 ? post.divination_records[0] : null
+      } else {
+        divinationRecord = post.divination_records
+      }
+    }
+
+    return {
+      ...post,
+      author: profilesMap.get(post.user_id) || null,
+      is_liked: likedPostIds.includes(post.id),
+      is_favorited: favoritedPostIds.includes(post.id),
+      divination_record: divinationRecord,
+    }
+  })
+}
+
+/**
+ * 获取用户点赞的帖子列表
+ */
+export async function getUserLikedPosts(options?: {
+  limit?: number
+  offset?: number
+}): Promise<Post[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const {
+    limit = 50,
+    offset = 0,
+  } = options || {}
+
+  // 先获取用户点赞的帖子ID列表
+  const { data: likes, error: likesError } = await supabase
+    .from('post_likes')
+    .select('post_id')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (likesError) {
+    console.error('Error fetching liked posts:', likesError)
+    throw likesError
+  }
+
+  if (!likes || likes.length === 0) {
+    return []
+  }
+
+  const postIds = likes.map(l => l.post_id)
+
+  // 查询帖子详情，同时获取关联的排盘记录
+  const { data: posts, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      *,
+      divination_records (
+        id,
+        original_key,
+        changed_key,
+        lines,
+        changing_flags
+      )
+    `)
+    .in('id', postIds)
+    .order('created_at', { ascending: false })
+
+  if (postsError) {
+    console.error('Error fetching posts:', postsError)
+    throw postsError
+  }
+
+  if (!posts || posts.length === 0) {
+    return []
+  }
+
+  // 获取所有唯一的 user_id
+  const userIds = [...new Set(posts.map((post: any) => post.user_id).filter(Boolean))]
+
+  // 批量查询用户信息
+  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .in('id', userIds)
+
+    if (profiles) {
+      profiles.forEach((profile: any) => {
+        profilesMap.set(profile.id, profile)
+      })
+    }
+  }
+
+  // 获取当前用户收藏的帖子ID列表
+  let likedPostIds: string[] = postIds
+  let favoritedPostIds: string[] = []
+  const [favoritesResult] = await Promise.all([
+    supabase
+      .from('post_favorites')
+      .select('post_id')
+      .eq('user_id', currentUser.id)
+      .in('post_id', postIds),
+  ])
+
+  favoritedPostIds = favoritesResult.data?.map(f => f.post_id) || []
+
+  // 格式化数据并合并用户信息
+  return posts.map((post: any) => {
+    // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
+    let divinationRecord = null
+    if (post.divination_records) {
+      if (Array.isArray(post.divination_records)) {
+        divinationRecord = post.divination_records.length > 0 ? post.divination_records[0] : null
+      } else {
+        divinationRecord = post.divination_records
+      }
+    }
+
+    return {
+      ...post,
+      author: profilesMap.get(post.user_id) || null,
       is_liked: likedPostIds.includes(post.id),
       is_favorited: favoritedPostIds.includes(post.id),
       divination_record: divinationRecord,

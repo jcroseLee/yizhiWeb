@@ -133,7 +133,7 @@ const BOOKS = [
     title: '梅花易数',
     author: '邵康节',
     dynasty: '宋',
-    category: '占卜',
+    category: '推演',
     status: '全本',
     progress: 0,
     color: 'bg-[#F0F0ED]',

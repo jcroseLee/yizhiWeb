@@ -30,7 +30,10 @@ export default function ConditionalLayout({
         
         {/* 主内容区 */}
         <main className="flex-1 overflow-hidden relative z-0 h-full paper-texture">
-          <div className="h-full overflow-y-auto overflow-x-hidden">
+          <div
+            id="app-scroll-container"
+            className="h-full overflow-y-auto overflow-x-hidden"
+          >
             {children}
           </div>
         </main>

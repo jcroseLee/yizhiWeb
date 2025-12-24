@@ -29,6 +29,7 @@ const styles = `
     background-color: #fafaf9; /* stone-50 */
   }
 
+  /* 多行文本截断 */
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -45,49 +46,26 @@ const styles = `
 `
 
 // -----------------------------------------------------------------------------
-// 工具函数
+// 工具函数 (提取纯文本/卦象信息)
 // -----------------------------------------------------------------------------
 
-/**
- * 从HTML中提取纯文本摘要（支持 SSR）
- */
+/** 从HTML中提取纯文本 */
 export function extractTextFromHTML(html: string, maxLength: number = 100): string {
   if (!html) return ''
-  
-  // 在客户端使用 DOM API，在服务端使用正则表达式
   if (typeof window !== 'undefined') {
-    // 客户端：使用 DOM API
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = html
     let text = tempDiv.textContent || tempDiv.innerText || ''
     text = text.replace(/\s+/g, ' ').trim()
-    if (text.length > maxLength) {
-      text = text.substring(0, maxLength) + '...'
-    }
-    return text
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
   } else {
-    // 服务端：使用正则表达式移除 HTML 标签
-    let text = html
-      .replace(/<[^>]*>/g, '') // 移除所有 HTML 标签
-      .replace(/&nbsp;/g, ' ') // 替换 &nbsp;
-      .replace(/&amp;/g, '&') // 替换 &amp;
-      .replace(/&lt;/g, '<') // 替换 &lt;
-      .replace(/&gt;/g, '>') // 替换 &gt;
-      .replace(/&quot;/g, '"') // 替换 &quot;
-      .replace(/&#39;/g, "'") // 替换 &#39;
-      .replace(/\s+/g, ' ') // 移除多余的空白字符
-      .trim()
-    
-    if (text.length > maxLength) {
-      text = text.substring(0, maxLength) + '...'
-    }
-    return text
+    // SSR fallback (简易正则)
+    const text = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
   }
 }
 
-/**
- * 针对求测帖：去掉"关联排盘/问题"等前缀，只保留背景描述
- */
+/** 提取求测背景 (去除固定前缀) */
 export function extractHelpBackground(html: string, maxLength: number = 100): string {
   let text = extractTextFromHTML(html, 1000)
   text = text
@@ -96,64 +74,37 @@ export function extractHelpBackground(html: string, maxLength: number = 100): st
     .replace(/关联排盘[:：][^\n]*/g, '')
     .replace(/问题[:：][^\n]*/g, '')
     .replace(/卦(名|象)[:：][^\n]*/g, '')
-  // 过滤掉可能的空行
-  text = text
-    .split(/\n/)
-    .map(l => l.trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim()
-  if (text.length > maxLength) {
-    return text.substring(0, maxLength) + '...'
-  }
-  return text
+    .split(/\n/).map(l => l.trim()).filter(Boolean).join('\n').trim()
+  
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
 }
 
-/**
- * 获取卦象信息 - 与社区页面保持一致
- */
+/** 解析排盘记录为卦象信息 */
 export function getGuaInfo(divinationRecord: {
   original_key?: string
   lines?: string[]
   changing_flags?: boolean[]
 } | null | undefined) {
   if (!divinationRecord) return null
-
-  // 优先使用 original_key 构建（与社区页面一致）
   const originalKey = String(divinationRecord.original_key || '').replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
-  
   if (originalKey.length !== 6) return null
 
-  // 获取卦名（使用共享的常量）
   const guaName = HEXAGRAM_FULL_NAMES[originalKey] || '未知卦'
-
-  // 构建 lines 数组（从下往上：初爻=0，上爻=5，但显示时需要从上往下）
-  // GuaBlock 从上往下显示，所以需要反转
   const lines: boolean[] = []
-  for (let i = 0; i < 6; i++) {
-    lines.push(originalKey[i] === '1')
-  }
-  // 反转顺序，从上爻到初爻（GuaBlock 从上往下显示）
-  lines.reverse()
+  for (let i = 0; i < 6; i++) lines.push(originalKey[i] === '1')
+  lines.reverse() // 上爻在上
 
-  // 获取变爻索引（changing_flags 是从下往上：第0位是初爻，第5位是上爻）
   const changingLines: number[] = []
   const changingFlags = divinationRecord.changing_flags || []
   for (let i = 0; i < changingFlags.length && i < 6; i++) {
-    if (changingFlags[i]) {
-      changingLines.push(i)
-    }
+    if (changingFlags[i]) changingLines.push(i)
   }
 
-  return {
-    guaName,
-    lines,
-    changingLines,
-  }
+  return { guaName, lines, changingLines }
 }
 
 // -----------------------------------------------------------------------------
-// 类型定义 (保持不变)
+// 类型与配置
 // -----------------------------------------------------------------------------
 export interface Post {
   id: string
@@ -174,7 +125,6 @@ export interface Post {
   isFavorited?: boolean
 }
 
-// 帖子类型配置
 const POST_TYPE_CONFIG = {
   theory: { label: '论道', color: 'bg-blue-50 text-blue-600 border-blue-100' },
   help: { label: '悬卦', color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -183,9 +133,8 @@ const POST_TYPE_CONFIG = {
 }
 
 // -----------------------------------------------------------------------------
-// 主组件
+// PostCard 组件
 // -----------------------------------------------------------------------------
-
 export default function PostCard({ post }: { post: Post }) {
   const { toast } = useToast()
   const router = useRouter()
@@ -206,8 +155,7 @@ export default function PostCard({ post }: { post: Post }) {
   }, [])
   
   const handleLike = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation();
     if (isLiking) return
     try {
       setIsLiking(true)
@@ -216,38 +164,32 @@ export default function PostCard({ post }: { post: Post }) {
       setLikeCount(prev => prev + (nextLiked ? 1 : -1))
     } catch (error) {
       console.error(error)
-      toast({ title: '操作失败', description: '无法执行点赞操作', variant: 'destructive' })
+      toast({ title: '操作失败', variant: 'destructive' })
     } finally {
       setIsLiking(false)
     }
   }
 
   const handleFavorite = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation();
     if (isFavoriting) return
     try {
       setIsFavoriting(true)
       const nextFavorited = await togglePostFavorite(post.id)
       setFavorited(nextFavorited)
-      toast({ 
-        title: nextFavorited ? '已收藏' : '已取消收藏',
-        description: nextFavorited ? '帖子已添加到收藏' : '帖子已从收藏中移除'
-      })
+      toast({ title: nextFavorited ? '已收藏' : '已取消收藏' })
     } catch (error) {
       console.error(error)
-      toast({ title: '操作失败', description: '无法执行收藏操作', variant: 'destructive' })
+      toast({ title: '操作失败', variant: 'destructive' })
     } finally {
       setIsFavoriting(false)
     }
   }
 
   const handleMessageClick = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation();
     if (!post.author.id) return
     if (!currentUser) {
-      toast({ title: '请先登录', variant: 'destructive' })
       router.push(`/login?redirect=${encodeURIComponent(`/messages?userId=${post.author.id}`)}`)
       return
     }
@@ -262,22 +204,22 @@ export default function PostCard({ post }: { post: Post }) {
     <>
     <style jsx global>{styles}</style>
     
-    <div className="paper-card group relative py-6 px-5 first:rounded-t-xl last:rounded-b-xl last:border-b-0">
+    {/* 容器：移动端紧凑 (py-4)，大屏宽松 (sm:py-6) */}
+    <div className="paper-card group relative py-4 px-4 sm:py-6 sm:px-5 first:rounded-t-xl last:rounded-b-xl last:border-b-0">
       
-      {/* 主要内容区域 */}
-      <div className="flex gap-6 items-start">
+      {/* 布局：移动端垂直堆叠 (flex-col)，大屏水平排列 (sm:flex-row) */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 items-start">
         
-        {/* 左侧：文本内容 (Flex-1) */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2">
+        {/* 左侧 (移动端为上方)：文本信息 */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2 w-full">
           
-          {/* 1. 标题 (核心焦点) */}
+          {/* 1. 标题 */}
           <Link href={`/community/${post.id}`} className="block group/title">
-            <h3 className="text-[19px] leading-snug font-bold text-[#1c1c1c] group-hover/title:text-[#C82E31] transition-colors font-serif tracking-tight mb-1">
-              {/* 帖子类型标签 */}
+            {/* 字号适配：移动端 17px，大屏 19px */}
+            <h3 className="text-[17px] sm:text-[19px] leading-snug font-bold text-[#1c1c1c] group-hover/title:text-[#C82E31] transition-colors font-serif tracking-tight mb-1">
               <span className={`inline-flex items-center align-middle mr-2 px-1.5 py-0.5 rounded text-xs font-normal border ${typeConfig.color}`}>
                 {typeConfig.label}
               </span>
-              {/* 悬赏标签 (仅当 > 0 时显示) */}
               {hasBounty && (
                 <span className="inline-flex items-center align-middle mr-2 px-1.5 py-0.5 rounded text-xs font-normal bg-amber-50 text-amber-700 border border-amber-200">
                   <Coins className="w-3 h-3 mr-0.5 fill-amber-500 text-amber-600" />
@@ -288,43 +230,35 @@ export default function PostCard({ post }: { post: Post }) {
             </h3>
           </Link>
           
-          {/* 2. 摘要 (吸引阅读) */}
+          {/* 2. 摘要 */}
           <Link href={`/community/${post.id}`} className="block cursor-pointer">
-            <p className={`text-[15px] text-[#4a4a4a] leading-relaxed hover:text-[#2c2c2c] transition-colors ${showMedia ? 'line-clamp-3' : 'line-clamp-2'}`}>
+            <p className={`text-[14px] sm:text-[15px] text-[#4a4a4a] leading-relaxed hover:text-[#2c2c2c] transition-colors ${showMedia ? 'line-clamp-3' : 'line-clamp-2'}`}>
               {post.excerpt}
             </p>
           </Link>
           
-          {/* 3. 底部信息栏 (作者 + 数据) */}
-          <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-4 text-xs text-stone-400">
-              {/* 作者信息 (简化) */}
-              {post.author.id ? (
-                <Link href={`/u/${post.author.id}`} className="flex items-center gap-2 group/author cursor-pointer">
-                  <Avatar className="w-5 h-5 border border-stone-100 group-hover/author:ring-2 group-hover/author:ring-[#C82E31]/20 transition-all">
-                    {post.author.avatar && <AvatarImage src={post.author.avatar} />}
-                    <AvatarFallback className="text-[9px] bg-stone-100">{post.author.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <span className="group-hover/author:text-[#C82E31] transition-colors">{post.author.name}</span>
-                  <span className="text-stone-300">•</span>
-                  <span>{post.time}</span>
-                </Link>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Avatar className="w-5 h-5 border border-stone-100">
-                    {post.author.avatar && <AvatarImage src={post.author.avatar} />}
-                    <AvatarFallback className="text-[9px] bg-stone-100">{post.author.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <span>{post.author.name}</span>
-                  <span className="text-stone-300">•</span>
-                  <span>{post.time}</span>
-                </div>
-              )}
+          {/* 3. 底部信息栏 (作者 + 按钮) */}
+          <div className="flex flex-wrap items-center justify-between mt-2 gap-y-2">
+            
+            {/* 作者信息 */}
+            <div className="flex items-center gap-3 sm:gap-4 text-xs text-stone-400">
+              <div className="flex items-center gap-2 group/author">
+                <Avatar className="w-5 h-5 border border-stone-100 group-hover/author:ring-2 group-hover/author:ring-[#C82E31]/20 transition-all">
+                  {post.author.avatar && <AvatarImage src={post.author.avatar} />}
+                  <AvatarFallback className="text-[9px] bg-stone-100">{post.author.name[0]}</AvatarFallback>
+                </Avatar>
+                {/* 移动端截断长名字 */}
+                <span className="group-hover/author:text-[#C82E31] transition-colors max-w-[80px] truncate sm:max-w-none">
+                  {post.author.name}
+                </span>
+                <span className="text-stone-300">•</span>
+                <span>{post.time}</span>
+              </div>
               
-              {/* 标签 */}
+              {/* 标签 (移动端空间不足时，自动隐藏多余标签) */}
               {post.tags.length > 0 && (
                 <div className="hidden sm:flex items-center gap-2">
-                  {post.tags.map((tag, i) => (
+                  {post.tags.slice(0, 3).map((tag, i) => (
                     <span key={i} className="bg-stone-50 px-1.5 py-0.5 rounded text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer">
                       {tag}
                     </span>
@@ -333,13 +267,10 @@ export default function PostCard({ post }: { post: Post }) {
               )}
             </div>
 
-            {/* 操作按钮 (Hover 时高亮) */}
-            <div className="flex items-center gap-4">
+            {/* 操作按钮组 (自动换行) */}
+            <div className="flex items-center gap-2 sm:gap-4 ml-auto">
                <Button 
-                 variant="ghost"
-                 size="sm"
-                 onClick={handleLike}
-                 disabled={isLiking}
+                 variant="ghost" size="sm" onClick={handleLike} disabled={isLiking}
                  className={`h-6 px-1.5 text-xs gap-1 hover:bg-transparent ${liked ? 'text-[#C82E31]' : 'text-stone-400 hover:text-stone-600'}`}
                >
                  <Heart className={`w-3.5 h-3.5 ${liked ? 'fill-current' : ''}`} /> 
@@ -347,40 +278,21 @@ export default function PostCard({ post }: { post: Post }) {
                </Button>
                
                <Button 
-                 variant="ghost"
-                 size="sm"
-                 onClick={handleFavorite}
-                 disabled={isFavoriting}
+                 variant="ghost" size="sm" onClick={handleFavorite} disabled={isFavoriting}
                  className={`h-6 px-1.5 text-xs gap-1 hover:bg-transparent ${favorited ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}
                >
                  <Bookmark className={`w-3.5 h-3.5 ${favorited ? 'fill-current' : ''}`} /> 
-                 收藏
+                 <span className="hidden sm:inline">收藏</span>
                </Button>
                
                <Link href={`/community/${post.id}#comments`}>
-                 <Button 
-                   variant="ghost"
-                   size="sm"
-                   className="h-6 px-1.5 text-xs gap-1 text-stone-400 hover:text-stone-600 hover:bg-transparent"
-                 >
+                 <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs gap-1 text-stone-400 hover:text-stone-600 hover:bg-transparent">
                    <MessageSquare className="w-3.5 h-3.5" /> 
                    {post.stats.comments > 0 ? post.stats.comments : '评论'}
                  </Button>
                </Link>
 
-               {/* 私信按钮 - 仅当有作者ID且不是自己时显示 */}
-               {post.author.id && currentUser && currentUser.id !== post.author.id && (
-                 <Button 
-                   variant="ghost"
-                   size="sm"
-                   onClick={handleMessageClick}
-                   className="h-6 px-1.5 text-xs gap-1 text-stone-400 hover:text-stone-600 hover:bg-transparent"
-                   title="发送私信"
-                 >
-                   <MessageSquare className="w-3.5 h-3.5" />
-                 </Button>
-               )}
-
+               {/* 更多菜单 (举报) */}
                <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6 text-stone-300 hover:text-stone-600">
@@ -393,13 +305,8 @@ export default function PostCard({ post }: { post: Post }) {
                     targetType="post"
                     postTitle={post.title}
                     trigger={
-                      <Button
-                        variant="ghost"
-                        className="w-full h-8 text-xs justify-start px-2 text-stone-600 hover:text-[#C82E31] hover:bg-red-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Flag className="w-3.5 h-3.5 mr-1.5" />
-                        举报违规
+                      <Button variant="ghost" className="w-full h-8 text-xs justify-start px-2 text-stone-600 hover:text-[#C82E31] hover:bg-red-50" onClick={(e) => e.stopPropagation()}>
+                        <Flag className="w-3.5 h-3.5 mr-1.5" /> 举报违规
                       </Button>
                     }
                   />
@@ -409,25 +316,24 @@ export default function PostCard({ post }: { post: Post }) {
           </div>
         </div>
 
-        {/* 右侧：媒体区域 (保持不变，视觉平衡) */}
+        {/* 右侧 (移动端为下方)：媒体区域 */}
+        {/* 关键优化：移动端全宽显示，增强视觉冲击力 */}
         {showMedia && (
-          <div className="shrink-0 hidden sm:block pt-1">
+          <div className="shrink-0 w-full sm:w-auto pt-2 sm:pt-1 sm:pl-2">
             {post.hasGua && post.guaName ? (
-              <div className="scale-95 origin-top-right">
-                <GuaBlock 
-                  name={post.guaName} 
-                  lines={post.lines} 
-                  changingLines={post.changingLines}
-                />
+              // 卦象：移动端居中+浅色背景，大屏靠右
+              <div className="flex justify-center sm:block sm:scale-95 sm:origin-top-right bg-stone-50 sm:bg-transparent rounded-lg sm:rounded-none p-2 sm:p-0">
+                <GuaBlock name={post.guaName} lines={post.lines} changingLines={post.changingLines} />
               </div>
             ) : post.coverImage ? (
-              <Link href={`/community/${post.id}`} className="block media-container rounded-lg overflow-hidden border border-stone-100 bg-stone-50 relative w-[140px] h-[105px]">
+              // 图片：移动端宽幅 Banner (h-40)，大屏缩略图 (140x105)
+              <Link href={`/community/${post.id}`} className="block media-container rounded-lg overflow-hidden border border-stone-100 bg-stone-50 relative w-full h-[160px] sm:w-[140px] sm:h-[105px]">
                 <Image 
                   src={post.coverImage} 
                   alt={post.title}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="140px"
+                  sizes="(max-width: 640px) 100vw, 140px"
                 />
               </Link>
             ) : null}

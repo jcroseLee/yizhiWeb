@@ -548,7 +548,7 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', targetUserId)
 
-    // 获取参与推演数（占卜记录数）
+    // 获取参与推演数（推演记录数）
     const { count: participatedDeductions } = await supabase
       .from('divination_records')
       .select('*', { count: 'exact', head: true })
@@ -905,7 +905,7 @@ export async function getDailyActivityData(userId?: string): Promise<Array<{ wee
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - weeksAgo * 7)
 
-    // 获取用户的占卜记录（按创建日期分组）
+      // 获取用户的推演记录（按创建日期分组）
     const { data: records } = await supabase
       .from('divination_records')
       .select('created_at')
@@ -932,7 +932,7 @@ export async function getDailyActivityData(userId?: string): Promise<Array<{ wee
     // 合并所有活动数据
     const allActivities: Array<{ date: string; count: number }> = []
     
-    // 处理占卜记录
+        // 处理推演记录
     records?.forEach(record => {
       const date = new Date(record.created_at).toISOString().split('T')[0]
       const existing = allActivities.find(a => a.date === date)
@@ -1028,7 +1028,7 @@ export async function getUserNotes(searchQuery?: string): Promise<Note[]> {
       return []
     }
 
-    // 将占卜记录转换为笔记格式
+        // 将推演记录转换为笔记格式
     // 注意：divination_records 表没有 updated_at 字段，使用 created_at 作为替代
     return (data || []).map((record: any) => ({
       id: record.id,

@@ -1,11 +1,9 @@
 'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Textarea } from '@/lib/components/ui/textarea'
 import { useToast } from '@/lib/hooks/use-toast'
 import { createPost } from '@/lib/services/community'
-import { getUserProfile } from '@/lib/services/profile'
-import { BookOpen, Coffee, Coins, Compass, HelpCircle, TrendingUp, User } from 'lucide-react'
+import { BookOpen, Coffee, Coins, Compass, HelpCircle, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -114,28 +112,10 @@ export default function PostComposer() {
   const [titleError, setTitleError] = useState(false)
   const [contentError, setContentError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [userAvatar, setUserAvatar] = useState<string | null>(null)
-  const [userNickname, setUserNickname] = useState<string>('')
   const titleTextareaRef = useRef<HTMLTextAreaElement>(null)
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  
-  // 获取当前用户信息
-  useEffect(() => {
-    const loadUserInfo = async () => {
-      try {
-        const profile = await getUserProfile()
-        if (profile) {
-          setUserAvatar(profile.avatar_url)
-          setUserNickname(profile.nickname || '')
-        }
-      } catch (error) {
-        console.error('Failed to load user info:', error)
-      }
-    }
-    loadUserInfo()
-  }, [])
   
   // 输入框提示文案轮播
   const placeholders = [
@@ -317,12 +297,6 @@ export default function PostComposer() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#C82E31]/5 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
         
         <div className="flex gap-4 relative z-10">
-          <Avatar className="w-11 h-11 border border-stone-200 shadow-sm shrink-0">
-            {userAvatar && <AvatarImage src={userAvatar} alt={userNickname || '用户'} />}
-            <AvatarFallback className="bg-gradient-to-br from-stone-100 to-stone-200 text-stone-500">
-              <User className="h-6 w-6" />
-            </AvatarFallback>
-          </Avatar>
           <div className="flex-1">
             {/* 输入框容器 */}
             <div 

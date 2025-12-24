@@ -23,10 +23,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/', label: '首页' },
+  { href: '/community', label: '社区' },
   { href: '/cases', label: '案例库' },
   { href: '/library', label: '藏经阁' },
   { href: '/6yao', label: '排盘工具' },
-  { href: '/profile', label: '个人中心' },
 ]
 
 export default function Navigation() {

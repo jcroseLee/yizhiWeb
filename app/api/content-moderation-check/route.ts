@@ -17,7 +17,6 @@ type Decision = 'pass' | 'warn' | 'block'
 
 function buildDefaultKeywords() {
   return [
-    { word: '算命', severity: 'block', category: '迷信' },
     { word: '改运', severity: 'block', category: '迷信' },
     { word: '神仙', severity: 'block', category: '迷信' },
     { word: '风水宝地', severity: 'block', category: '迷信' },

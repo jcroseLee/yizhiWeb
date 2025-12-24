@@ -4,14 +4,15 @@ import { Button } from '@/lib/components/ui/button'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getPosts, type Post } from '@/lib/services/community'
 import {
+  ArrowUp,
   BookOpen,
   Coffee,
   Compass,
   Flame,
   HelpCircle,
-  ListFilter,
   TrendingUp
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import DailyFortuneCard from './components/DailyFortuneCard'
 import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo } from './components/PostCard'
@@ -21,10 +22,10 @@ import TrendingTopicsCard from './components/TrendingTopicsCard'
 import UserInfoCard from './components/UserInfoCard'
 
 // -----------------------------------------------------------------------------
-// 样式定义：引入新中式纹理与排版 - 增强质感
+// 样式定义
 // -----------------------------------------------------------------------------
 const styles = `  
-  /* 标签激活态下划线 - 模拟毛笔笔触，朱砂红 */
+  /* 标签激活态下划线 */
   .tab-active {
     position: relative;
     color: #C82E31;
@@ -47,7 +48,6 @@ const styles = `
   /* 隐藏滚动条 */
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-  
 `
 
 // -----------------------------------------------------------------------------
@@ -55,10 +55,10 @@ const styles = `
 // -----------------------------------------------------------------------------
 const CHANNELS = [
   { id: 'recommend', label: '推荐', icon: Flame },
-  { id: 'theory', label: '论道', icon: BookOpen }, // 理论
-  { id: 'help', label: '悬卦', icon: HelpCircle }, // 求助
-  { id: 'debate', label: '争鸣', icon: TrendingUp }, // 争议/热点
-  { id: 'chat', label: '茶寮', icon: Coffee }, // 闲聊
+  { id: 'theory', label: '论道', icon: BookOpen },
+  { id: 'help', label: '悬卦', icon: HelpCircle },
+  { id: 'debate', label: '争鸣', icon: TrendingUp },
+  { id: 'chat', label: '茶寮', icon: Coffee },
 ]
 
 // 格式化时间
@@ -77,7 +77,7 @@ function formatTime(dateString: string): string {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-// 从 divination_record 提取卦象信息
+// 提取卦象信息辅助函数
 interface DivinationRecord {
   original_key?: string
   changed_key?: string
@@ -85,44 +85,32 @@ interface DivinationRecord {
   changing_flags?: boolean[]
 }
 
-// 使用 PostCard 导出的 getGuaInfo 函数
 const extractGuaInfo = getGuaInfo
 
-// 将 section 映射到 type
+// 映射板块类型
 function mapSectionToType(
   section?: string | null, 
   type?: string | null,
   bounty?: number | null,
   divinationRecordId?: string | null
 ): 'help' | 'theory' | 'debate' | 'chat' {
-  // 如果有悬赏或关联排盘记录，优先判断为求助贴
-  if ((bounty && bounty > 0) || divinationRecordId) {
-    return 'help'
-  }
+  if ((bounty && bounty > 0) || divinationRecordId) return 'help'
+  if (type && ['theory', 'help', 'debate', 'chat'].includes(type)) return type as any
   
-  // 优先使用 type 字段
-  if (type && ['theory', 'help', 'debate', 'chat'].includes(type)) {
-    return type as 'help' | 'theory' | 'debate' | 'chat'
-  }
-  
-  // 如果没有 type，从 section 映射
   if (section) {
     const sectionMap: Record<string, 'help' | 'theory' | 'debate' | 'chat'> = {
       'study': 'theory',
       'help': 'help',
       'casual': 'chat',
-      'announcement': 'theory', // 公告默认归类为论道
+      'announcement': 'theory',
     }
     return sectionMap[section] || 'theory'
   }
-  
   return 'theory'
 }
 
-// 转换Post类型以适配PostCard组件
+// 转换数据格式
 function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] {
-  // 尝试从 divination_records 获取卦象信息
-  // 注意：Supabase 返回的关联数据可能是数组或对象
   interface PostWithDivination extends Omit<Post, 'section'> {
     divination_records?: DivinationRecord | DivinationRecord[] | null
     section?: 'study' | 'help' | 'casual' | 'announcement' | null
@@ -136,39 +124,23 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     : null
 
   const guaInfo = extractGuaInfo(divinationRecord)
+  const postType = mapSectionToType(postWithDivination.section, post.type, post.bounty, post.divination_record_id)
 
   return {
-    id: post.id, // 使用原始UUID，不转换为数字
-    type: mapSectionToType(
-      postWithDivination.section, 
-      post.type,
-      post.bounty,
-      post.divination_record_id
-    ),
+    id: post.id,
+    type: postType,
     author: {
       name: post.author?.nickname || '匿名用户',
       avatar: post.author?.avatar_url || '',
-      level: 1, // 可以从用户表获取
+      level: 1,
       isVerified: false,
     },
-    title: mapSectionToType(
-      postWithDivination.section, 
-      post.type,
-      post.bounty,
-      post.divination_record_id
-    ) === 'help'
-      ? `求测：${post.title}`
-      : post.title,
-    excerpt: mapSectionToType(
-      postWithDivination.section, 
-      post.type,
-      post.bounty,
-      post.divination_record_id
-    ) === 'help'
+    title: postType === 'help' ? `求测：${post.title}` : post.title,
+    excerpt: postType === 'help'
       ? extractHelpBackground(post.content_html || post.content, 100)
       : extractTextFromHTML(post.content_html || post.content, 100),
-    tags: [], // 可以从内容中提取或添加tags字段
-    bounty: post.bounty || 0, // 使用实际的bounty值
+    tags: [],
+    bounty: post.bounty || 0,
     stats: {
       likes: post.like_count,
       comments: post.comment_count,
@@ -190,10 +162,25 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
 // -----------------------------------------------------------------------------
 
 export default function CommunityPage() {
+  const router = useRouter()
   const [activeChannel, setActiveChannel] = useState('recommend')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const { toast } = useToast()
+
+  const handleScrollToTop = () => {
+    const scrollContainer = document.getElementById('app-scroll-container') as HTMLElement | null
+    if (scrollContainer) {
+      if (typeof scrollContainer.scrollTo === 'function') {
+        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
+      } else {
+        scrollContainer.scrollTop = 0
+      }
+      return
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const loadPosts = async () => {
     try {
@@ -218,56 +205,81 @@ export default function CommunityPage() {
     }
   }
 
-  // 加载帖子列表
   useEffect(() => {
     loadPosts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannel])
 
+  // 监听页面滚动位置，控制"回到顶部"按钮
+  useEffect(() => {
+    const scrollContainer = document.getElementById('app-scroll-container')
+
+    const handleScroll = () => {
+      const scrollElement = scrollContainer ?? document.documentElement
+      const scrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY
+      const { scrollHeight, clientHeight } = scrollElement
+      const scrollableHeight = scrollHeight - clientHeight
+
+      if (scrollableHeight > 0) {
+        setShowScrollTop((scrollTop / scrollableHeight) > 0.2)
+      }
+    }
+
+    handleScroll()
+    const target: HTMLElement | Window = scrollContainer ?? window
+    target.addEventListener('scroll', handleScroll as EventListener, { passive: true })
+    return () => target.removeEventListener('scroll', handleScroll as EventListener)
+  }, [])
+
   return (
     <>
       <style jsx global>{styles}</style>
-      <div className="min-h-screen font-sans text-stone-800">
-        <main className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
-          <div className="flex gap-8">
+      <div className="min-h-screen font-sans text-stone-800 paper-texture">
+        <main className="max-w-7xl mx-auto w-full">
+          <div className="flex flex-col lg:flex-row gap-0 lg:gap-8 px-0 lg:px-6 py-0 lg:py-8">
             
             {/* --- 左侧内容区 --- */}
-            <div className="flex-1 min-w-0 space-y-6">
+            <div className="flex-1 min-w-0 space-y-2 lg:space-y-6">
               
               {/* 1. 发布器组件 */}
-              <PostComposer />
-
-              {/* 2. 频道 Tab (优化：朱砂红底部短横线，模拟毛笔笔触) */}
-              <div className="flex items-center justify-between bg-[#f7f7f9] py-3 border-b border-stone-200/60 mb-2">
-                <div className="flex gap-8 px-2">
-                  {CHANNELS.map(channel => {
-                    const Icon = channel.icon;
-                    const isActive = activeChannel === channel.id;
-                    return (
-                      <Button
-                        key={channel.id}
-                        onClick={() => setActiveChannel(channel.id)}
-                        variant="ghost"
-                        className={`flex items-center gap-2 text-sm transition-colors pb-2 relative h-auto p-0 hover:bg-transparent ${
-                          isActive ? 'tab-active text-stone-900' : 'text-stone-500 hover:text-stone-800'
-                        }`}
-                      >
-                        <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-[#C82E31]' : ''}`} />
-                        {channel.label}
-                      </Button>
-                    )
-                  })}
-                </div>
-                <Button
-                  variant="outline"
-                  className="text-xs text-stone-500 hover:text-stone-800 flex items-center gap-1 px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto"
-                >
-                  <ListFilter className="h-3 w-3" /> 筛选
-                </Button>
+              <div className="bg-white lg:rounded-xl p-4 lg:p-0 lg:bg-transparent shadow-sm lg:shadow-none border-b lg:border-none border-stone-100">
+                 <PostComposer />
               </div>
 
-              {/* 3. 帖子流 (优化：卡片质感与内容区分) */}
-              <div className="space-y-4">
+              {/* 2. 频道 Tab */}
+              <div className="sticky top-0 lg:relative z-10 bg-[#fdfbf7] lg:bg-transparent pt-2 lg:pt-0">
+                <div className="flex items-center justify-between bg-white lg:bg-[#fdfbf7] px-4 py-3 border-b lg:border-b border-stone-200/60 lg:rounded-t-lg shadow-sm lg:shadow-none mx-0 lg:mx-0">
+                  <div className="flex gap-6 lg:gap-8 overflow-x-auto scrollbar-hide pr-4 w-full lg:w-auto">
+                    {CHANNELS.map(channel => {
+                      const Icon = channel.icon;
+                      const isActive = activeChannel === channel.id;
+                      return (
+                        <button
+                          key={channel.id}
+                          onClick={() => setActiveChannel(channel.id)}
+                          className={`flex items-center gap-1.5 text-sm transition-colors pb-2 relative whitespace-nowrap outline-none ${
+                            isActive ? 'tab-active text-stone-900' : 'text-stone-500 hover:text-stone-800'
+                          }`}
+                        >
+                          <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-[#C82E31]' : ''}`} />
+                          {channel.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* 筛选按钮 */}
+                  {/* <Button
+                    variant="outline"
+                    className="hidden lg:flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0 ml-2"
+                  >
+                    <ListFilter className="h-3 w-3" /> 筛选
+                  </Button> */}
+                </div>
+              </div>
+
+              {/* 3. 帖子流 */}
+              <div className="space-y-3 lg:space-y-4 px-2 lg:px-0 pb-20 lg:pb-0">
                 {loading ? (
                   <>
                     {Array.from({ length: 5 }).map((_, index) => (
@@ -275,15 +287,18 @@ export default function CommunityPage() {
                     ))}
                   </>
                 ) : posts.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-stone-400">
-                    暂无帖子
+                  <div className="py-12 text-center text-sm text-stone-400 bg-white rounded-lg border border-stone-100 mx-2 lg:mx-0">
+                    <div className="flex justify-center mb-2">
+                      <HelpCircle className="w-8 h-8 text-stone-200" />
+                    </div>
+                    暂无帖子，快来发布第一条吧
                   </div>
                 ) : (
                   <>
                     {posts.map(post => (
                       <PostCard key={post.id} post={convertPostForCard(post)} />
                     ))}
-                    <div className="py-8 text-center text-sm font-serif text-stone-400">
+                    <div className="py-8 text-center text-xs font-serif text-stone-300">
                       —— 问道无止境 ——
                     </div>
                   </>
@@ -291,22 +306,18 @@ export default function CommunityPage() {
               </div>
             </div>
 
-            {/* --- 右侧侧边栏 (优化：更强的层次感和工具入口) --- */}
+            {/* --- 右侧侧边栏 --- */}
             <aside className="hidden lg:block w-80 shrink-0 space-y-6">
               
-              {/* 1. 今日运势卡片 */}
               <DailyFortuneCard />
-
-              {/* 2. 作者/用户信息卡片 */}
               <UserInfoCard />
-
-              {/* 3. 论道风向标 */}
               <TrendingTopicsCard />
 
-              {/* 4. 工具栏 (优化：更具"法器"或"令牌"质感) */}
               <div className="grid grid-cols-2 gap-3">
-                 {/* 在线排盘 - 深色渐变，罗盘背景装饰 */}
-                 <button className="bg-gradient-to-br from-[#7f7562d6] to-[#716643] rounded-xl p-4 text-white relative overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all hover:scale-[1.02]">
+                 <button 
+                   onClick={() => router.push('/6yao')}
+                   className="bg-linear-to-br from-[#7f7562d6] to-[#716643] rounded-xl p-4 text-white relative overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] text-left"
+                 >
                    <div className="absolute -right-3 -bottom-3 opacity-10 group-hover:opacity-20 transition-opacity">
                      <Compass className="w-16 h-16" />
                    </div>
@@ -318,8 +329,10 @@ export default function CommunityPage() {
                      </div>
                    </div>
                  </button>
-                 {/* 古籍查询 - 白色卡片，书本图标背景 */}
-                 <button className="bg-white border border-stone-200 rounded-xl p-4 text-stone-800 relative overflow-hidden cursor-pointer group shadow-sm hover:border-[#C82E31]/30 hover:shadow-md transition-all hover:scale-[1.02]">
+                 <button 
+                   onClick={() => router.push('/library')}
+                   className="bg-white border border-stone-200 rounded-xl p-4 text-stone-800 relative overflow-hidden cursor-pointer group shadow-sm hover:border-[#C82E31]/30 hover:shadow-md transition-all hover:scale-[1.02] text-left"
+                 >
                    <div className="absolute -right-3 -bottom-3 text-stone-100 group-hover:text-stone-200 transition-colors">
                      <BookOpen className="w-16 h-16" />
                    </div>
@@ -333,7 +346,6 @@ export default function CommunityPage() {
                  </button>
               </div>
 
-              {/* Footer */}
               <div className="text-xs text-stone-400 text-center pt-4">
                 <span className="hover:text-stone-600 cursor-pointer">社区公约</span> · 
                 <span className="hover:text-stone-600 cursor-pointer ml-2">关于易知</span>
@@ -342,6 +354,23 @@ export default function CommunityPage() {
             </aside>
           </div>
         </main>
+        
+        {/* 回到顶部按钮 (悬浮) */}
+        <div 
+          className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${
+            showScrollTop 
+              ? 'opacity-100 translate-y-0 scale-100' 
+              : 'opacity-0 translate-y-4 scale-75 pointer-events-none'
+          }`}
+        >
+          <Button 
+            className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-white text-stone-600 shadow-md border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-transform hover:-translate-y-1"
+            onClick={handleScrollToTop}
+            aria-label="回到顶部"
+          >
+            <ArrowUp className="w-5 h-5 lg:w-6 lg:h-6" />
+          </Button>
+        </div>
       </div>
     </>
   )

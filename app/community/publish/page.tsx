@@ -34,7 +34,6 @@ import {
   ScrollText,
   Send,
   Sparkles,
-  Type,
   X
 } from 'lucide-react'
 import Image from 'next/image'
@@ -42,7 +41,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 // -----------------------------------------------------------------------------
-// 样式定义 - 核心修复区域
+// 样式定义
 // -----------------------------------------------------------------------------
 const styles = `
   .input-clean {
@@ -61,54 +60,47 @@ const styles = `
   .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 20px; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #d6d3d1; }
 
-  /* --- 核心修复：强制编辑器高度自适应（写文章模式） --- */
-  
-  /* 1. 编辑器外层容器 - 写文章模式 */
+  /* 核心修复：强制编辑器高度自适应（写文章模式） */
   .rich-text-content {
-    min-height: 60vh !important;
+    min-height: 50vh !important;
     height: auto !important;
     overflow: visible !important;
     border: none !important;
   }
 
-  /* 2. 工具栏 sticky 定位（第一个 div，包含工具栏按钮） */
+  /* 移动端工具栏调整 */
   .rich-text-content > div:first-child {
     position: sticky !important;
-    top: 64px !important; /* Navbar 高度 h-16 = 64px */
+    top: 56px !important; /* 移动端 Navbar 高度通常稍小 */
     z-index: 30 !important;
-    background-color: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+    background-color: rgba(255, 255, 255, 0.98) !important;
     border-bottom: 1px solid #e7e5e4 !important;
     margin: 0 !important;
+    padding: 8px 4px !important;
+    overflow-x: auto !important; /* 允许工具栏横向滚动 */
+  }
+  
+  @media (min-width: 1024px) {
+    .rich-text-content > div:first-child {
+      top: 64px !important;
+    }
   }
 
-  /* 3. 覆盖 RichTextEditor 内部的编辑器容器（最后一个 div，包含 EditorContent） */
-  /* 排除工具栏（第一个 div，有 flex 和 border-b 类）和上传区域 */
   .rich-text-content > div:last-child {
-    min-height: 60vh !important;
+    min-height: 50vh !important;
     max-height: none !important;
     height: auto !important;
     overflow: visible !important;
   }
 
-  /* 4. ProseMirror 内核强制样式 - 无内部滚动，高度自适应 */
   .rich-text-content .ProseMirror {
-    min-height: 60vh !important;
+    min-height: 50vh !important;
     height: auto !important; 
     overflow: visible !important;
     outline: none !important;
     padding-bottom: 200px !important;
   }
   
-  /* 5. 确保编辑器内容区内所有嵌套容器都不会产生滚动 */
-  .rich-text-content > div:last-child > div {
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-  
-  /* 6. 占位符样式 */
   .rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
     color: #a8a29e;
     content: attr(data-placeholder);
@@ -165,7 +157,7 @@ const convertRecordToDisplay = (record: DivinationRecord): RecordDisplay => {
 }
 
 // -----------------------------------------------------------------------------
-// 子组件：排盘卡片 (保持不变)
+// 子组件：排盘卡片
 // -----------------------------------------------------------------------------
 const RecordCard = ({ data, onClick, isSelected = false, compact = false }: { data: RecordDisplay, onClick?: () => void, isSelected?: boolean, compact?: boolean }) => {
   return (
@@ -211,7 +203,6 @@ function PublishPageContent() {
   const [activeTab, setActiveTab] = useState<'divination' | 'article'>(initialTab)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingPostId, setEditingPostId] = useState<string | null>(null)
-  const [loadingPost, setLoadingPost] = useState(false)
   
   const [title, setTitle] = useState('')
   const [bounty, setBounty] = useState(0)
@@ -220,10 +211,9 @@ function PublishPageContent() {
   const [backgroundDesc, setBackgroundDesc] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
-  const [isDraft, setIsDraft] = useState(false)  // 是否为草稿
+  const [isDraft, setIsDraft] = useState(false)
   const [historyRecords, setHistoryRecords] = useState<RecordDisplay[]>([])
   const [loadingRecords, setLoadingRecords] = useState(false)
-  // 封面图片相关状态
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -259,7 +249,6 @@ function PublishPageContent() {
       }
       await loadHistoryRecords()
       
-      // 处理排盘记录参数
       if (recordIdParam) {
         try {
           const record = await getDivinationRecordById(recordIdParam, true)
@@ -275,39 +264,27 @@ function PublishPageContent() {
         } catch (error) { console.error(error) }
       }
       
-      // 处理帖子编辑参数
       if (postIdParam) {
-        setLoadingPost(true)
         setIsEditMode(true)
         setEditingPostId(postIdParam)
         try {
           const post = await getPost(postIdParam)
           if (post) {
-            // 检查是否是当前用户的帖子
             const currentUser = await getCurrentUser()
             if (post.user_id !== currentUser?.id) {
-              toast({ 
-                title: '无权限', 
-                description: '您只能编辑自己的帖子',
-                variant: 'destructive' 
-              })
+              toast({ title: '无权限', description: '您只能编辑自己的帖子', variant: 'destructive' })
               router.push('/community')
               return
             }
-            
-            // 填充表单数据
             setTitle(post.title)
             setBounty(post.bounty || 0)
             setCoverImageUrl(post.cover_image_url || null)
-            setIsDraft(post.status === 'draft')  // 识别是否为草稿
+            setIsDraft(post.status === 'draft')
             
-            // 根据帖子类型设置 tab 和内容
             if (post.type === 'help' && post.divination_record) {
-              // 排盘求测类型
               setActiveTab('divination')
               const displayRecord = convertRecordToDisplay(post.divination_record)
               setSelectedRecord(displayRecord)
-              // 提取背景说明（去掉标题部分）
               const content = post.content_html || post.content || ''
               const cleanedContent = content
                 .replace(/<[^>]*>/g, ' ')
@@ -318,33 +295,20 @@ function PublishPageContent() {
                 .trim()
               setBackgroundDesc(cleanedContent || '')
             } else {
-              // 文章类型
               setActiveTab('article')
               setBackgroundDesc(post.content_html || post.content || '')
             }
-            
-            // 清理 URL 参数
             const newSearchParams = new URLSearchParams(searchParams.toString())
             newSearchParams.delete('id')
             window.history.replaceState({}, '', `${window.location.pathname}?${newSearchParams.toString()}`)
           } else {
-            toast({ 
-              title: '加载失败', 
-              description: '帖子不存在',
-              variant: 'destructive' 
-            })
+            toast({ title: '加载失败', description: '帖子不存在', variant: 'destructive' })
             router.push('/community')
           }
         } catch (error) {
-          console.error('Error loading post:', error)
-          toast({ 
-            title: '加载失败', 
-            description: '无法加载帖子数据',
-            variant: 'destructive' 
-          })
+          console.error(error)
+          toast({ title: '加载失败', description: '无法加载帖子数据', variant: 'destructive' })
           router.push('/community')
-        } finally {
-          setLoadingPost(false)
         }
       }
     }
@@ -355,33 +319,19 @@ function PublishPageContent() {
     if (showHistoryModal) loadHistoryRecords()
   }, [showHistoryModal, loadHistoryRecords])
   
-  // 封面图片处理函数
   const handleCoverImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // 验证文件类型
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!allowedTypes.includes(file.type)) {
-      toast({ 
-        title: '不支持的文件类型', 
-        description: '请上传 JPEG、PNG、WebP 或 GIF 格式的图片',
-        variant: 'destructive' 
-      })
+      toast({ title: '不支持的文件类型', description: '请上传图片文件', variant: 'destructive' })
       return
     }
-
-    // 验证文件大小（10MB）
     const maxSize = 10 * 1024 * 1024
     if (file.size > maxSize) {
-      toast({ 
-        title: '文件过大', 
-        description: '文件大小不能超过 10MB',
-        variant: 'destructive' 
-      })
+      toast({ title: '文件过大', description: '文件大小不能超过 10MB', variant: 'destructive' })
       return
     }
-
     try {
       setUploadingCover(true)
       const url = await uploadPostCover(file)
@@ -390,30 +340,17 @@ function PublishPageContent() {
         toast({ title: '封面图片上传成功' })
       }
     } catch (error) {
-      console.error('Error uploading cover image:', error)
-      toast({ 
-        title: '上传失败', 
-        description: error instanceof Error ? error.message : '未知错误',
-        variant: 'destructive' 
-      })
+      console.error(error)
+      toast({ title: '上传失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
     } finally {
       setUploadingCover(false)
-      // 重置 input，允许重复选择同一文件
-      if (e.target) {
-        e.target.value = ''
-      }
+      if (e.target) e.target.value = ''
     }
   }
 
-  const handleRemoveCoverImage = () => {
-    setCoverImageUrl(null)
-  }
-
-  const handleCoverImageClick = () => {
-    fileInputRef.current?.click()
-  }
+  const handleRemoveCoverImage = () => setCoverImageUrl(null)
+  const handleCoverImageClick = () => fileInputRef.current?.click()
   
-  // Publish Handler
   const handlePublish = async () => {
     if (!title.trim()) return toast({ title: '请输入标题', variant: 'destructive' })
     if (activeTab === 'divination' && !selectedRecord) return toast({ title: '请选择排盘记录', variant: 'destructive' })
@@ -432,7 +369,7 @@ function PublishPageContent() {
       const postData = {
         title: title.trim(),
         content: content.trim(),
-        type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat', // 求测默认悬卦，写文章默认论道
+        type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
         bounty: bounty > 0 ? bounty : undefined,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
@@ -440,37 +377,26 @@ function PublishPageContent() {
       
       let post
       if (isEditMode && editingPostId) {
-        // 编辑模式
         if (isDraft) {
-          // 如果是草稿，发布它
-          post = await publishDraft(editingPostId)
-          // 还需要更新内容
+          await publishDraft(editingPostId)
           post = await updatePost(editingPostId, postData)
           toast({ title: '发布成功' })
         } else {
-          // 更新已发布的帖子
           post = await updatePost(editingPostId, postData)
           toast({ title: '更新成功' })
         }
       } else {
-        // 新建模式：创建帖子
         post = await createPost(postData)
         toast({ title: '发布成功' })
       }
-      
       router.push(`/community/${post.id}`)
     } catch (error) {
-      toast({ 
-        title: isEditMode ? '更新失败' : '发布失败', 
-        description: error instanceof Error ? error.message : '未知错误', 
-        variant: 'destructive' 
-      })
+      toast({ title: isEditMode ? '更新失败' : '发布失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
     }
   }
   
-  // 保存为草稿
   const handleSaveDraft = async () => {
     if (!title.trim() && !backgroundDesc.trim()) {
       return toast({ title: '请至少填写标题或内容', variant: 'destructive' })
@@ -497,24 +423,17 @@ function PublishPageContent() {
       
       let draft
       if (isEditMode && editingPostId && isDraft) {
-        // 更新现有草稿
         draft = await updateDraft(editingPostId, draftData)
         toast({ title: '草稿已更新' })
       } else {
-        // 创建新草稿
         draft = await saveDraft(draftData)
         toast({ title: '草稿已保存' })
-        // 保存后切换到编辑模式
         setIsEditMode(true)
         setEditingPostId(draft.id)
         setIsDraft(true)
       }
     } catch (error) {
-      toast({ 
-        title: '保存草稿失败', 
-        description: error instanceof Error ? error.message : '未知错误', 
-        variant: 'destructive' 
-      })
+      toast({ title: '保存草稿失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
     } finally {
       setIsSavingDraft(false)
     }
@@ -526,66 +445,63 @@ function PublishPageContent() {
         {styles}
       </style>
       <div className="min-h-screen bg-[#f5f5f7] paper-texture font-sans text-stone-800 pb-20">
+        
         {/* Navbar */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200 h-16">
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-stone-200 h-14 lg:h-16">
           <div className="max-w-7xl mx-auto px-4 lg:px-8 h-full flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 lg:gap-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => router.back()}
-                className="-ml-2 hover:bg-stone-100"
+                className="-ml-2 hover:bg-stone-100 h-9 w-9"
               >
                 <ArrowLeft className="h-5 w-5 text-stone-600" />
               </Button>
-              <h1 className="text-lg font-serif font-bold text-stone-900">
+              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[120px] lg:max-w-none">
                 {isEditMode ? '编辑帖子' : '发布内容'}
               </h1>
             </div>
-            <div className="flex items-center gap-3">
-              {/* <span className="text-xs text-stone-400 hidden sm:inline-block">
-                已自动保存
-              </span> */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="rounded-full px-6"
-                  onClick={handleSaveDraft}
-                  disabled={isSavingDraft || isSubmitting}
-                >
-                  {isSavingDraft ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  {isSavingDraft ? '保存中' : '保存草稿'}
-                </Button>
-                <Button
-                  className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-6 shadow-md shadow-red-100 transition-all"
-                  onClick={handlePublish}
-                  disabled={
-                    isSubmitting ||
-                    !title.trim() ||
-                    (activeTab === "divination" && !selectedRecord)
-                  }
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  {isSubmitting ? (isEditMode ? "更新中" : "发布中") : (isDraft ? "发布" : (isEditMode ? "更新" : "发布"))}
-                </Button>
-              </div>
+            
+            {/* 顶部操作按钮 */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="rounded-full px-3 lg:px-6 h-8 lg:h-10 text-xs lg:text-sm"
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft || isSubmitting}
+              >
+                {isSavingDraft ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin lg:mr-2" />
+                ) : (
+                  <Save className="h-3.5 w-3.5 lg:mr-2" />
+                )}
+                <span className="hidden lg:inline">{isSavingDraft ? '保存中' : '保存草稿'}</span>
+                <span className="lg:hidden">{isSavingDraft ? '保存' : '草稿'}</span>
+              </Button>
+              <Button
+                className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-4 lg:px-6 h-8 lg:h-10 text-xs lg:text-sm shadow-md shadow-red-100 transition-all"
+                onClick={handlePublish}
+                disabled={isSubmitting || !title.trim() || (activeTab === "divination" && !selectedRecord)}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin lg:mr-2" />
+                ) : (
+                  <Send className="h-3.5 w-3.5 lg:mr-2" />
+                )}
+                <span>{isSubmitting ? (isEditMode ? "更新" : "发布") : (isDraft ? "发布" : (isEditMode ? "更新" : "发布"))}</span>
+              </Button>
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-0 lg:px-8 py-0 lg:py-8">
+          <div className="flex flex-col lg:flex-row gap-0 lg:gap-8 items-start">
+            
             {/* 左侧编辑器区 */}
             <div className="flex-1 w-full min-w-0">
-              <Card className="min-h-[85vh] border-none shadow-sm flex flex-col bg-white">
+              <Card className="min-h-[85vh] border-none shadow-sm flex flex-col bg-white rounded-none lg:rounded-xl">
                 <Tabs
                   value={activeTab}
                   onValueChange={(v) =>
@@ -593,40 +509,43 @@ function PublishPageContent() {
                   }
                   className="flex-1 flex flex-col"
                 >
-                  {/* Tab Header */}
-                  <div className="border-b border-stone-100 bg-stone-50/30 px-6 pt-4 shrink-0">
-                    <TabsList className="bg-stone-100 p-1 h-auto rounded-lg">
+                  {/* Tab Header - 恢复 PC 端样式，保留移动端优化 */}
+                  <div className="border-b border-stone-100 bg-stone-50/50 lg:bg-stone-50/30 px-4 lg:px-6 pt-3 lg:pt-4 shrink-0">
+                    <TabsList className="bg-stone-200/50 lg:bg-stone-100 p-1 h-auto rounded-lg w-full lg:w-auto grid grid-cols-2 lg:inline-flex">
                       <TabsTrigger
                         value="divination"
-                        className="px-6 py-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#C82E31] data-[state=active]:shadow-sm transition-all cursor-pointer"
+                        className="py-2 lg:px-6 lg:py-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#C82E31] data-[state=active]:shadow-sm transition-all cursor-pointer text-xs lg:text-sm"
                       >
-                        <LayoutGrid className="h-4 w-4 mr-2" /> 排盘求测
+                        <LayoutGrid className="h-3.5 w-3.5 lg:h-4 lg:w-4 mr-2" /> 排盘求测
                       </TabsTrigger>
                       <TabsTrigger
                         value="article"
-                        className="px-6 py-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#C82E31] data-[state=active]:shadow-sm transition-all cursor-pointer"
+                        className="py-2 lg:px-6 lg:py-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#C82E31] data-[state=active]:shadow-sm transition-all cursor-pointer text-xs lg:text-sm"
                       >
-                        <FileText className="h-4 w-4 mr-2" /> 撰写文章
+                        <FileText className="h-3.5 w-3.5 lg:h-4 lg:w-4 mr-2" /> 撰写文章
                       </TabsTrigger>
                     </TabsList>
                   </div>
 
                   <div className="flex-1 flex flex-col">
-                    {/* Tab 1: 排盘求测 (保持原样) */}
+                    
+                    {/* Tab 1: 排盘求测 */}
                     <TabsContent
                       value="divination"
-                      className="p-6 lg:p-10 flex-1 flex flex-col space-y-8 mt-0 animate-in fade-in duration-300"
+                      className="p-4 lg:p-10 flex-1 flex flex-col space-y-6 lg:space-y-8 mt-0 animate-in fade-in duration-300"
                     >
                       <div className="space-y-2">
+                        {/* 标题输入 */}
                         <Input
                           type="text"
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
                           placeholder="请输入你想测算的问题..."
-                          className="input-clean text-2xl lg:text-3xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight border-0 shadow-none px-0"
+                          className="input-clean text-xl lg:text-3xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight border-0 shadow-none px-0"
                         />
                         <div className="h-px w-full bg-stone-100"></div>
                       </div>
+                      
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-bold text-stone-700 flex items-center gap-2">
@@ -642,17 +561,14 @@ function PublishPageContent() {
                         {!selectedRecord ? (
                           <button
                             onClick={() => setShowHistoryModal(true)}
-                            className="w-full h-28 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50/50 hover:bg-stone-50 hover:border-[#C82E31]/50 hover:text-[#C82E31] transition-all flex flex-col items-center justify-center gap-3 group cursor-pointer"
+                            className="w-full h-24 lg:h-28 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50/50 hover:bg-stone-50 hover:border-[#C82E31]/50 hover:text-[#C82E31] transition-all flex flex-col items-center justify-center gap-2 lg:gap-3 group cursor-pointer"
                           >
-                            <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center group-hover:border-red-200 group-hover:shadow-md transition-all">
-                              <History className="h-5 w-5 text-stone-400 group-hover:text-[#C82E31]" />
+                            <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center group-hover:border-red-200 group-hover:shadow-md transition-all">
+                              <History className="h-4 w-4 lg:h-5 lg:w-5 text-stone-400 group-hover:text-[#C82E31]" />
                             </div>
                             <div className="text-center">
-                              <span className="text-sm font-bold block text-stone-600 group-hover:text-[#C82E31]">
+                              <span className="text-xs lg:text-sm font-bold block text-stone-600 group-hover:text-[#C82E31]">
                                 选择历史排盘记录
-                              </span>
-                              <span className="text-xs text-stone-400 mt-1 block">
-                                支持选择最近50条记录
                               </span>
                             </div>
                           </button>
@@ -664,12 +580,8 @@ function PublishPageContent() {
                                 variant="secondary"
                                 size="sm"
                                 type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  setShowHistoryModal(true)
-                                }}
-                                className="h-8 px-3 bg-white/80 backdrop-blur-sm shadow-sm border border-stone-200 text-stone-600 hover:text-[#C82E31] hover:bg-white transition-all"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowHistoryModal(true) }}
+                                className="h-8 px-3 bg-white/80 backdrop-blur-sm shadow-sm border border-stone-200 text-stone-600 hover:text-[#C82E31] hover:bg-white transition-all text-xs"
                               >
                                 更换
                               </Button>
@@ -677,11 +589,7 @@ function PublishPageContent() {
                                 variant="secondary"
                                 size="icon"
                                 type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  setSelectedRecord(null)
-                                }}
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedRecord(null) }}
                                 className="h-8 w-8 bg-white/80 backdrop-blur-sm shadow-sm border border-stone-200 text-stone-400 hover:text-red-500 hover:bg-white transition-all"
                               >
                                 <X className="h-4 w-4" />
@@ -690,6 +598,7 @@ function PublishPageContent() {
                           </div>
                         )}
                       </div>
+                      
                       <div className="space-y-3 flex-1 flex flex-col min-h-[300px]">
                         <Label className="text-sm font-bold text-stone-700 flex items-center gap-2">
                           <FileText className="w-4 h-4 text-stone-400" />{" "}
@@ -700,31 +609,23 @@ function PublishPageContent() {
                             content={backgroundDesc}
                             onChange={(content) => setBackgroundDesc(content)}
                             placeholder="请详细描述事情起因、现状以及您最担心的点..."
-                            className="w-full h-full flex-1 border-none"
+                            className="w-full h-full flex-1 border-none min-h-[200px]"
                           />
                         </div>
                       </div>
+                      
+                      {/* 悬赏设置 */}
                       <div className="pt-4 border-t border-stone-100 shrink-0">
                         <div className="bg-linear-to-r from-amber-50 to-orange-50/50 rounded-xl p-1">
-                          <div className="bg-white/60 rounded-lg p-4 flex items-center justify-between backdrop-blur-sm">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                                  bounty > 0
-                                    ? "bg-amber-100 text-amber-600 shadow-sm"
-                                    : "bg-stone-100 text-stone-400"
-                                }`}
-                              >
-                                <Coins className="h-5 w-5" />
+                          <div className="bg-white/60 rounded-lg p-3 lg:p-4 flex items-center justify-between backdrop-blur-sm">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                              <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center transition-colors ${bounty > 0 ? "bg-amber-100 text-amber-600 shadow-sm" : "bg-stone-100 text-stone-400"}`}>
+                                <Coins className="h-4 w-4 lg:h-5 lg:w-5" />
                               </div>
                               <div>
-                                <div className="text-sm font-bold text-stone-800">
-                                  悬赏易币
-                                </div>
-                                <div className="text-xs text-stone-500">
-                                  {bounty > 0
-                                    ? "提高悬赏可加快回复速度"
-                                    : "设置悬赏吸引更多大师解卦"}
+                                <div className="text-xs lg:text-sm font-bold text-stone-800">悬赏易币</div>
+                                <div className="text-[10px] lg:text-xs text-stone-500 hidden sm:block">
+                                  {bounty > 0 ? "提高悬赏可加快回复速度" : "设置悬赏吸引更多大师解卦"}
                                 </div>
                               </div>
                             </div>
@@ -733,32 +634,24 @@ function PublishPageContent() {
                                 type="number"
                                 min="0"
                                 value={bounty}
-                                onChange={(e) =>
-                                  setBounty(Number(e.target.value))
-                                }
-                                className="w-24 pr-10 text-right font-bold border-stone-200 focus-visible:ring-amber-500/20 focus-visible:border-amber-500"
+                                onChange={(e) => setBounty(Number(e.target.value))}
+                                className="w-20 lg:w-24 pr-8 lg:pr-10 text-right font-bold border-stone-200 focus-visible:ring-amber-500/20 focus-visible:border-amber-500 h-8 lg:h-10 text-sm"
                               />
-                              <span className="absolute right-3 text-xs text-stone-400 font-medium">
-                                币
-                              </span>
+                              <span className="absolute right-2 lg:right-3 text-xs text-stone-400 font-medium">币</span>
                             </div>
                           </div>
                         </div>
                       </div>
                     </TabsContent>
 
-                    {/* 
-                       Tab 2: 撰写文章 (深度优化)
-                       - 使用 h-auto 替代 flex/h-full，允许高度撑开
-                       - Sticky 工具栏
-                    */}
+                    {/* Tab 2: 撰写文章 */}
                     <TabsContent
                       value="article"
                       className="flex-1 flex flex-col mt-0 animate-in fade-in duration-300 h-auto"
                     >
                       {/* 头部信息 */}
-                      <div className="px-6 lg:px-10 pt-8 pb-4 space-y-6 border-y border-stone-100 backdrop-blur-sm">
-                        {/* 封面图片上传区域 */}
+                      <div className="px-4 lg:px-10 pt-6 pb-4 space-y-6 border-y border-stone-100 backdrop-blur-sm">
+                        {/* 封面图片 */}
                         <div className="space-y-3">
                           <input
                             ref={fileInputRef}
@@ -772,7 +665,7 @@ function PublishPageContent() {
                             <div className="relative group">
                               <div 
                                 onClick={handleCoverImageClick}
-                                className="relative w-full h-48 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group-hover:border-[#C82E31]/50 transition-all cursor-pointer"
+                                className="relative w-full h-40 lg:h-48 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group-hover:border-[#C82E31]/50 transition-all cursor-pointer"
                               >
                                 <Image
                                   src={coverImageUrl}
@@ -781,31 +674,22 @@ function PublishPageContent() {
                                   className="object-cover group-hover:opacity-90 transition-opacity pointer-events-none"
                                   sizes="(max-width: 768px) 100vw, 100%"
                                 />
-                                {/* 悬浮提示 */}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
                                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-white text-sm font-medium">
                                     <ImageIcon className="h-4 w-4" />
                                     <span>点击更换封面</span>
                                   </div>
                                 </div>
-                                {/* 删除按钮 */}
                                 <Button
                                   type="button"
                                   variant="destructive"
                                   size="icon"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleRemoveCoverImage()
-                                  }}
-                                  className="absolute top-2 right-2 h-8 w-8 bg-black/50 hover:bg-black/70 text-white border-none shadow-lg z-10"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveCoverImage() }}
+                                  className="absolute top-2 right-2 h-7 w-7 lg:h-8 lg:w-8 bg-black/50 hover:bg-black/70 text-white border-none shadow-lg z-10"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <X className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
                                 </Button>
                               </div>
-                              <p className="text-xs text-stone-400 mt-1 text-center">
-                                建议比例 16:9，点击图片区域可更换
-                              </p>
                             </div>
                           ) : (
                             <Button
@@ -813,19 +697,17 @@ function PublishPageContent() {
                               variant="outline"
                               disabled={uploadingCover}
                               onClick={handleCoverImageClick}
-                              className="w-full h-32 bg-stone-50 border-2 border-dashed border-stone-200 hover:border-[#C82E31]/30 hover:bg-stone-50 text-stone-400 hover:text-[#C82E31] transition-all rounded-xl shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="w-full h-24 lg:h-32 bg-stone-50 border-2 border-dashed border-stone-200 hover:border-[#C82E31]/30 hover:bg-stone-50 text-stone-400 hover:text-[#C82E31] transition-all rounded-xl shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {uploadingCover ? (
                                 <div className="flex items-center gap-2">
-                                  <Loader2 className="h-5 w-5 animate-spin" />
-                                  <span className="text-sm font-medium">上传中...</span>
+                                  <Loader2 className="h-4 w-4 lg:h-5 lg:w-5 animate-spin" />
+                                  <span className="text-xs lg:text-sm font-medium">上传中...</span>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2">
-                                  <ImageIcon className="h-5 w-5" />
-                                  <span className="text-sm font-medium">
-                                    添加文章封面 (建议 16:9)
-                                  </span>
+                                  <ImageIcon className="h-4 w-4 lg:h-5 lg:w-5" />
+                                  <span className="text-xs lg:text-sm font-medium">添加文章封面</span>
                                 </div>
                               )}
                             </Button>
@@ -836,18 +718,17 @@ function PublishPageContent() {
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
                           placeholder="请输入文章标题"
-                          className="input-clean text-4xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight px-0 py-2 shrink-0"
+                          className="input-clean text-2xl lg:text-4xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight px-0 py-2 shrink-0"
                         />
                       </div>
 
-                      {/* 编辑器区域 (容器不限高) */}
-                      <div className="px-6 lg:px-10 py-6 flex-1 bg-white">
+                      {/* 编辑器区域 */}
+                      <div className="px-4 lg:px-10 py-6 flex-1 bg-white">
                         <RichTextEditor
                           content={backgroundDesc}
                           onChange={(content) => setBackgroundDesc(content)}
                           placeholder="开始撰写您的正文... 支持 Markdown 语法"
-                          // 这里的 rich-text-content 类对应 styles 中的自适应样式
-                          className="w-full h-auto border-none focus-within:ring-0 text-lg leading-relaxed text-stone-800 rich-text-content"
+                          className="w-full h-auto border-none focus-within:ring-0 text-base lg:text-lg leading-relaxed text-stone-800 rich-text-content"
                         />
                       </div>
                     </TabsContent>
@@ -856,8 +737,8 @@ function PublishPageContent() {
               </Card>
             </div>
 
-            {/* 右侧助手 (Sidebar) - 智能切换 */}
-            <aside className="w-full lg:w-80 shrink-0 space-y-6 sticky top-24">
+            {/* 右侧助手 (移动端隐藏) */}
+            <aside className="hidden lg:block w-80 shrink-0 space-y-6 sticky top-24">
               <Card className="border-none shadow-sm bg-white overflow-hidden">
                 <div className="h-1.5 bg-gradient-to-r from-stone-200 to-stone-300"></div>
                 <CardHeader className="pb-3">
@@ -870,9 +751,7 @@ function PublishPageContent() {
                   {activeTab === "divination" ? (
                     <>
                       <div className="bg-stone-50 p-3 rounded-lg border border-stone-100">
-                        <p className="leading-relaxed">
-                          描述越清晰，断卦越准确。建议包含：
-                        </p>
+                        <p className="leading-relaxed">描述越清晰，断卦越准确。建议包含：</p>
                         <ul className="list-disc pl-4 mt-2 space-y-1 text-stone-400">
                           <li>起卦的初衷</li>
                           <li>当前遇到的具体困难</li>
@@ -883,36 +762,22 @@ function PublishPageContent() {
                         <p className="font-bold mb-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" /> 关于悬赏
                         </p>
-                        <p className="opacity-80">
-                          悬赏贴通常能在 1
-                          小时内获得高质量回复。结帖时请手动采纳最佳答案。
-                        </p>
+                        <p className="opacity-80">悬赏贴通常能在 1 小时内获得高质量回复。</p>
                       </div>
                     </>
                   ) : (
                     <div className="space-y-4">
                       <div className="bg-stone-50 p-3 rounded-lg border border-stone-100">
-                        <p className="font-bold text-stone-700 mb-2">
-                          优质文章标准：
-                        </p>
+                        <p className="font-bold text-stone-700 mb-2">优质文章标准：</p>
                         <ul className="space-y-2">
-                          <li className="flex gap-2">
-                            <Check className="w-3 h-3 text-green-500 mt-0.5" />{" "}
-                            标题简明扼要
-                          </li>
-                          <li className="flex gap-2">
-                            <Check className="w-3 h-3 text-green-500 mt-0.5" />{" "}
-                            结构清晰，分段合理
-                          </li>
-                          <li className="flex gap-2">
-                            <Check className="w-3 h-3 text-green-500 mt-0.5" />{" "}
-                            引用古籍请注明出处
-                          </li>
+                          <li className="flex gap-2"><Check className="w-3 h-3 text-green-500 mt-0.5" /> 标题简明扼要</li>
+                          <li className="flex gap-2"><Check className="w-3 h-3 text-green-500 mt-0.5" /> 结构清晰，分段合理</li>
+                          <li className="flex gap-2"><Check className="w-3 h-3 text-green-500 mt-0.5" /> 引用古籍请注明出处</li>
                         </ul>
                       </div>
-                      <p className="text-stone-400 pl-1">
-                        <Type className="inline w-3 h-3 mr-1" />
-                        排版清晰的文章更容易获得&ldquo;精选&rdquo;推荐，展示在首页显眼位置。
+                      <p className="text-stone-400 pl-1 gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-type inline w-3 h-3 mr-1" aria-hidden="true"><path d="M12 4v16"></path><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"></path><path d="M9 20h6"></path></svg>
+                        排版清晰的文章更容易获得“精选”推荐，展示在首页显眼位置。
                       </p>
                     </div>
                   )}
@@ -922,13 +787,13 @@ function PublishPageContent() {
           </div>
         </main>
 
-        {/* 历史排盘弹窗 */}
+        {/* 历史排盘弹窗 - 移动端全屏模式优化 */}
         <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>
-          <DialogContent className="max-w-2xl bg-white p-0 gap-0 overflow-hidden border-none shadow-xl">
-            <DialogHeader className="px-6 py-4 border-b border-stone-100 bg-stone-50/50">
+          <DialogContent className="max-w-2xl w-[95vw] lg:w-full bg-white p-0 gap-0 overflow-hidden border-none shadow-xl rounded-xl">
+            <DialogHeader className="px-4 lg:px-6 py-4 border-b border-stone-100 bg-stone-50/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <DialogTitle className="text-lg font-serif font-bold text-stone-900">
+                  <DialogTitle className="text-base lg:text-lg font-serif font-bold text-stone-900">
                     选择排盘记录
                   </DialogTitle>
                   <DialogDescription className="text-xs text-stone-500 mt-1">
@@ -937,7 +802,7 @@ function PublishPageContent() {
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[500px] overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-4 min-h-[300px]">
+            <div className="max-h-[60vh] lg:max-h-[500px] overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-3 lg:p-4 min-h-[300px]">
               {loadingRecords ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[#C82E31]" />
@@ -982,7 +847,7 @@ function PublishPageContent() {
                 </div>
               )}
             </div>
-            <div className="px-6 py-3 border-t border-stone-100 bg-white flex justify-between items-center text-xs text-stone-500">
+            <div className="px-4 lg:px-6 py-3 border-t border-stone-100 bg-white flex justify-between items-center text-xs text-stone-500">
               <span>共 {historyRecords.length} 条记录</span>
               <Button
                 variant="link"

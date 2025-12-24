@@ -88,7 +88,7 @@ const MOCK_CASES: CaseItem[] = [
     },
     {
       id: 3,
-    question: '考虑投资某个项目，想通过占卜了解风险',
+    question: '考虑投资某个项目，想通过推演了解风险',
     background: '朋友介绍了一个投资项目，回报率不错，但需要投入较大资金...',
       tags: ['投资', '决策', '财运'],
     guaName: '天风姤',

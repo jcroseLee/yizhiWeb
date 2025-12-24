@@ -4,8 +4,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "易知 - 六爻占卜",
-  description: "专业的六爻占卜平台",
+  title: "易知 - 六爻推演",
+  description: "专业的六爻推演平台",
 };
 
 export const viewport: Viewport = {

@@ -1,10 +1,10 @@
-# 易知 - 六爻占卜 Web 端
+# 易知 - 六爻推演 Web 端
 
-基于 Next.js + Tailwind CSS 构建的六爻占卜 Web 独立站 PC 端。
+基于 Next.js + Tailwind CSS 构建的六爻推演 Web 独立站 PC 端。
 
 ## 功能特性
 
-- ✅ 六爻占卜功能
+- ✅ 六爻推演功能
   - 手动摇卦
   - 自动摇卦
   - 手工起卦
@@ -33,7 +33,7 @@
 ```
 web/
 ├── app/                    # Next.js App Router 页面
-│   ├── page.tsx           # 首页（占卜功能）
+│   ├── page.tsx           # 首页（推演功能）
 │   ├── result/            # 结果页面
 │   └── layout.tsx         # 根布局
 ├── lib/                    # 核心库文件
@@ -46,7 +46,7 @@ web/
 │   │   └── ExampleUsage.tsx # 组件使用示例
 │   ├── constants/         # 常量定义
 │   │   ├── hexagrams.ts   # 六十四卦数据
-│   │   └── divination.ts  # 占卜相关常量
+│   │   └── divination.ts  # 推演相关常量
 │   ├── stores/           # 状态管理
 │   │   └── divinationStore.ts # 排盘数据管理
 │   ├── utils/             # 工具函数
@@ -111,7 +111,7 @@ npm start
 - [ ] 社区功能
 - [ ] 消息功能
 - [ ] 个人中心
-- [ ] 占卜记录管理
+- [ ] 推演记录管理
 - [ ] AI 解读功能
 - [ ] 笔记功能
 - [ ] 用户认证
@@ -132,7 +132,7 @@ npm start
 ## 注意事项
 
 - 本项目基于原 Taro 小程序项目迁移而来
-- 保留了核心的六爻占卜逻辑和工具函数
+- 保留了核心的六爻推演逻辑和工具函数
 - UI 已适配 PC 端，使用 Tailwind CSS + shadcn/ui 进行样式设计
 - 数据存储使用 localStorage（后续可迁移到 Supabase）
 - 所有 UI 组件都可以直接修改源码进行定制

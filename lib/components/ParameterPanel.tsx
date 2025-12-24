@@ -64,7 +64,7 @@ export default function ParameterPanel({
         <div className="flex items-center justify-between mt-3 px-6">        
           <div>
             <CardTitle className="mb-1 text-lg font-serif text-ink-800">参数设置</CardTitle>
-            <p className="text-xs text-gray-400">调整占卜相关参数</p>
+            <p className="text-xs text-gray-400">调整推演相关参数</p>
           </div>
         </div>
       </CardHeader>

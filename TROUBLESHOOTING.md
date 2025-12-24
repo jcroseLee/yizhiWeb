@@ -9,7 +9,7 @@ Missing Supabase environment variables
 
 ### 解决方案
 
-1. **如果暂时不需要 Supabase 功能**（占卜功能使用 localStorage，不需要 Supabase）：
+1. **如果暂时不需要 Supabase 功能**（推演功能使用 localStorage，不需要 Supabase）：
    - 应用仍然可以正常运行
    - 只是 Supabase 相关功能（用户认证、云端数据存储）将不可用
    - 可以忽略这个警告
@@ -44,7 +44,7 @@ BackgroundService.js:1 Uncaught SyntaxError
 ## 其他常见问题
 
 ### 1. 页面刷新后数据丢失
-- 占卜结果存储在 `localStorage` 中
+- 推演结果存储在 `localStorage` 中
 - 如果使用无痕模式，`localStorage` 会在关闭标签页后清除
 - 这是正常行为
 

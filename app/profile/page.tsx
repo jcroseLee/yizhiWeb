@@ -6,6 +6,7 @@ import {
   Award,
   BookOpen,
   CalendarCheck,
+  CheckSquare,
   Coins,
   Edit2,
   HelpCircle,
@@ -29,7 +30,7 @@ import { RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResu
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
-import { deletePost, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
+import { deleteDraft, deletePost, getUserDrafts, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
   calculateLevel,
   checkIn,
@@ -39,7 +40,7 @@ import {
   hasCheckedInToday,
   type CoinTransaction
 } from '@/lib/services/growth'
-import { deleteDivinationRecord, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
+import { deleteDivinationRecord, deleteDivinationRecords, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
 import { CircularProgress } from './components/CircularProgress'
 import { CoinRulesDialog } from './components/CoinRulesDialog'
@@ -96,7 +97,8 @@ function ProfilePageContent() {
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [favoritePosts, setFavoritePosts] = useState<Post[]>([])
   const [likedPosts, setLikedPosts] = useState<Post[]>([])
-  const [postTab, setPostTab] = useState<'mine' | 'fav' | 'liked'>('mine')
+  const [draftPosts, setDraftPosts] = useState<Post[]>([])
+  const [postTab, setPostTab] = useState<'mine' | 'fav' | 'liked' | 'draft'>('mine')
   const [loadingPosts, setLoadingPosts] = useState(false)
   const [divinationRecords, setDivinationRecords] = useState<DivinationRecord[]>([])
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -121,6 +123,12 @@ function ProfilePageContent() {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [coinRulesDialogOpen, setCoinRulesDialogOpen] = useState(false)
   const [expRulesDialogOpen, setExpRulesDialogOpen] = useState(false)
+  // 使用 ref 追踪已加载的 tab，避免重复请求
+  const loadedTabsRef = useRef<Set<'fav' | 'liked' | 'draft'>>(new Set())
+  // 批量删除排盘记录的状态
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set())
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [batchDeleting, setBatchDeleting] = useState(false)
 
   // Data fetching (保持原有逻辑)
   useEffect(() => {
@@ -176,16 +184,30 @@ function ProfilePageContent() {
         setActivityData(dailyActivity)
         setFollowStats(followStatsData)
         
-        // 预加载收藏和点赞的帖子
+        // 预加载收藏、点赞和草稿的帖子
         try {
-          const [favPosts, likedPostsData] = await Promise.all([
+          const [favPosts, likedPostsData, draftsData] = await Promise.all([
             getUserFavoritePosts({ limit: 50 }),
-            getUserLikedPosts({ limit: 50 })
+            getUserLikedPosts({ limit: 50 }),
+            getUserDrafts({ limit: 50 })
           ])
           setFavoritePosts(favPosts)
           setLikedPosts(likedPostsData)
+          setDraftPosts(draftsData)
+          // 标记这些 tab 已加载
+          loadedTabsRef.current.add('fav')
+          loadedTabsRef.current.add('liked')
+          loadedTabsRef.current.add('draft')
         } catch (error) {
-          console.error('Error loading favorite/liked posts:', error)
+          console.error('Error loading favorite/liked/draft posts:', error)
+          // 出错时设置为空数组，防止 useEffect 无限重试
+          setFavoritePosts([])
+          setLikedPosts([])
+          setDraftPosts([])
+          // 即使出错也标记为已加载，避免重试
+          loadedTabsRef.current.add('fav')
+          loadedTabsRef.current.add('liked')
+          loadedTabsRef.current.add('draft')
         }
       } catch (e) {
         console.error(e)
@@ -217,16 +239,38 @@ function ProfilePageContent() {
 
   // 当切换帖子标签时自动加载
   useEffect(() => {
-    const loadPostsForTab = async (tab: 'mine' | 'fav' | 'liked') => {
-      if (loadingPosts) return
+    const loadPostsForTab = async () => {
+      // 如果是 mine tab，不需要加载（在初始化时已加载）
+      if (postTab === 'mine') return
+      
+      // 检查是否已经加载过或正在加载
+      if (loadingPosts || loadedTabsRef.current.has(postTab)) return
+      
+      // 检查是否已有数据
+      const hasData = 
+        (postTab === 'fav' && favoritePosts.length > 0) ||
+        (postTab === 'liked' && likedPosts.length > 0) ||
+        (postTab === 'draft' && draftPosts.length > 0)
+      
+      if (hasData) {
+        loadedTabsRef.current.add(postTab)
+        return
+      }
+
       setLoadingPosts(true)
       try {
-        if (tab === 'fav' && favoritePosts.length === 0) {
+        if (postTab === 'fav') {
           const posts = await getUserFavoritePosts({ limit: 50 })
           setFavoritePosts(posts)
-        } else if (tab === 'liked' && likedPosts.length === 0) {
+          loadedTabsRef.current.add('fav')
+        } else if (postTab === 'liked') {
           const posts = await getUserLikedPosts({ limit: 50 })
           setLikedPosts(posts)
+          loadedTabsRef.current.add('liked')
+        } else if (postTab === 'draft') {
+          const posts = await getUserDrafts({ limit: 50 })
+          setDraftPosts(posts)
+          loadedTabsRef.current.add('draft')
         }
       } catch (error) {
         console.error('Error loading posts:', error)
@@ -235,8 +279,9 @@ function ProfilePageContent() {
         setLoadingPosts(false)
       }
     }
-    loadPostsForTab(postTab)
-  }, [postTab, loadingPosts, favoritePosts.length, likedPosts.length, toast])
+    loadPostsForTab()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postTab])
 
   // 处理取消关注（在我关注的列表中）
   const handleUnfollow = async (userId: string) => {
@@ -384,16 +429,84 @@ function ProfilePageContent() {
       setRecordToDelete(null)
     }
   }
+
+  // 批量删除处理函数
+  const handleToggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode)
+    setSelectedRecordIds(new Set())
+  }
+
+  const handleToggleSelectRecord = (recordId: string) => {
+    setSelectedRecordIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(recordId)) {
+        newSet.delete(recordId)
+      } else {
+        newSet.add(recordId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedRecordIds.size === divinationRecords.length) {
+      setSelectedRecordIds(new Set())
+    } else {
+      setSelectedRecordIds(new Set(divinationRecords.map(r => r.id)))
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedRecordIds.size === 0) {
+      toast({ title: '请选择要删除的记录', variant: 'destructive' })
+      return
+    }
+
+    setBatchDeleting(true)
+    try {
+      const result = await deleteDivinationRecords(Array.from(selectedRecordIds))
+      
+      if (result.success) {
+        // 从列表中移除已删除的记录
+        setDivinationRecords(prev => prev.filter(r => !selectedRecordIds.has(r.id) || result.failedIds.includes(r.id)))
+        setSelectedRecordIds(new Set())
+        setIsSelectMode(false)
+        
+        toast({ 
+          title: result.message,
+          variant: result.failedIds.length > 0 ? 'default' : 'default'
+        })
+      } else {
+        toast({ title: '删除失败', description: result.message, variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Error batch deleting records:', error)
+      toast({ title: '删除失败', description: '请稍后重试', variant: 'destructive' })
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
   const handleDeletePostClick = (id: string) => { setPostToDelete(id); setDeletePostDialogOpen(true) }
   const handleConfirmDeletePost = async () => { 
       if (!postToDelete) return
       setDeletingPost(true)
       try {
-        await deletePost(postToDelete)
-        setUserPosts(prev => prev.filter(p => p.id !== postToDelete))
-        setFavoritePosts(prev => prev.filter(p => p.id !== postToDelete))
-        setLikedPosts(prev => prev.filter(p => p.id !== postToDelete))
-        toast({ title: '删除成功', variant: 'default' })
+        // 检查是否是草稿
+        const isDraft = draftPosts.some(p => p.id === postToDelete)
+        
+        if (isDraft) {
+          // 删除草稿
+          await deleteDraft(postToDelete)
+          setDraftPosts(prev => prev.filter(p => p.id !== postToDelete))
+          toast({ title: '草稿已删除', variant: 'default' })
+        } else {
+          // 删除已发布的帖子
+          await deletePost(postToDelete)
+          setUserPosts(prev => prev.filter(p => p.id !== postToDelete))
+          setFavoritePosts(prev => prev.filter(p => p.id !== postToDelete))
+          setLikedPosts(prev => prev.filter(p => p.id !== postToDelete))
+          toast({ title: '删除成功', variant: 'default' })
+        }
       } catch {
         toast({ title: '删除失败', variant: 'destructive' })
       } finally {
@@ -651,11 +764,12 @@ function ProfilePageContent() {
                     { id: 'mine', label: '我的发布' },
                     { id: 'fav', label: '我的收藏' },
                     { id: 'liked', label: '我赞过的' },
+                    { id: 'draft', label: '我的草稿' },
                   ].map(tab => (
                     <Button
                       key={tab.id}
                       variant="ghost"
-                      onClick={() => setPostTab(tab.id as 'mine' | 'fav' | 'liked')}
+                      onClick={() => setPostTab(tab.id as 'mine' | 'fav' | 'liked' | 'draft')}
                       className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all h-auto ${
                         postTab === tab.id 
                           ? 'bg-white text-stone-800 shadow-sm' 
@@ -670,13 +784,17 @@ function ProfilePageContent() {
 
               {/* 根据当前标签显示对应的帖子列表 */}
               {(() => {
-                const currentPosts = postTab === 'mine' ? userPosts : postTab === 'fav' ? favoritePosts : likedPosts
+                const currentPosts = postTab === 'mine' ? userPosts 
+                  : postTab === 'fav' ? favoritePosts 
+                  : postTab === 'liked' ? likedPosts 
+                  : draftPosts
                 const isEmpty = currentPosts.length === 0
-                const emptyMessage = postTab === 'mine' 
-                  ? '暂无内容，去发布第一篇帖子吧' 
-                  : postTab === 'fav' 
-                  ? '还没有收藏任何帖子' 
-                  : '还没有点赞任何帖子'
+                const emptyMessage = 
+                  postTab === 'mine' ? '暂无内容，去发布第一篇帖子吧' :
+                  postTab === 'fav' ? '还没有收藏任何帖子' :
+                  postTab === 'liked' ? '还没有点赞任何帖子' :
+                  postTab === 'draft' ? '还没有草稿，去创建第一篇草稿吧' :
+                  '暂无内容'
 
                 if (loadingPosts && isEmpty) {
                   return (
@@ -692,6 +810,8 @@ function ProfilePageContent() {
                       <p className="text-stone-400 text-sm">
                         {postTab === 'mine' ? (
                           <>暂无内容，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/community/publish')}>发布</span>第一篇帖子吧</>
+                        ) : postTab === 'draft' ? (
+                          <>还没有草稿，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/community/publish')}>创建</span>第一篇草稿吧</>
                         ) : (
                           emptyMessage
                         )}
@@ -718,8 +838,27 @@ function ProfilePageContent() {
                     // 获取卦象信息
                     const guaInfo = getGuaInfo(post.divination_record)
 
+                    // 判断是否为草稿
+                    const isDraft = post.status === 'draft' || postTab === 'draft'
+
                     return (
                       <div key={post.id} className="relative group">
+                        {/* 草稿标签 */}
+                        {isDraft && (
+                          <div className="mb-2 flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs text-stone-500 border-stone-300 bg-stone-50">
+                              草稿
+                            </Badge>
+                            <span className="text-xs text-stone-400">
+                              更新于 {new Date(post.updated_at).toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        )}
                         <PostCard 
                           post={{
                             id: post.id,
@@ -736,9 +875,9 @@ function ProfilePageContent() {
                             bounty: post.bounty,
                             coverImage: post.cover_image_url || undefined,
                             stats: {
-                              likes: post.like_count || 0,
-                              comments: post.comment_count || 0,
-                              views: post.view_count || 0,
+                              likes: isDraft ? 0 : (post.like_count || 0),
+                              comments: isDraft ? 0 : (post.comment_count || 0),
+                              views: isDraft ? 0 : (post.view_count || 0),
                             },
                             time: new Date(post.created_at).toLocaleString('zh-CN', {
                               month: '2-digit',
@@ -754,12 +893,24 @@ function ProfilePageContent() {
                           }} 
                         />
                       {/* 编辑/删除按钮 */}
-                      {postTab === 'mine' && (
+                      {(postTab === 'mine' || postTab === 'draft') && (
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                          <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/90 shadow-sm hover:text-blue-600" onClick={() => handleEditPost(post.id)}>
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-8 w-8 bg-white/90 shadow-sm hover:text-blue-600" 
+                            onClick={() => handleEditPost(post.id)}
+                            title={postTab === 'draft' ? '继续编辑草稿' : '编辑帖子'}
+                          >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
-                          <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/90 shadow-sm hover:text-red-600" onClick={() => handleDeletePostClick(post.id)}>
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-8 w-8 bg-white/90 shadow-sm hover:text-red-600" 
+                            onClick={() => handleDeletePostClick(post.id)}
+                            title={postTab === 'draft' ? '删除草稿' : '删除帖子'}
+                          >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
@@ -779,44 +930,144 @@ function ProfilePageContent() {
                   <p className="text-stone-400 text-sm">暂无排盘记录，去<span className="text-[#C82E31] cursor-pointer hover:underline" onClick={() => router.push('/6yao')}>排盘</span>开始你的易学之旅吧</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {divinationRecords.map((record) => (
-                  <div 
-                    key={record.id}
-                    onClick={() => handleRecordClick(record)}
-                    className="group bg-white border border-stone-100 p-4 rounded-xl cursor-pointer hover:border-[#C82E31]/30 hover:shadow-md transition-all relative overflow-hidden"
-                  >
-                    <div className="absolute right-0 top-0 w-20 h-20 bg-stone-50 rounded-bl-[4rem] -mr-4 -mt-4 transition-transform group-hover:scale-110" />
-                    
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] text-stone-400 font-mono bg-stone-50 px-2 py-0.5 rounded-full">
-                          {new Date(record.created_at).toLocaleDateString()}
-                        </span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 -mr-2 -mt-2 text-stone-300 hover:text-red-500 hover:bg-transparent opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteClick(record.id)
-                          }}
+                <>
+                  {/* 批量操作工具栏 */}
+                  <div className="flex items-center justify-between mb-6 bg-stone-50/50 p-4 rounded-lg border border-stone-200">
+                    <div className="flex items-center gap-3">
+                      {isSelectMode ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAll}
+                            className="text-xs h-8"
+                          >
+                            {selectedRecordIds.size === divinationRecords.length ? '取消全选' : '全选'}
+                          </Button>
+                          <span className="text-xs text-stone-500">
+                            已选择 <span className="font-semibold text-[#C82E31]">{selectedRecordIds.size}</span> / {divinationRecords.length} 条记录
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-stone-600">共 {divinationRecords.length} 条排盘记录</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isSelectMode ? (
+                        <>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleBatchDelete}
+                            disabled={selectedRecordIds.size === 0 || batchDeleting}
+                            className="text-xs h-8"
+                          >
+                            {batchDeleting ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                删除中...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                                删除 ({selectedRecordIds.size})
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleToggleSelectMode}
+                            className="text-xs h-8"
+                          >
+                            取消
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleToggleSelectMode}
+                          className="text-xs h-8"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          批量管理
                         </Button>
-                      </div>
-                      <h4 className="font-bold text-stone-800 mb-1 group-hover:text-[#C82E31] transition-colors line-clamp-1">
-                        {record.question || '无题排盘'}
-                      </h4>
-                      <div className="flex items-center gap-2 text-xs text-stone-500">
-                        <span>{record.method === 1 ? '金钱课' : '时间起卦'}</span>
-                        <span className="w-px h-3 bg-stone-200" />
-                        <span>{record.original_key ? '已成卦' : '未成卦'}</span>
-                      </div>
+                      )}
                     </div>
                   </div>
-                  ))}
-                </div>
+
+                  {/* 排盘记录列表 */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {divinationRecords.map((record) => (
+                    <div 
+                      key={record.id}
+                      onClick={(e) => {
+                        if (isSelectMode) {
+                          e.stopPropagation()
+                          handleToggleSelectRecord(record.id)
+                        } else {
+                          handleRecordClick(record)
+                        }
+                      }}
+                      className={`group bg-white border p-4 rounded-xl cursor-pointer transition-all relative overflow-hidden ${
+                        isSelectMode
+                          ? selectedRecordIds.has(record.id)
+                            ? 'border-[#C82E31] shadow-md bg-red-50/30'
+                            : 'border-stone-100 hover:border-stone-200'
+                          : 'border-stone-100 hover:border-[#C82E31]/30 hover:shadow-md'
+                      }`}
+                    >
+                      {/* 选择框 */}
+                      {isSelectMode && (
+                        <div className="absolute left-3 top-3 z-20">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                            selectedRecordIds.has(record.id)
+                              ? 'bg-[#C82E31] border-[#C82E31]'
+                              : 'bg-white border-stone-300'
+                          }`}>
+                            {selectedRecordIds.has(record.id) && (
+                              <CheckSquare className="w-4 h-4 text-white" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="absolute right-0 top-0 w-20 h-20 bg-stone-50 rounded-bl-[4rem] -mr-4 -mt-4 transition-transform group-hover:scale-110" />
+                      
+                      <div className={`relative z-10 ${isSelectMode ? 'ml-8' : ''}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[10px] text-stone-400 font-mono bg-stone-50 px-2 py-0.5 rounded-full">
+                            {new Date(record.created_at).toLocaleDateString()}
+                          </span>
+                          {!isSelectMode && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 -mr-2 -mt-2 text-stone-300 hover:text-red-500 hover:bg-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteClick(record.id)
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        <h4 className={`font-bold text-stone-800 mb-1 transition-colors line-clamp-1 ${
+                          !isSelectMode && 'group-hover:text-[#C82E31]'
+                        }`}>
+                          {record.question || '无题排盘'}
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs text-stone-500">
+                          <span>{record.method === 1 ? '金钱课' : '时间起卦'}</span>
+                          <span className="w-px h-3 bg-stone-200" />
+                          <span>{record.original_key ? '已成卦' : '未成卦'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    ))}
+                  </div>
+                </>
               )}
             </TabsContent>
 

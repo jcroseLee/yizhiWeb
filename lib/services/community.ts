@@ -1,5 +1,6 @@
 import { getCurrentUser } from './auth'
 import { getSupabaseClient } from './supabaseClient'
+import { logError } from '../utils/errorLogger'
 
 // -----------------------------------------------------------------------------
 // 图片上传工具函数
@@ -96,6 +97,7 @@ export interface Post {
   comment_count: number
   created_at: string
   updated_at: string
+  status?: 'published' | 'draft' | 'archived'  // 帖子状态
   // 关联的用户信息
   author?: {
     id: string
@@ -198,6 +200,7 @@ export async function getPosts(options?: {
   } = options || {}
 
   // 查询帖子，同时获取关联的排盘记录
+  // 只查询已发布的帖子（status = 'published'），排除草稿
   let query = supabase
     .from('posts')
     .select(`
@@ -210,6 +213,7 @@ export async function getPosts(options?: {
         changing_flags
       )
     `)
+    .eq('status', 'published')  // 只显示已发布的帖子，排除草稿
     .order(orderBy, { ascending: orderDirection === 'asc' })
     .range(offset, offset + limit - 1)
 
@@ -221,7 +225,7 @@ export async function getPosts(options?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching posts:', error)
+    logError('Error fetching posts:', error)
     throw error
   }
 
@@ -380,9 +384,17 @@ export async function getPost(postId: string): Promise<Post | null> {
   if (error) {
     // 如果是帖子不存在（PGRST116），返回 null 而不是抛出错误
     if (error.code === 'PGRST116') {
+      console.debug(`Post ${postId} not found (may have been deleted)`)
       return null
     }
-    // 提供更详细的错误信息
+    
+    // 检查是否是空错误对象（通常表示帖子已删除或无权访问）
+    if (!error.message && !error.code) {
+      console.debug(`Post ${postId} returned empty error (may have been deleted or inaccessible)`)
+      return null
+    }
+    
+    // 提供更详细的错误信息（仅用于真正的错误）
     const errorMessage = error.message || error.code || 'Unknown error'
     const errorDetails = {
       message: errorMessage,
@@ -505,7 +517,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
     .single()
 
   if (error) {
-    console.error('Error creating post:', error)
+    logError('Error creating post:', error)
     throw error
   }
 
@@ -529,7 +541,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
     await addExp(20, '发布帖子')
   } catch (error) {
     // 静默处理错误，不影响帖子发布
-    console.error('Failed to add exp for post creation:', error)
+    logError('Failed to add exp for post creation:', error)
   }
 
   return {
@@ -562,6 +574,7 @@ export async function updatePost(
       title: updates.title,
       content: updates.content,
       content_html: updates.content_html || updates.content,
+      cover_image_url: updates.cover_image_url,
     })
     .eq('id', postId)
     .eq('user_id', currentUser.id)
@@ -610,10 +623,12 @@ export async function getUserPosts(options?: {
     throw new Error('Supabase client not initialized')
   }
 
+  // 获取当前用户（用于判断是否是查看自己的帖子）
+  const currentUser = await getCurrentUser()
+  
   // 如果没有提供userId，使用当前登录用户
   let targetUserId = options?.userId
   if (!targetUserId) {
-    const currentUser = await getCurrentUser()
     if (!currentUser) {
       throw new Error('User not authenticated')
     }
@@ -628,6 +643,9 @@ export async function getUserPosts(options?: {
   } = options || {}
 
   // 查询用户的帖子，同时获取关联的排盘记录
+  // 如果查看的是当前用户的帖子，包括草稿；否则只显示已发布的
+  const isOwnPosts = currentUser?.id === targetUserId
+  
   let query = supabase
     .from('posts')
     .select(`
@@ -643,6 +661,15 @@ export async function getUserPosts(options?: {
     .eq('user_id', targetUserId)
     .order(orderBy, { ascending: orderDirection === 'asc' })
     .range(offset, offset + limit - 1)
+  
+  // 如果不是查看自己的帖子，只显示已发布的
+  // 如果是查看自己的帖子，包括已发布和草稿（不限制 status）
+  if (!isOwnPosts) {
+    query = query.eq('status', 'published')
+  } else {
+    // 明确包含已发布和草稿（排除已归档的）
+    query = query.in('status', ['published', 'draft'])
+  }
 
   const { data, error } = await query
 
@@ -669,7 +696,6 @@ export async function getUserPosts(options?: {
   } : null
 
   // 获取当前登录用户点赞和收藏的帖子ID列表
-  const currentUser = await getCurrentUser()
   let likedPostIds: string[] = []
   let favoritedPostIds: string[] = []
   if (currentUser) {
@@ -754,6 +780,7 @@ export async function getUserFavoritePosts(options?: {
   const postIds = favorites.map(f => f.post_id)
 
   // 查询帖子详情，同时获取关联的排盘记录
+  // 只查询已发布的帖子，排除草稿
   const { data: posts, error: postsError } = await supabase
     .from('posts')
     .select(`
@@ -767,6 +794,7 @@ export async function getUserFavoritePosts(options?: {
       )
     `)
     .in('id', postIds)
+    .eq('status', 'published')  // 只显示已发布的帖子
     .order('created_at', { ascending: false })
 
   if (postsError) {
@@ -873,6 +901,7 @@ export async function getUserLikedPosts(options?: {
   const postIds = likes.map(l => l.post_id)
 
   // 查询帖子详情，同时获取关联的排盘记录
+  // 只查询已发布的帖子，排除草稿
   const { data: posts, error: postsError } = await supabase
     .from('posts')
     .select(`
@@ -886,6 +915,7 @@ export async function getUserLikedPosts(options?: {
       )
     `)
     .in('id', postIds)
+    .eq('status', 'published')  // 只显示已发布的帖子
     .order('created_at', { ascending: false })
 
   if (postsError) {
@@ -1111,7 +1141,7 @@ export async function getComments(postId: string): Promise<Comment[]> {
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Error fetching comments:', error)
+    logError('Error fetching comments:', error)
     throw error
   }
 
@@ -1305,7 +1335,7 @@ export async function createComment(
     .single()
 
   if (error) {
-    console.error('Error creating comment:', error)
+    logError('Error creating comment:', error)
     throw error
   }
 
@@ -1696,6 +1726,388 @@ export async function cancelAdoptComment(commentId: string, postId: string): Pro
   } catch (error) {
     console.error('Error canceling adopt:', error)
     return { success: false, message: '取消采纳失败，请重试' }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 草稿箱功能
+// -----------------------------------------------------------------------------
+
+/**
+ * 保存为草稿
+ */
+export async function saveDraft(input: CreatePostInput): Promise<Post> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  // 构建插入数据，只包含有值的字段
+  const insertData: Record<string, any> = {
+    user_id: currentUser.id,
+    title: input.title || '未命名草稿',
+    content: input.content || '',
+    content_html: input.content_html || input.content || '',
+    type: input.type || 'theory',
+  }
+
+  // 只添加有值的可选字段
+  if (input.bounty !== undefined && input.bounty !== null && input.bounty > 0) {
+    insertData.bounty = input.bounty
+  } else {
+    insertData.bounty = 0
+  }
+
+  if (input.divination_record_id) {
+    insertData.divination_record_id = input.divination_record_id
+  }
+
+  if (input.cover_image_url) {
+    insertData.cover_image_url = input.cover_image_url
+  }
+
+  // 尝试添加 status 字段（如果字段不存在，会报错）
+  insertData.status = 'draft'
+
+  const { data, error } = await supabase
+    .from('posts')
+    .insert(insertData)
+    .select('*')
+    .single()
+
+  if (error) {
+    // 检查是否是字段不存在的错误
+    const errorMessage = error.message || ''
+    const errorCode = error.code || ''
+    const errorDetails = error.details || ''
+    const errorHint = error.hint || ''
+    
+    // 如果错误信息包含 "column" 和 "does not exist"，说明字段不存在
+    if (
+      errorMessage.toLowerCase().includes('column') && 
+      (errorMessage.toLowerCase().includes('does not exist') || 
+       errorMessage.toLowerCase().includes('不存在'))
+    ) {
+      const missingField = errorMessage.match(/column "(\w+)" does not exist/i)?.[1] ||
+                          errorMessage.match(/列 "(\w+)" 不存在/i)?.[1]
+      logError('Error saving draft - Database migration required:', {
+        message: `字段 "${missingField || 'status'}" 不存在，请运行数据库迁移`,
+        code: errorCode,
+        details: errorDetails,
+        hint: errorHint || '请执行迁移文件: supabase/migrations/20250223_add_draft_status_to_posts.sql',
+        fullError: error,
+      })
+      throw new Error(
+        `❌ 数据库字段缺失：${missingField || 'status'}\n\n` +
+        `请运行数据库迁移后再试。\n` +
+        `迁移文件: supabase/migrations/20250223_add_draft_status_to_posts.sql\n\n` +
+        `快速修复：在 Supabase Dashboard 的 SQL Editor 中执行：\n` +
+        `ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published' CHECK (status IN ('published', 'draft', 'archived'));`
+      )
+    }
+    
+    // 检查是否是约束错误（如 status 值不符合约束）
+    if (
+      errorMessage.toLowerCase().includes('check constraint') ||
+      errorMessage.toLowerCase().includes('violates check constraint')
+    ) {
+      logError('Error saving draft - Constraint violation:', {
+        message: errorMessage,
+        code: errorCode,
+        details: errorDetails,
+        hint: errorHint || 'status 字段的值必须是 published, draft 或 archived',
+        fullError: error,
+      })
+      throw new Error(
+        `❌ 数据约束错误：${errorMessage}\n\n` +
+        `请检查 status 字段的值是否正确。`
+      )
+    }
+    
+    // 记录详细错误信息
+    logError('Error saving draft:', {
+      message: errorMessage || '未知错误',
+      code: errorCode || 'UNKNOWN',
+      details: errorDetails || '',
+      hint: errorHint || '',
+      fullError: error,
+      insertData: insertData, // 记录插入的数据以便调试
+    })
+    
+    // 抛出更友好的错误
+    throw new Error(
+      `保存草稿失败：${errorMessage || '未知错误'}\n` +
+      (errorCode ? `错误代码: ${errorCode}\n` : '') +
+      (errorHint ? `提示: ${errorHint}` : '')
+    )
+  }
+
+  // 查询用户信息
+  let author = null
+  if (data.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .eq('id', data.user_id)
+      .single()
+
+    if (profile) {
+      author = {
+        id: profile.id,
+        nickname: profile.nickname,
+        avatar_url: profile.avatar_url,
+      }
+    }
+  }
+
+  return {
+    ...data,
+    author,
+    is_liked: false,
+  }
+}
+
+/**
+ * 更新草稿
+ */
+export async function updateDraft(
+  draftId: string,
+  updates: Partial<CreatePostInput>
+): Promise<Post> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const { data, error } = await supabase
+    .from('posts')
+    .update({
+      title: updates.title,
+      content: updates.content,
+      content_html: updates.content_html || updates.content,
+      cover_image_url: updates.cover_image_url,
+      type: updates.type,
+      bounty: updates.bounty,
+      divination_record_id: updates.divination_record_id,
+    })
+    .eq('id', draftId)
+    .eq('user_id', currentUser.id)
+    .eq('status', 'draft')  // 只能更新草稿
+    .select('*')
+    .single()
+
+  if (error) {
+    logError('Error updating draft:', error)
+    throw error
+  }
+
+  // 查询用户信息
+  let author = null
+  if (data.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .eq('id', data.user_id)
+      .single()
+
+    if (profile) {
+      author = {
+        id: profile.id,
+        nickname: profile.nickname,
+        avatar_url: profile.avatar_url,
+      }
+    }
+  }
+
+  return {
+    ...data,
+    author,
+    is_liked: false,
+  }
+}
+
+/**
+ * 发布草稿（将草稿状态改为已发布）
+ */
+export async function publishDraft(draftId: string): Promise<Post> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const { data, error } = await supabase
+    .from('posts')
+    .update({
+      status: 'published',
+    })
+    .eq('id', draftId)
+    .eq('user_id', currentUser.id)
+    .eq('status', 'draft')  // 只能发布草稿
+    .select('*')
+    .single()
+
+  if (error) {
+    logError('Error publishing draft:', error)
+    throw error
+  }
+
+  // 发布后添加修业值
+  try {
+    const { addExp } = await import('./growth')
+    await addExp(10, '发布帖子')
+  } catch (error) {
+    logError('Failed to add exp for publishing post:', error)
+  }
+
+  // 查询用户信息
+  let author = null
+  if (data.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .eq('id', data.user_id)
+      .single()
+
+    if (profile) {
+      author = {
+        id: profile.id,
+        nickname: profile.nickname,
+        avatar_url: profile.avatar_url,
+      }
+    }
+  }
+
+  return {
+    ...data,
+    author,
+    is_liked: false,
+  }
+}
+
+/**
+ * 获取用户的草稿列表
+ */
+export async function getUserDrafts(
+  options?: {
+    limit?: number
+    offset?: number
+  }
+): Promise<Post[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const {
+    limit = 50,
+    offset = 0,
+  } = options || {}
+
+  const { data, error } = await supabase
+    .from('posts')
+    .select(`
+      *,
+      divination_records (
+        id,
+        original_key,
+        changed_key,
+        lines,
+        changing_flags
+      )
+    `)
+    .eq('user_id', currentUser.id)
+    .eq('status', 'draft')
+    .order('updated_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    logError('Error fetching drafts:', error)
+    throw error
+  }
+
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  // 获取用户信息
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, nickname, avatar_url')
+    .eq('id', currentUser.id)
+    .single()
+
+  const author = profile ? {
+    id: profile.id,
+    nickname: profile.nickname,
+    avatar_url: profile.avatar_url,
+  } : null
+
+  // 格式化数据
+  return data.map((post: any) => {
+    // 处理 divination_records
+    let divinationRecord = null
+    if (post.divination_records) {
+      if (Array.isArray(post.divination_records)) {
+        divinationRecord = post.divination_records.length > 0 ? post.divination_records[0] : null
+      } else {
+        divinationRecord = post.divination_records
+      }
+    }
+
+    return {
+      ...post,
+      author,
+      is_liked: false,
+      is_favorited: false,
+      divination_record: divinationRecord,
+    }
+  })
+}
+
+/**
+ * 删除草稿
+ */
+export async function deleteDraft(draftId: string): Promise<void> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
+  const { error } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', draftId)
+    .eq('user_id', currentUser.id)
+    .eq('status', 'draft')  // 只能删除草稿
+
+  if (error) {
+    logError('Error deleting draft:', error)
+    throw error
   }
 }
 

@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient'
 import { getCurrentUser } from './auth'
+import { logError } from '../utils/errorLogger'
 
 // -----------------------------------------------------------------------------
 // 类型定义
@@ -8,7 +9,7 @@ import { getCurrentUser } from './auth'
 export interface Notification {
   id: string
   user_id: string
-  type: 'comment' | 'like' | 'reply' | 'follow' | 'system'
+  type: 'comment' | 'like' | 'reply' | 'follow' | 'system' | 'report_resolved' | 'report_rejected'
   related_id: string
   related_type: 'post' | 'comment' | 'user'
   actor_id: string | null
@@ -60,7 +61,7 @@ export async function getNotifications(
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching notifications:', error)
+      logError('Error fetching notifications:', error)
       throw error
     }
 
@@ -93,7 +94,7 @@ export async function getNotifications(
 
     return data
   } catch (error: any) {
-    console.error('Error in getNotifications:', error)
+    logError('Error in getNotifications:', error)
     throw error
   }
 }
@@ -120,13 +121,13 @@ export async function getUnreadNotificationCount(): Promise<number> {
       .eq('is_read', false)
 
     if (error) {
-      console.error('Error getting unread notification count:', error)
+      logError('Error getting unread notification count:', error)
       return 0
     }
 
     return count || 0
   } catch (error) {
-    console.error('Error in getUnreadNotificationCount:', error)
+    logError('Error in getUnreadNotificationCount:', error)
     return 0
   }
 }
@@ -153,13 +154,13 @@ export async function markNotificationAsRead(notificationId: string): Promise<bo
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error marking notification as read:', error)
+      logError('Error marking notification as read:', error)
       throw error
     }
 
     return true
   } catch (error: any) {
-    console.error('Error in markNotificationAsRead:', error)
+    logError('Error in markNotificationAsRead:', error)
     throw error
   }
 }
@@ -186,13 +187,13 @@ export async function markAllNotificationsAsRead(): Promise<boolean> {
       .eq('is_read', false)
 
     if (error) {
-      console.error('Error marking all notifications as read:', error)
+      logError('Error marking all notifications as read:', error)
       throw error
     }
 
     return true
   } catch (error: any) {
-    console.error('Error in markAllNotificationsAsRead:', error)
+    logError('Error in markAllNotificationsAsRead:', error)
     throw error
   }
 }
@@ -297,14 +298,14 @@ export async function createNotification(
     })
 
     if (error) {
-      console.error('Error creating notification:', error)
+      logError('Error creating notification:', error)
       return false
     }
 
     // 函数返回通知ID（uuid），如果成功则返回true
     return data !== null && data !== undefined
   } catch (error) {
-    console.error('Error in createNotification:', error)
+    logError('Error in createNotification:', error)
     return false
   }
 }

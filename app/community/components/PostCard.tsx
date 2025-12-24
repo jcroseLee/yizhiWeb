@@ -8,11 +8,12 @@ import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { togglePostFavorite, togglePostLike } from '@/lib/services/community'
-import { Bookmark, Coins, Flame, Heart, MessageSquare, MoreHorizontal } from 'lucide-react'
+import { Bookmark, Coins, Flag, Heart, MessageSquare, MoreHorizontal } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import ReportDialog from './ReportDialog'
 
 // -----------------------------------------------------------------------------
 // 样式定义
@@ -173,6 +174,14 @@ export interface Post {
   isFavorited?: boolean
 }
 
+// 帖子类型配置
+const POST_TYPE_CONFIG = {
+  theory: { label: '论道', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+  help: { label: '悬卦', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  debate: { label: '争鸣', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+  chat: { label: '茶寮', color: 'bg-green-50 text-green-600 border-green-100' },
+}
+
 // -----------------------------------------------------------------------------
 // 主组件
 // -----------------------------------------------------------------------------
@@ -187,10 +196,10 @@ export default function PostCard({ post }: { post: Post }) {
   const [favorited, setFavorited] = useState(!!post.isFavorited)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
   
-  const isDebate = post.type === 'debate';
   const showMedia = (post.hasGua && post.guaName) || post.coverImage;
   const bountyAmount = typeof post.bounty === 'number' ? post.bounty : Number(post.bounty) || 0;
   const hasBounty = bountyAmount > 0;
+  const typeConfig = POST_TYPE_CONFIG[post.type] || POST_TYPE_CONFIG.chat;
 
   useEffect(() => {
     getCurrentUser().then(setCurrentUser)
@@ -264,12 +273,10 @@ export default function PostCard({ post }: { post: Post }) {
           {/* 1. 标题 (核心焦点) */}
           <Link href={`/community/${post.id}`} className="block group/title">
             <h3 className="text-[19px] leading-snug font-bold text-[#1c1c1c] group-hover/title:text-[#C82E31] transition-colors font-serif tracking-tight mb-1">
-              {/* 争鸣标签 */}
-              {isDebate && (
-                <span className="inline-flex items-center align-middle mr-2 px-1.5 py-0.5 rounded text-xs font-normal bg-blue-50 text-blue-600 border border-blue-100">
-                  <Flame className="w-3 h-3 mr-0.5 fill-current" />争鸣
-                </span>
-              )}
+              {/* 帖子类型标签 */}
+              <span className={`inline-flex items-center align-middle mr-2 px-1.5 py-0.5 rounded text-xs font-normal border ${typeConfig.color}`}>
+                {typeConfig.label}
+              </span>
               {/* 悬赏标签 (仅当 > 0 时显示) */}
               {hasBounty && (
                 <span className="inline-flex items-center align-middle mr-2 px-1.5 py-0.5 rounded text-xs font-normal bg-amber-50 text-amber-700 border border-amber-200">
@@ -380,10 +387,22 @@ export default function PostCard({ post }: { post: Post }) {
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-24 p-1">
-                  <Button variant="ghost" className="w-full h-8 text-xs justify-start px-2" onClick={(e) => { e.stopPropagation(); toast({ title: '已举报' }) }}>
-                    举报
-                  </Button>
+                <PopoverContent align="end" className="w-32 p-1 bg-white">
+                  <ReportDialog
+                    targetId={post.id}
+                    targetType="post"
+                    postTitle={post.title}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        className="w-full h-8 text-xs justify-start px-2 text-stone-600 hover:text-[#C82E31] hover:bg-red-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Flag className="w-3.5 h-3.5 mr-1.5" />
+                        举报违规
+                      </Button>
+                    }
+                  />
                 </PopoverContent>
               </Popover>
             </div>

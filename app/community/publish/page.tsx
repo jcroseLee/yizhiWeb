@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/ta
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
-import { createPost, getPost, updatePost, uploadPostCover } from '@/lib/services/community'
+import { createPost, getPost, publishDraft, saveDraft, updateDraft, updatePost, uploadPostCover } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord } from '@/lib/services/profile'
 import {
   ArrowLeft,
@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   Loader2,
   PenTool,
+  Save,
   ScrollText,
   Send,
   Sparkles,
@@ -218,6 +219,8 @@ export default function PublishPageSimple() {
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [backgroundDesc, setBackgroundDesc] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isDraft, setIsDraft] = useState(false)  // 是否为草稿
   const [historyRecords, setHistoryRecords] = useState<RecordDisplay[]>([])
   const [loadingRecords, setLoadingRecords] = useState(false)
   // 封面图片相关状态
@@ -296,6 +299,7 @@ export default function PublishPageSimple() {
             setTitle(post.title)
             setBounty(post.bounty || 0)
             setCoverImageUrl(post.cover_image_url || null)
+            setIsDraft(post.status === 'draft')  // 识别是否为草稿
             
             // 根据帖子类型设置 tab 和内容
             if (post.type === 'help' && post.divination_record) {
@@ -428,7 +432,7 @@ export default function PublishPageSimple() {
       const postData = {
         title: title.trim(),
         content: content.trim(),
-        type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
+        type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat', // 求测默认悬卦，写文章默认论道
         bounty: bounty > 0 ? bounty : undefined,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
@@ -436,9 +440,18 @@ export default function PublishPageSimple() {
       
       let post
       if (isEditMode && editingPostId) {
-        // 编辑模式：更新帖子
-        post = await updatePost(editingPostId, postData)
-        toast({ title: '更新成功' })
+        // 编辑模式
+        if (isDraft) {
+          // 如果是草稿，发布它
+          post = await publishDraft(editingPostId)
+          // 还需要更新内容
+          post = await updatePost(editingPostId, postData)
+          toast({ title: '发布成功' })
+        } else {
+          // 更新已发布的帖子
+          post = await updatePost(editingPostId, postData)
+          toast({ title: '更新成功' })
+        }
       } else {
         // 新建模式：创建帖子
         post = await createPost(postData)
@@ -454,6 +467,56 @@ export default function PublishPageSimple() {
       })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+  
+  // 保存为草稿
+  const handleSaveDraft = async () => {
+    if (!title.trim() && !backgroundDesc.trim()) {
+      return toast({ title: '请至少填写标题或内容', variant: 'destructive' })
+    }
+    
+    try {
+      setIsSavingDraft(true)
+      let content = backgroundDesc
+      if (activeTab === 'divination' && selectedRecord) {
+        const guaInfo = selectedRecord.record.question 
+          ? `**关联排盘：${selectedRecord.gua}**\n**问题：${selectedRecord.record.question}**\n\n${backgroundDesc}`
+          : `**关联排盘：${selectedRecord.gua}**\n\n${backgroundDesc}`
+        content = guaInfo
+      }
+      
+      const draftData = {
+        title: title.trim() || '未命名草稿',
+        content: content.trim() || '',
+        type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
+        bounty: bounty > 0 ? bounty : undefined,
+        divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
+        cover_image_url: coverImageUrl || null,
+      }
+      
+      let draft
+      if (isEditMode && editingPostId && isDraft) {
+        // 更新现有草稿
+        draft = await updateDraft(editingPostId, draftData)
+        toast({ title: '草稿已更新' })
+      } else {
+        // 创建新草稿
+        draft = await saveDraft(draftData)
+        toast({ title: '草稿已保存' })
+        // 保存后切换到编辑模式
+        setIsEditMode(true)
+        setEditingPostId(draft.id)
+        setIsDraft(true)
+      }
+    } catch (error) {
+      toast({ 
+        title: '保存草稿失败', 
+        description: error instanceof Error ? error.message : '未知错误', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setIsSavingDraft(false)
     }
   }
 
@@ -480,25 +543,40 @@ export default function PublishPageSimple() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-stone-400 hidden sm:inline-block">
+              {/* <span className="text-xs text-stone-400 hidden sm:inline-block">
                 已自动保存
-              </span>
-              <Button
-                className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-6 shadow-md shadow-red-100 transition-all"
-                onClick={handlePublish}
-                disabled={
-                  isSubmitting ||
-                  !title.trim() ||
-                  (activeTab === "divination" && !selectedRecord)
-                }
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                {isSubmitting ? (isEditMode ? "更新中" : "发布中") : (isEditMode ? "更新" : "发布")}
-              </Button>
+              </span> */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-full px-6"
+                  onClick={handleSaveDraft}
+                  disabled={isSavingDraft || isSubmitting}
+                >
+                  {isSavingDraft ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isSavingDraft ? '保存中' : '保存草稿'}
+                </Button>
+                <Button
+                  className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-6 shadow-md shadow-red-100 transition-all"
+                  onClick={handlePublish}
+                  disabled={
+                    isSubmitting ||
+                    !title.trim() ||
+                    (activeTab === "divination" && !selectedRecord)
+                  }
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  {isSubmitting ? (isEditMode ? "更新中" : "发布中") : (isDraft ? "发布" : (isEditMode ? "更新" : "发布"))}
+                </Button>
+              </div>
             </div>
           </div>
         </header>

@@ -246,7 +246,8 @@ export default function MessagesPage() {
     try {
       const allNotifs = await getNotifications(100, 0, false)
       const social = allNotifs.filter(n => ['like', 'comment', 'reply', 'follow'].includes(n.type))
-      const system = allNotifs.filter(n => n.type === 'system')
+      // 系统通知包括: system, report_resolved, report_rejected
+      const system = allNotifs.filter(n => ['system', 'report_resolved', 'report_rejected'].includes(n.type))
       
       setSocialNotifications(social)
       setSystemNotifications(system)
@@ -271,7 +272,7 @@ export default function MessagesPage() {
               return await getPost(id)
             } catch (error) {
               // 静默处理错误，可能是帖子不存在或已被删除
-              console.warn(`Failed to load post ${id}:`, error)
+              console.debug(`Failed to load post ${id}:`, error)
               return null
             }
           })
@@ -311,6 +312,7 @@ export default function MessagesPage() {
                     return await getPost(id)
                   } catch {
                     // 静默处理错误，可能是帖子不存在或已被删除
+                    console.debug(`Failed to load post ${id}`)
                     return null
                   }
                 })
@@ -342,7 +344,8 @@ export default function MessagesPage() {
     const subConvs = subscribeToConversations(loadConversations)
     const subNotifs = subscribeToNotifications((n) => {
       if (!n) { loadNotifications(); return }
-      if (n.type === 'system') {
+      // 举报处理通知也归类为系统通知
+      if (n.type === 'system' || n.type === 'report_resolved' || n.type === 'report_rejected') {
         setSystemNotifications(prev => [n, ...prev])
         if (!n.is_read) setUnreadSystemCount(c => c + 1)
       } else {
@@ -516,25 +519,53 @@ export default function MessagesPage() {
           </div>
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-4">
-              {systemNotifications.length === 0 ? <div className="text-center text-stone-400 py-8">暂无系统通知</div> : systemNotifications.map(msg => (
-                <div key={msg.id} onClick={async () => {
-                  if (!msg.is_read) {
-                    await markNotificationAsRead(msg.id)
-                    setUnreadSystemCount(c => Math.max(0, c - 1))
-                    setSystemNotifications(prev => prev.map(n => n.id === msg.id ? { ...n, is_read: true } : n))
-                  }
-                }} className="flex items-start gap-4 p-4 rounded-xl border border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer">
-                  <div className="p-2.5 rounded-full shrink-0 bg-blue-50 text-blue-500"><Bell size={18} /></div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <span className="text-sm font-bold text-stone-800">系统通知</span>
-                      <span className="text-xs text-stone-400">{formatTime(msg.created_at)}</span>
+              {systemNotifications.length === 0 ? <div className="text-center text-stone-400 py-8">暂无系统通知</div> : systemNotifications.map(msg => {
+                // 根据通知类型显示不同的图标和标题
+                const isReportNotif = msg.type === 'report_resolved' || msg.type === 'report_rejected'
+                const reportAction = msg.type === 'report_resolved' ? '已处理' : msg.type === 'report_rejected' ? '已驳回' : ''
+                const bgColor = msg.type === 'report_resolved' ? 'bg-green-50 text-green-500' : 
+                               msg.type === 'report_rejected' ? 'bg-orange-50 text-orange-500' : 
+                               'bg-blue-50 text-blue-500'
+                const hoverBgColor = msg.type === 'report_resolved' ? 'group-hover:bg-green-100' : 
+                                    msg.type === 'report_rejected' ? 'group-hover:bg-orange-100' : 
+                                    'group-hover:bg-blue-100'
+                const title = isReportNotif ? `举报${reportAction}` : '系统通知'
+                
+                return (
+                  <div key={msg.id} onClick={async () => {
+                    if (!msg.is_read) {
+                      await markNotificationAsRead(msg.id)
+                      setUnreadSystemCount(c => Math.max(0, c - 1))
+                      setSystemNotifications(prev => prev.map(n => n.id === msg.id ? { ...n, is_read: true } : n))
+                    }
+                    // 如果是举报通知且有帖子ID，可以跳转到帖子
+                    if (isReportNotif && msg.metadata?.post_id) {
+                      router.push(`/community/${msg.metadata.post_id}`)
+                    }
+                  }} className="flex items-start gap-4 p-4 rounded-xl border border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer group">
+                    <div className={`p-2.5 rounded-full shrink-0 ${bgColor} ${hoverBgColor} transition-colors`}>
+                      <Bell size={18} />
                     </div>
-                    <p className="text-sm text-stone-600 mt-1">{msg.content}</p>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <span className="text-sm font-bold text-stone-800">{title}</span>
+                        <span className="text-xs text-stone-400">{formatTime(msg.created_at)}</span>
+                      </div>
+                      <p className="text-sm text-stone-600 mt-1">{msg.content}</p>
+                      {/* 显示举报相关的元数据 */}
+                      {isReportNotif && msg.metadata?.post_title && (
+                        <div className="mt-2 p-2 bg-stone-50 rounded text-xs text-stone-500 border border-stone-100">
+                          <div className="font-medium">相关帖子: {msg.metadata.post_title}</div>
+                          {msg.metadata.admin_note && (
+                            <div className="mt-1 text-stone-400">备注: {msg.metadata.admin_note}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {!msg.is_read && <div className="w-2 h-2 rounded-full bg-[#C82E31]" />}
                   </div>
-                  {!msg.is_read && <div className="w-2 h-2 rounded-full bg-[#C82E31]" />}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </ScrollArea>
         </div>

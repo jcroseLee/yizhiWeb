@@ -1,13 +1,12 @@
 'use client'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
-import { Bookmark, Coins, FileText } from 'lucide-react'
+import { Card, CardContent } from '@/lib/components/ui/card'
+import { calculateLevel, getUserGrowth } from '@/lib/services/growth'
+import { getUserFollowStats, getUserProfile } from '@/lib/services/profile'
+import { Coins, FileText, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { getUserProfile } from '@/lib/services/profile'
-import { getUserGrowth } from '@/lib/services/growth'
-import { Card, CardContent } from '@/lib/components/ui/card'
-import { calculateLevel } from '@/lib/services/growth'
 
 /**
  * 作者/用户信息卡片 (User Info Card)
@@ -18,9 +17,10 @@ export default function UserInfoCard() {
     name: string
     level: number
     avatar: string | null
+    motto: string | null
     stats: {
       posts: number
-      collections: number
+      followers: number
       coins: number
     }
   } | null>(null)
@@ -31,14 +31,16 @@ export default function UserInfoCard() {
         const profile = await getUserProfile()
         if (profile) {
           const growth = await getUserGrowth()
+          const followStats = await getUserFollowStats()
           setUser({
             id: profile.id,
             name: profile.nickname || '易学研习者',
             level: growth ? calculateLevel(growth.exp) : profile.level || 1,
             avatar: profile.avatar_url,
+            motto: profile.motto,
             stats: {
-              posts: 0, // 可以从stats获取
-              collections: 0, // 可以从stats获取
+              posts: followStats.postsCount || 0,
+              followers: followStats.followersCount || 0,
               coins: growth?.yiCoins || 0,
             }
           })
@@ -58,10 +60,10 @@ export default function UserInfoCard() {
     <Card className="bg-white border border-stone-200/50 rounded-xl shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-0">
         {/* 上半部分：基础信息 */}
-        <Link href={`/u/${user.id}`} className="block p-5 flex items-center gap-3 border-b border-dashed border-stone-100 hover:bg-stone-50/50 transition-colors group">
+        <Link href={`/u/${user.id}`} className="flex p-5 items-center gap-3 border-b border-dashed border-stone-100 hover:bg-stone-50/50 transition-colors group">
           <Avatar className="w-12 h-12 border border-white shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-[#C82E31]/20 transition-all">
             {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
-            <AvatarFallback className="bg-gradient-to-br from-stone-100 to-stone-200 text-stone-600 font-serif font-bold text-lg">
+            <AvatarFallback className="bg-linear-to-br from-stone-100 to-stone-200 text-stone-600 font-serif font-bold text-lg">
               {user.name[0]}
             </AvatarFallback>
           </Avatar>
@@ -72,7 +74,9 @@ export default function UserInfoCard() {
                 LV.{user.level}
               </span>
             </div>
-            <p className="text-xs text-stone-400 mt-0.5 font-serif">每日一卦，精进不止。</p>
+            <p className="text-xs text-stone-400 mt-0.5 font-serif line-clamp-2">
+              {user.motto || '每日一卦，精进不止。'}
+            </p>
           </div>
         </Link>
 
@@ -89,14 +93,14 @@ export default function UserInfoCard() {
             </div>
           </div>
 
-          {/* 收藏 */}
+          {/* 关注者 */}
           <div className="flex-1 flex flex-col items-center gap-1 border-r border-stone-100/50 cursor-pointer group hover:bg-gray-50/50 transition-colors">
             <span className="text-xl font-bold text-stone-800 group-hover:text-[#C82E31] transition-colors font-serif">
-              {user.stats.collections}
+              {user.stats.followers}
             </span>
             <div className="flex items-center gap-1 text-xs text-stone-400">
-              <Bookmark className="w-3 h-3" />
-              收藏
+              <Users className="w-3 h-3" />
+              关注者
             </div>
           </div>
 

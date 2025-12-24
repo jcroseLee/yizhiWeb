@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient'
 import { getCurrentUser } from './auth'
+import { logError } from '../utils/errorLogger'
 
 // -----------------------------------------------------------------------------
 // 类型定义
@@ -78,7 +79,7 @@ export async function getConversations(
     })
 
     if (error) {
-      console.error('Error fetching conversations:', error)
+      logError('Error fetching conversations:', error)
       throw error
     }
 
@@ -111,7 +112,7 @@ export async function getConversations(
 
     return data
   } catch (error: any) {
-    console.error('Error in getConversations:', error)
+    logError('Error in getConversations:', error)
     throw error
   }
 }
@@ -144,13 +145,13 @@ export async function setConversationSetting(
     })
 
     if (error) {
-      console.error('Error setting conversation setting:', error)
+      logError('Error setting conversation setting:', error)
       throw error
     }
 
     return true
   } catch (error: any) {
-    console.error('Error in setConversationSetting:', error)
+    logError('Error in setConversationSetting:', error)
     throw error
   }
 }
@@ -190,7 +191,7 @@ export async function getMessages(
       .range(offset, offset + limit - 1)
 
     if (error) {
-      console.error('Error fetching messages:', error)
+      logError('Error fetching messages:', error)
       throw error
     }
 
@@ -220,7 +221,7 @@ export async function getMessages(
 
     return data.reverse()
   } catch (error: any) {
-    console.error('Error in getMessages:', error)
+    logError('Error in getMessages:', error)
     throw error
   }
 }
@@ -268,7 +269,7 @@ export async function sendMessage(
       .single()
 
     if (error) {
-      console.error('Error sending message:', error)
+      logError('Error sending message:', error)
       // 提供更详细的错误信息
       const errorMessage = error.message || error.details || JSON.stringify(error) || '发送消息失败'
       throw new Error(`发送消息失败: ${errorMessage}`)
@@ -290,7 +291,7 @@ export async function sendMessage(
       sender: profile || undefined,
     }
   } catch (error: any) {
-    console.error('Error in sendMessage:', error)
+    logError('Error in sendMessage:', error)
     // 如果已经是 Error 对象，直接抛出；否则包装成 Error
     if (error instanceof Error) {
       throw error
@@ -320,13 +321,13 @@ export async function markMessagesAsRead(otherUserId: string): Promise<boolean> 
     })
 
     if (error) {
-      console.error('Error marking messages as read:', error)
+      logError('Error marking messages as read:', error)
       throw error
     }
 
     return true
   } catch (error: any) {
-    console.error('Error in markMessagesAsRead:', error)
+    logError('Error in markMessagesAsRead:', error)
     throw error
   }
 }
@@ -404,13 +405,13 @@ export async function getTotalUnreadCount(): Promise<number> {
       .eq('is_read', false)
 
     if (error) {
-      console.error('Error getting notification unread count:', error)
+      logError('Error getting notification unread count:', error)
       return dmUnreadCount
     }
 
     return dmUnreadCount + (notificationUnreadCount || 0)
   } catch (error) {
-    console.error('Error getting total unread count:', error)
+    logError('Error getting total unread count:', error)
     return 0
   }
 }

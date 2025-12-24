@@ -82,19 +82,6 @@ export async function getUserProfile(): Promise<UserProfile | null> {
         .single()
 
       if (error) {
-        // 记录详细的错误信息
-        // 使用可选链和默认值，确保即使属性不存在也能记录
-        const errorDetails = {
-          code: error.code || 'UNKNOWN',
-          message: error.message || 'Unknown error',
-          details: error.details || null,
-          hint: error.hint || null,
-          userId: user.id,
-          errorType: error.constructor?.name || typeof error,
-          errorString: String(error),
-          fullError: error,
-        }
-        
         // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
         // 静默处理，不记录日志
         if (error.code === 'PGRST116' || 
@@ -106,8 +93,28 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           return null
         }
         
-        // 记录实际错误
-        console.error('Error fetching profile:', errorDetails)
+        // 记录详细的错误信息（仅当不是空对象时）
+        // 使用可选链和默认值，确保即使属性不存在也能记录
+        const errorDetails = {
+          code: error.code || 'UNKNOWN',
+          message: error.message || 'Unknown error',
+          details: error.details || null,
+          hint: error.hint || null,
+          userId: user.id,
+          errorType: error.constructor?.name || typeof error,
+          errorString: String(error),
+        }
+        
+        // 只有当错误信息不是完全为空时才记录
+        const hasActualError = errorDetails.code !== 'UNKNOWN' || 
+                              errorDetails.message !== 'Unknown error' ||
+                              errorDetails.details !== null ||
+                              errorDetails.hint !== null
+        
+        if (hasActualError) {
+          console.error('Error fetching profile:', errorDetails)
+        }
+        
         return null
       }
 
@@ -286,18 +293,6 @@ export async function getUserProfileWithGrowth(): Promise<{
         .single()
 
       if (error) {
-        // 记录详细的错误信息
-        const errorDetails = {
-          code: error.code || 'UNKNOWN',
-          message: error.message || 'Unknown error',
-          details: error.details || null,
-          hint: error.hint || null,
-          userId: user.id,
-          errorType: error.constructor?.name || typeof error,
-          errorString: String(error),
-          fullError: error,
-        }
-        
         // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
         // 静默处理，不记录日志
         if (error.code === 'PGRST116' || 
@@ -309,8 +304,27 @@ export async function getUserProfileWithGrowth(): Promise<{
           return { profile: null, growth: null }
         }
         
-        // 记录实际错误
-        console.error('Error fetching profile with growth:', errorDetails)
+        // 记录详细的错误信息（仅当不是空对象时）
+        const errorDetails = {
+          code: error.code || 'UNKNOWN',
+          message: error.message || 'Unknown error',
+          details: error.details || null,
+          hint: error.hint || null,
+          userId: user.id,
+          errorType: error.constructor?.name || typeof error,
+          errorString: String(error),
+        }
+        
+        // 只有当错误信息不是完全为空时才记录
+        const hasActualError = errorDetails.code !== 'UNKNOWN' || 
+                              errorDetails.message !== 'Unknown error' ||
+                              errorDetails.details !== null ||
+                              errorDetails.hint !== null
+        
+        if (hasActualError) {
+          console.error('Error fetching profile with growth:', errorDetails)
+        }
+        
         return { profile: null, growth: null }
       }
 
@@ -1163,6 +1177,102 @@ export async function deleteDivinationRecord(recordId: string): Promise<{ succes
   } catch (error: any) {
     console.error('Error deleting divination record:', error)
     return { success: false, message: '删除失败：' + (error.message || '未知错误') }
+  }
+}
+
+/**
+ * 批量删除排盘记录
+ */
+export async function deleteDivinationRecords(recordIds: string[]): Promise<{ 
+  success: boolean; 
+  message: string;
+  deletedCount: number;
+  failedIds: string[];
+}> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录', deletedCount: 0, failedIds: recordIds }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误', deletedCount: 0, failedIds: recordIds }
+  }
+
+  if (recordIds.length === 0) {
+    return { success: false, message: '请选择要删除的记录', deletedCount: 0, failedIds: [] }
+  }
+
+  try {
+    // 先检查哪些排盘有帖子引用
+    const { data: referencedRecords, error: checkError } = await supabase
+      .from('posts')
+      .select('divination_record_id')
+      .in('divination_record_id', recordIds)
+
+    if (checkError) {
+      console.error('Error checking post references:', checkError)
+      return { success: false, message: '删除失败：无法检查引用关系', deletedCount: 0, failedIds: recordIds }
+    }
+
+    // 找出被引用的记录ID
+    const referencedIds = new Set(referencedRecords?.map(r => r.divination_record_id).filter(Boolean) || [])
+    
+    // 可以删除的记录ID
+    const deletableIds = recordIds.filter(id => !referencedIds.has(id))
+    
+    if (deletableIds.length === 0) {
+      return { 
+        success: false, 
+        message: '所选记录均已关联帖子，无法删除', 
+        deletedCount: 0, 
+        failedIds: recordIds 
+      }
+    }
+
+    // 批量删除未被引用的记录
+    const { error: deleteError } = await supabase
+      .from('divination_records')
+      .delete()
+      .in('id', deletableIds)
+      .eq('user_id', user.id) // 确保只能删除自己的记录
+
+    if (deleteError) {
+      console.error('Error deleting divination records:', deleteError)
+      return { 
+        success: false, 
+        message: '删除失败：' + (deleteError.message || '未知错误'), 
+        deletedCount: 0, 
+        failedIds: recordIds 
+      }
+    }
+
+    const failedIds = Array.from(referencedIds)
+    const deletedCount = deletableIds.length
+
+    if (failedIds.length > 0) {
+      return {
+        success: true,
+        message: `成功删除 ${deletedCount} 条记录，${failedIds.length} 条记录因关联帖子无法删除`,
+        deletedCount,
+        failedIds
+      }
+    }
+
+    return { 
+      success: true, 
+      message: `成功删除 ${deletedCount} 条记录`, 
+      deletedCount,
+      failedIds: [] 
+    }
+  } catch (error: any) {
+    console.error('Error deleting divination records:', error)
+    return { 
+      success: false, 
+      message: '删除失败：' + (error.message || '未知错误'), 
+      deletedCount: 0, 
+      failedIds: recordIds 
+    }
   }
 }
 

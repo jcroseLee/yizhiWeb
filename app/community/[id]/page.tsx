@@ -22,8 +22,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import GuaPanelDual from '@/app/community/components/GuaPanelDual'
 import PostDetailSkeleton from '@/app/community/components/PostDetailSkeleton'
+import ReportDialog from '@/app/community/components/ReportDialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
 import { useToast } from '@/lib/hooks/use-toast'
 import {
   adoptComment,
@@ -557,7 +559,30 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                       <MessageSquare className="h-4 w-4" /> 回复
                     </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-stone-400"><MoreHorizontal className="h-4 w-4" /></Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-stone-400 hover:text-stone-600">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-32 p-1 bg-white">
+                      <ReportDialog
+                        targetId={post.id}
+                        targetType="post"
+                        postTitle={post.title}
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            className="w-full h-8 text-xs justify-start px-2 text-stone-600 hover:text-[#C82E31] hover:bg-red-50"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Flag className="w-3.5 h-3.5 mr-1.5" />
+                            举报违规
+                          </Button>
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>
@@ -663,6 +688,23 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                              >
                                 <ThumbsUp className="h-3 w-3" /> {comment.like_count}
                              </Button>
+                             {/* 举报按钮 */}
+                             {currentUserProfile && comment.user_id !== currentUserProfile.id && (
+                               <ReportDialog
+                                 targetId={comment.id}
+                                 targetType="comment"
+                                 trigger={
+                                   <Button
+                                     variant="ghost"
+                                     size="sm"
+                                     className="text-xs text-stone-400 hover:text-red-600 font-medium px-0"
+                                   >
+                                     <Flag className="h-3 w-3" />
+                                     举报
+                                   </Button>
+                                 }
+                               />
+                             )}
                              {/* 删除按钮 - 只有评论作者可见 */}
                              {currentUserProfile && comment.user_id === currentUserProfile.id && (
                                <Button 

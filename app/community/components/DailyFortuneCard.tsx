@@ -2,9 +2,11 @@
 
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
+import { useToast } from '@/lib/hooks/use-toast'
+import { checkIn, hasCheckedInToday } from '@/lib/services/growth'
 import { getDailyFortune } from '@/lib/utils/dailyFortune'
-import { Check, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Check, Loader2, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
 /**
  * 节气印章组件
@@ -64,7 +66,10 @@ const SolarTermSeal = ({ term }: { term: string }) => {
  * 修改版：移除吉凶和宜忌显示
  */
 export default function DailyFortuneCard() {
+  const { toast } = useToast()
   const [isSigned, setIsSigned] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isCheckingIn, setIsCheckingIn] = useState(false)
 
   const today = useMemo(() => {
     const data = getDailyFortune(new Date())
@@ -73,6 +78,56 @@ export default function DailyFortuneCard() {
     const day = dateMatch ? dateMatch[2].padStart(2, '0') : ''
     return { ...data, month, day }
   }, [])
+
+  // 检查签到状态
+  useEffect(() => {
+    const checkSignStatus = async () => {
+      try {
+        setIsLoading(true)
+        const checkedIn = await hasCheckedInToday()
+        setIsSigned(checkedIn)
+      } catch (error) {
+        console.error('Failed to check sign status:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    checkSignStatus()
+  }, [])
+
+  // 处理签到
+  const handleCheckIn = async () => {
+    try {
+      setIsCheckingIn(true)
+      const result = await checkIn()
+      
+      if (result.success) {
+        setIsSigned(true)
+        
+        // 显示成功消息
+        toast({
+          title: '签到成功！',
+          description: result.message || `获得 ${result.coins} 易币，${result.exp} 修业值`,
+        })
+      } else {
+        // 显示错误消息
+        toast({
+          title: '签到失败',
+          description: result.message || '请稍后重试',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Failed to check in:', error)
+      toast({
+        title: '签到失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsCheckingIn(false)
+    }
+  }
 
   return (
     <Card className="relative overflow-hidden border border-stone-200/60 bg-[#FDFBF7] rounded-xl shadow-sm hover:shadow-md transition-all duration-500 group">
@@ -143,13 +198,13 @@ export default function DailyFortuneCard() {
 
         {/* ---------------- 底部：语录与交互 ---------------- */}
         <div className="flex items-center justify-between">
-          <p className="text-xs text-stone-400 italic font-serif pr-4 leading-relaxed line-clamp-1">
+          <p className="text-xs text-stone-400 italic font-serif pr-4 leading-relaxed">
             &ldquo;{today.quote}&rdquo;
           </p>
           
           <Button
-            onClick={() => setIsSigned(true)}
-            disabled={isSigned}
+            onClick={handleCheckIn}
+            disabled={isSigned || isCheckingIn || isLoading}
             variant="outline"
             size="sm"
             className={`
@@ -160,7 +215,15 @@ export default function DailyFortuneCard() {
               }
             `}
           >
-            {isSigned ? (
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> 加载中
+              </>
+            ) : isCheckingIn ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> 签到中
+              </>
+            ) : isSigned ? (
               <>
                 <Check className="w-3.5 h-3.5" /> 已签
               </>

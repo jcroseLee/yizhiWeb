@@ -279,7 +279,7 @@ export default function PostComposer() {
       const post = await createPost({
         title: trimmedTitle,
         content: trimmedContent,
-        type: (selectedCategory as 'theory' | 'help' | 'debate' | 'chat') || undefined,
+        type: (selectedCategory as 'theory' | 'help' | 'debate' | 'chat') || 'chat', // 快捷发布默认为茶寮
       })
       
       toast({

@@ -537,7 +537,7 @@ export async function addReputation(amount: number, reason: string, relatedId?: 
 
     // 记录声望变化日志（如果表存在）
     try {
-      await supabase
+      const { error: logError } = await supabase
         .from('reputation_logs')
         .insert({
           user_id: user.id,
@@ -547,10 +547,11 @@ export async function addReputation(amount: number, reason: string, relatedId?: 
           reputation_before: currentReputation,
           reputation_after: finalReputation,
         })
-        .catch(err => {
-          // 如果表不存在，忽略错误（不影响主流程）
-          console.debug('Reputation log table may not exist:', err)
-        })
+      
+      if (logError) {
+        // 如果表不存在，忽略错误（不影响主流程）
+        console.debug('Reputation log table may not exist:', logError)
+      }
     } catch (logError) {
       // 日志记录失败不影响主流程
       console.debug('Failed to log reputation change:', logError)

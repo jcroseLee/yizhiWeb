@@ -90,14 +90,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Credit master's wallet (or prepare for external payout)
-        const masterUserId = consultation.masters?.user_id
+        const masters = Array.isArray(consultation.masters) ? consultation.masters[0] : consultation.masters
+        const masterUserId = masters?.user_id
         if (masterUserId && payoutAmount > 0) {
           const { error: walletError } = await supabase.rpc('adjust_user_wallet', {
             p_user_id: masterUserId,
             p_amount: payoutAmount,
             p_direction: 'credit',
             p_consultation_id: consultation.id,
-            p_description: `咨询订单结算：${consultation.masters?.name || '卦师'}，订单金额¥${price.toFixed(2)}，实际结算¥${payoutAmount.toFixed(2)}`,
+            p_description: `咨询订单结算：${masters?.name || '卦师'}，订单金额¥${price.toFixed(2)}，实际结算¥${payoutAmount.toFixed(2)}`,
           })
 
           if (walletError) {

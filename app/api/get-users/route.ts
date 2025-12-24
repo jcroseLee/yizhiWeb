@@ -83,9 +83,9 @@ export async function GET(request: NextRequest) {
     const usersWithDetails = await Promise.all(
       (profiles || []).map(async (profile) => {
         try {
-          const { data: authUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id)
+          const { data: authUserData, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id)
 
-          if (userError || !authUser) {
+          if (userError || !authUserData || !authUserData.user) {
             return {
               id: profile.id,
               email: null,
@@ -98,6 +98,8 @@ export async function GET(request: NextRequest) {
               created_at: profile.created_at,
             }
           }
+
+          const authUser = authUserData.user
 
           // Determine login type based on email format
           const email = authUser.email || ''

@@ -1,12 +1,11 @@
 'use client'
 
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('正在验证...')
 
@@ -214,3 +213,17 @@ export default function AuthCallbackPage() {
   )
 }
 
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full flex items-center justify-center bg-black">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto border-4 border-white/20 border-t-white/60 rounded-full animate-spin" />
+          <p className="text-white/80">正在验证...</p>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
+  )
+}

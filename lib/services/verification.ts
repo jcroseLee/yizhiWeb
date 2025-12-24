@@ -97,7 +97,7 @@ export async function verifyComment(
     }
 
     // 6. 记录验证日志（数据库触发器会自动处理，但为了确保，我们也手动记录）
-    await supabase
+    const { error: logError } = await supabase
       .from('verification_logs')
       .insert({
         comment_id: commentId,
@@ -106,10 +106,11 @@ export async function verifyComment(
         commenter_id: comment.user_id,
         verification_result: result,
       })
-      .catch(err => {
-        // 如果插入失败（可能触发器已经插入），忽略错误
-        console.log('Verification log insert error (may be duplicate):', err)
-      })
+    
+    if (logError) {
+      // 如果插入失败（可能触发器已经插入），忽略错误
+      console.log('Verification log insert error (may be duplicate):', logError)
+    }
 
     const message = result === 'accurate'
       ? '已标记为"准"，评论者获得20声望值'

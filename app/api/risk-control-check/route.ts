@@ -114,9 +114,10 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (consultation) {
+          const masters = Array.isArray(consultation.masters) ? consultation.masters[0] : consultation.masters
           const otherUserId =
             userId === consultation.user_id
-              ? consultation.masters?.user_id
+              ? masters?.user_id
               : consultation.user_id
 
           if (otherUserId) {

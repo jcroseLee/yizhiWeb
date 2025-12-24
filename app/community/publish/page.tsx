@@ -39,7 +39,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 // -----------------------------------------------------------------------------
 // 样式定义 - 核心修复区域
@@ -198,7 +198,7 @@ const RecordCard = ({ data, onClick, isSelected = false, compact = false }: { da
 // -----------------------------------------------------------------------------
 // 主页面组件
 // -----------------------------------------------------------------------------
-export default function PublishPageSimple() {
+function PublishPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -997,4 +997,19 @@ export default function PublishPageSimple() {
       </div>
     </>
   );
+}
+
+export default function PublishPageSimple() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 mx-auto border-4 border-stone-200 border-t-[#C82E31] rounded-full animate-spin" />
+          <p className="text-stone-500">加载中...</p>
+        </div>
+      </div>
+    }>
+      <PublishPageContent />
+    </Suspense>
+  )
 }

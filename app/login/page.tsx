@@ -2,7 +2,7 @@
 
 import Galaxy from '@/lib/components/Galaxy'
 import Link from 'next/link'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import LoginForm from './components/LoginForm'
 import RegisterForm from './components/RegisterForm'
 
@@ -74,11 +74,17 @@ export default function LoginPage() {
           <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           
           {/* 根据模式显示登录或注册表单 */}
-          {isRegisterMode ? (
-            <RegisterForm onSwitchToLogin={() => setIsRegisterMode(false)} />
-          ) : (
-            <LoginForm onSwitchToRegister={() => setIsRegisterMode(true)} />
-          )}
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+            </div>
+          }>
+            {isRegisterMode ? (
+              <RegisterForm onSwitchToLogin={() => setIsRegisterMode(false)} />
+            ) : (
+              <LoginForm onSwitchToRegister={() => setIsRegisterMode(true)} />
+            )}
+          </Suspense>
         </div>
       </div>
 

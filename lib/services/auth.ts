@@ -66,7 +66,7 @@ export async function signOut(): Promise<void> {
  * @returns 取消监听的函数
  */
 export function onAuthStateChange(
-  callback: (event: 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED', session: Session | null) => void
+  callback: (event: string, session: Session | null) => void
 ): () => void {
   const supabase = getSupabaseClient()
   if (!supabase) {

@@ -1575,7 +1575,7 @@ export async function adoptComment(commentId: string, postId: string): Promise<{
     // 7. 手动调用声望增加函数（作为备份，因为触发器已经处理）
     try {
       const { addReputation } = await import('./growth')
-      await addReputation(10, '断语被题主采纳', commentId, 'comment_adoption')
+      await addReputation(10, '断语被题主采纳', commentId)
     } catch (error) {
       // 如果触发器已经处理，这里可能会重复，但不会影响主流程
       console.debug('Reputation may have been added by trigger:', error)

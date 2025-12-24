@@ -25,7 +25,7 @@ const AvatarImage = React.forwardRef<
   <AvatarPrimitive.Image
     ref={ref}
     className={cn("aspect-square h-full w-full", className)}
-    src={src && src.trim() !== '' ? src : undefined}
+    src={typeof src === 'string' && src.trim() !== '' ? src : src instanceof Blob ? src : undefined}
     {...props}
   />
 ))

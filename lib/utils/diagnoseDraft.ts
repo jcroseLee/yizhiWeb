@@ -7,7 +7,7 @@ export async function diagnoseDraftFeature() {
   
   try {
     // 动态导入 Supabase 客户端
-    const { getSupabaseClient } = await import('@/lib/services/auth')
+    const { getSupabaseClient } = await import('@/lib/services/supabaseClient')
     const supabase = getSupabaseClient()
     
     if (!supabase) {

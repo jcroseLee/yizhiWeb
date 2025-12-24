@@ -51,7 +51,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 // --- 样式定义 ---
 const styles = `
@@ -192,7 +192,7 @@ const NotificationCard = ({
 }
 
 // --- 主页面组件 ---
-export default function MessagesPage() {
+function MessagesPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [user, setUser] = useState<{ id: string } | null>(null)
@@ -695,5 +695,20 @@ export default function MessagesPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 mx-auto border-4 border-stone-200 border-t-[#C82E31] rounded-full animate-spin" />
+          <p className="text-stone-500">加载消息...</p>
+        </div>
+      </div>
+    }>
+      <MessagesPageContent />
+    </Suspense>
   )
 }

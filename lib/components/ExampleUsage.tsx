@@ -11,7 +11,13 @@ import {
 } from '@/lib/components/ui/card'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
-import { Select } from '@/lib/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/lib/components/ui/select'
 import {
   Drawer,
   DrawerClose,
@@ -59,10 +65,15 @@ export function ExampleUsage() {
 
           <div className="space-y-2">
             <Label htmlFor="method">起卦方式</Label>
-            <Select id="method" defaultValue="0">
-              <option value="0">自动起卦</option>
-              <option value="1">手动起卦</option>
-              <option value="2">时间起卦</option>
+            <Select defaultValue="0">
+              <SelectTrigger id="method">
+                <SelectValue placeholder="选择起卦方式" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">自动起卦</SelectItem>
+                <SelectItem value="1">手动起卦</SelectItem>
+                <SelectItem value="2">时间起卦</SelectItem>
+              </SelectContent>
             </Select>
           </div>
 

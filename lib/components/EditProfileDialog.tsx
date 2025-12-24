@@ -85,9 +85,9 @@ export function EditProfileDialog({ open, onOpenChange, profile, onUpdate }: Edi
     setLoading(true)
     try {
       const success = await updateUserProfile({
-        nickname: nickname.trim() || null,
-        motto: motto.trim() || null,
-        avatar_url: avatarUrl || null,
+        nickname: nickname.trim() || undefined,
+        motto: motto.trim() || undefined,
+        avatar_url: avatarUrl || undefined,
       })
 
       if (success) {

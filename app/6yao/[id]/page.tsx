@@ -29,11 +29,12 @@ import { Card } from '@/lib/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/lib/components/ui/dialog'
 import { Textarea } from '@/lib/components/ui/textarea'
 import {
-  LINE_LABELS, RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
+  LINE_LABELS,
+  RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
-import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
+import { getUserGrowth } from '@/lib/services/growth'
 import {
   addDivinationNote,
   deleteDivinationNote,
@@ -58,6 +59,7 @@ const GLOBAL_STYLES = `
 
 const AI_NOTE_PREFIX = '【AI详批】'
 const AI_RESULT_STORAGE_PREFIX = 'aiResult:'
+const LOCAL_NOTES_STORAGE_PREFIX = 'divinationLocalNotes:'
 const stripAiNotePrefix = (content: string) => content.replace(/^【AI详批】\n?/, '')
 
 // --- 纯函数工具类 ---
@@ -70,8 +72,19 @@ const formatDateTime = (iso: string) => {
   return `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const loadLocalNotes = (resultId: string): DivinationNote[] => {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as DivinationNote[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 const buildChangedLines = buildChangedLinesUtil
-const getFullHexagramName = (binaryKey: string, shortName: string): string => HEXAGRAM_FULL_NAMES[binaryKey] || shortName
 
 // --- 子组件: 爻行显示 (核心修改) ---
 
@@ -303,6 +316,7 @@ function ResultPageContent() {
   const resultId = params.id as string
   const from = searchParams.get('from')
   const normalizedResultId = resultId.startsWith('db-') ? resultId.substring(3) : resultId
+  const isLocalResult = !isUUID(normalizedResultId)
   
   const [payload, setPayload] = useState<StoredDivinationPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -314,6 +328,11 @@ function ResultPageContent() {
   const [isAuthor, setIsAuthor] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false)
+  const [showAiSaveConfirm, setShowAiSaveConfirm] = useState(false)
+  const [showAiNotOwnerConfirm, setShowAiNotOwnerConfirm] = useState(false)
+  const [showAiCostConfirm, setShowAiCostConfirm] = useState(false)
+  const [aiBalanceChecking, setAiBalanceChecking] = useState(false)
+  const [pendingSaveAction, setPendingSaveAction] = useState<'ai' | 'note' | 'title' | null>(null)
   const [forceAiAnalyze, setForceAiAnalyze] = useState(false)
   
   // Note state
@@ -334,12 +353,50 @@ function ResultPageContent() {
   const displayNotes = useMemo(() => notes.filter((n) => !n.content.startsWith(AI_NOTE_PREFIX)), [notes])
   const recordIdForAi = savedRecordId || (isUUID(normalizedResultId) ? normalizedResultId : null)
   const aiStorageKey = recordIdForAi || normalizedResultId
+  const canEditQuestion = isSaved && isAuthor
+  const canAttemptEditQuestion = isLocalResult || canEditQuestion
+  const canViewPrivateNotes = isLocalResult || isAuthor
 
   const handleConfirmReanalyze = () => {
     setShowReanalyzeConfirm(false)
     setForceAiAnalyze(true)
     setShowAI(true)
   }
+
+  const persistQuestionUpdate = useCallback(async (nextQuestion: string) => {
+    const finalQuestion = (nextQuestion || '').trim() || '诚心求占此事吉凶'
+
+    if (!isSaved || !savedRecordId || !isAuthor) {
+      toast({ title: '请先保存到云端', description: '保存后才能修改标题', variant: 'destructive' })
+      return
+    }
+
+    if (isSaved && savedRecordId && isAuthor) {
+      setQuestionLoading(true)
+      try {
+        const { success, message } = await updateDivinationQuestion(savedRecordId, finalQuestion)
+        if (success) {
+          toast({ title: '更新成功', description: '所占事项已更新' })
+          setIsEditingQuestion(false)
+          setHasUnsavedChanges(false)
+          setQuestion(finalQuestion)
+          setPayload((prev) => (prev ? { ...prev, question: finalQuestion } : prev))
+          return
+        }
+        toast({ title: '更新失败', description: message, variant: 'destructive' })
+      } catch {
+        toast({ title: '更新失败', variant: 'destructive' })
+      } finally {
+        setQuestionLoading(false)
+      }
+      return
+    }
+
+    setQuestion(finalQuestion)
+    setIsEditingQuestion(false)
+    setHasUnsavedChanges(false)
+    setPayload((prev) => (prev ? { ...prev, question: finalQuestion } : prev))
+  }, [isSaved, savedRecordId, isAuthor, toast])
 
   // Sync question state with payload
   useEffect(() => {
@@ -430,6 +487,11 @@ function ResultPageContent() {
               if (!found.question) found.question = '诚心求占此事吉凶'
               setQuestion(found.question)
               setPayload(found)
+              setIsAuthor(false)
+              setIsSaved(false)
+              setSavedRecordId(null)
+              setHasUnsavedChanges(false)
+              setNotes(loadLocalNotes(resultId))
               const cached = localStorage.getItem(`${AI_RESULT_STORAGE_PREFIX}${normalizedResultId}`)
               if (cached) {
                 setAiResult(cached)
@@ -446,6 +508,11 @@ function ResultPageContent() {
                  if (!legacyData.question) legacyData.question = '诚心求占此事吉凶'
                  setQuestion(legacyData.question)
                  setPayload(legacyData)
+                 setIsAuthor(false)
+                 setIsSaved(false)
+                 setSavedRecordId(null)
+                 setHasUnsavedChanges(false)
+                 setNotes(loadLocalNotes(resultId))
                }
                else router.push('/6yao')
             }
@@ -545,6 +612,20 @@ function ResultPageContent() {
         setSavedRecordId(res.recordId || null)
         setHasUnsavedChanges(false)
         if (showToast) toast({ title: '保存成功' })
+        const newRecordId = res.recordId
+        if (newRecordId && isLocalResult) {
+          const localNotes = loadLocalNotes(resultId).filter((n) => !n.content.startsWith(AI_NOTE_PREFIX))
+          if (localNotes.length > 0 && typeof window !== 'undefined') {
+            try {
+              await Promise.all(localNotes.map((n) => addDivinationNote(newRecordId, n.content)))
+              window.localStorage.removeItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`)
+              const fetchedNotes = await getDivinationNotes(newRecordId)
+              setNotes(fetchedNotes)
+            } catch {
+              // ignore
+            }
+          }
+        }
         return res.recordId || null
       } else {
         if (showToast) toast({ title: '保存失败', description: res.message, variant: 'destructive' })
@@ -556,11 +637,126 @@ function ResultPageContent() {
     } finally {
       setSaving(false)
     }
-  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges])
+  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges, isLocalResult])
+
+  const handleAiAnalyzeClick = useCallback(async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+      toast({ title: '请先登录', description: '登录后才能使用 AI 分析', variant: 'destructive' })
+      return
+    }
+
+    if (aiResult) {
+      if (isSaved && !isAuthor) {
+        toast({ title: '提示', description: '你不是该排盘作者，AI 分析结果不会保存到该排盘记录' })
+      }
+      setShowAI(true)
+      return
+    }
+
+    if (!isSaved) {
+      setPendingSaveAction('ai')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
+    if (!isAuthor) {
+      setShowAiNotOwnerConfirm(true)
+      return
+    }
+
+    setShowAiCostConfirm(true)
+  }, [aiResult, isAuthor, isSaved, toast])
+
+  const handleQuestionEditClick = useCallback(async () => {
+    if (!canAttemptEditQuestion) return
+    const user = await getCurrentUser()
+    if (!user) {
+      toast({ title: '请先登录', description: '登录后才能修改标题', variant: 'destructive' })
+      return
+    }
+    if (!isSaved) {
+      setPendingSaveAction('title')
+      setShowAiSaveConfirm(true)
+      return
+    }
+    if (!isAuthor) return
+    setIsEditingQuestion(true)
+  }, [canAttemptEditQuestion, isAuthor, isSaved, toast])
+
+  const handleConfirmSaveForAi = async () => {
+    const action = pendingSaveAction
+    setShowAiSaveConfirm(false)
+    setPendingSaveAction(null)
+
+    const recordId = await saveRecordToCloud(false)
+    if (!recordId) {
+      toast({ title: '保存失败', variant: 'destructive' })
+      return
+    }
+
+    if (action === 'ai') {
+      toast({ title: '已保存到云端', description: '请再次点击 AI 分析开始推演' })
+      return
+    }
+    if (action === 'title') {
+      toast({ title: '已保存到云端', description: '现在可以修改标题' })
+      setIsEditingQuestion(true)
+      return
+    }
+    if (action === 'note') {
+      toast({ title: '已保存到云端', description: '现在可以添加笔记' })
+      return
+    }
+    toast({ title: '已保存到云端' })
+  }
+
+  const handleConfirmAiNotOwner = () => {
+    setShowAiNotOwnerConfirm(false)
+    setShowAiCostConfirm(true)
+  }
+
+  const handleConfirmAiAnalyze = async () => {
+    setAiBalanceChecking(true)
+    try {
+      const user = await getCurrentUser()
+      if (!user) {
+        setShowAiCostConfirm(false)
+        toast({ title: '请先登录', description: '登录后才能使用 AI 分析', variant: 'destructive' })
+        return
+      }
+
+      if (!isSaved) {
+        setShowAiCostConfirm(false)
+        setPendingSaveAction('ai')
+        setShowAiSaveConfirm(true)
+        return
+      }
+
+      const growth = await getUserGrowth()
+      const balance = growth?.yiCoins
+      if (typeof balance !== 'number') {
+        toast({ title: '无法使用 AI 分析', description: '无法获取易币余额，请稍后重试', variant: 'destructive' })
+        return
+      }
+
+      if (balance < 50) {
+        setShowAiCostConfirm(false)
+        toast({ title: '易币余额不足', description: '当前易币不足 50，无法使用 AI 分析', variant: 'destructive' })
+        return
+      }
+
+      setShowAiCostConfirm(false)
+      setForceAiAnalyze(true)
+      setShowAI(true)
+    } finally {
+      setAiBalanceChecking(false)
+    }
+  }
 
   const handlePublish = async () => {
     let recordIdToUse = savedRecordId || (isUUID(resultId) ? resultId : null)
-    if (!isSaved) recordIdToUse = await saveRecordToCloud(false)
+    if (!isSaved || hasUnsavedChanges) recordIdToUse = await saveRecordToCloud(true)
     if (recordIdToUse) router.push(`/community/publish?tab=divination&recordId=${recordIdToUse}`)
     else toast({ title: '无法发布', description: '无法获取排盘记录ID', variant: 'destructive' })
   }
@@ -568,11 +764,22 @@ function ResultPageContent() {
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) return
     
-    const recordIdToUse = savedRecordId || (isUUID(resultId) ? resultId : null)
+    const user = await getCurrentUser()
+    if (!user) {
+      toast({ title: '请先登录', description: '登录后才能添加笔记', variant: 'destructive' })
+      return
+    }
 
+    if (!isSaved) {
+      setPendingSaveAction('note')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
+    const recordIdToUse = savedRecordId || (isUUID(resultId) ? resultId : null)
     if (!recordIdToUse) {
-       toast({ title: '请先保存排盘记录', description: '保存后即可添加笔记', variant: 'destructive' })
-       return
+      toast({ title: '添加失败', description: '无法获取排盘记录ID', variant: 'destructive' })
+      return
     }
 
     setNoteLoading(true)
@@ -594,7 +801,23 @@ function ResultPageContent() {
 
   const handleUpdateNote = async (noteId: string) => {
     if (!editNoteContent.trim()) return
-    
+
+    const user = await getCurrentUser()
+    if (!user) {
+      toast({ title: '请先登录', description: '登录后才能修改笔记', variant: 'destructive' })
+      return
+    }
+    if (!isSaved) {
+      setPendingSaveAction('note')
+      setShowAiSaveConfirm(true)
+      return
+    }
+    if (noteId.startsWith('local_')) {
+      setPendingSaveAction('note')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
     setNoteLoading(true)
     try {
       const { success, note } = await updateDivinationNote(noteId, editNoteContent)
@@ -616,6 +839,22 @@ function ResultPageContent() {
   const handleDeleteNote = async (noteId: string) => {
     if (!confirm('确定要删除这条笔记吗？')) return
 
+    const user = await getCurrentUser()
+    if (!user) {
+      toast({ title: '请先登录', description: '登录后才能删除笔记', variant: 'destructive' })
+      return
+    }
+    if (!isSaved) {
+      setPendingSaveAction('note')
+      setShowAiSaveConfirm(true)
+      return
+    }
+    if (noteId.startsWith('local_')) {
+      setPendingSaveAction('note')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
     setNoteLoading(true)
     try {
       const { success } = await deleteDivinationNote(noteId)
@@ -634,8 +873,6 @@ function ResultPageContent() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-400">加载中...</div>
   if (!payload || !calculatedData) return null
-
-  console.log('[DEBUG] Render state:', { isSaved, hasUnsavedChanges, savedRecordId, notesCount: notes.length })
 
   const { 
     hasMovingLines, date, stems, branches, solarTerm, shenShaList, kongWang, 
@@ -675,7 +912,7 @@ function ResultPageContent() {
                               value={question}
                               onChange={(e) => {
                                 setQuestion(e.target.value)
-                                if (e.target.value !== (payload?.question || '诚心求占此事吉凶')) {
+                                if (isSaved && e.target.value !== (payload?.question || '诚心求占此事吉凶')) {
                                   setHasUnsavedChanges(true)
                                 }
                               }}
@@ -688,24 +925,7 @@ function ResultPageContent() {
                               }}
                               onKeyDown={async (e) => {
                                 if (e.key === 'Enter' && question !== (payload?.question || '诚心求占此事吉凶')) {
-                                  setQuestionLoading(true)
-                                  try {
-                                    const { success, message } = await updateDivinationQuestion(savedRecordId!, question)
-                                    if (success) {
-                                      toast({ title: '更新成功', description: '所占事项已更新' })
-                                      setIsEditingQuestion(false)
-                                      setHasUnsavedChanges(false)
-                                      if (payload) {
-                                        setPayload({ ...payload, question: question || '诚心求占此事吉凶' })
-                                      }
-                                    } else {
-                                      toast({ title: '更新失败', description: message, variant: 'destructive' })
-                                    }
-                                  } catch {
-                                    toast({ title: '更新失败', variant: 'destructive' })
-                                  } finally {
-                                    setQuestionLoading(false)
-                                  }
+                                  await persistQuestionUpdate(question)
                                 } else if (e.key === 'Escape') {
                                   setQuestion(payload?.question || '诚心求占此事吉凶')
                                   setIsEditingQuestion(false)
@@ -728,24 +948,7 @@ function ResultPageContent() {
                                 </button>
                                 <button
                                   onClick={async () => {
-                                    setQuestionLoading(true)
-                                    try {
-                                      const { success, message } = await updateDivinationQuestion(savedRecordId!, question)
-                                      if (success) {
-                                        toast({ title: '更新成功', description: '所占事项已更新' })
-                                        setIsEditingQuestion(false)
-                                        setHasUnsavedChanges(false)
-                                        if (payload) {
-                                          setPayload({ ...payload, question: question || '诚心求占此事吉凶' })
-                                        }
-                                      } else {
-                                        toast({ title: '更新失败', description: message, variant: 'destructive' })
-                                      }
-                                    } catch {
-                                      toast({ title: '更新失败', variant: 'destructive' })
-                                    } finally {
-                                      setQuestionLoading(false)
-                                    }
+                                    await persistQuestionUpdate(question)
                                   }}
                                   className="p-1 text-green-600 hover:text-green-700 transition-colors"
                                   disabled={questionLoading}
@@ -757,17 +960,17 @@ function ResultPageContent() {
                           </div>
                         ) : (
                           <span 
-                            onClick={() => isSaved && isAuthor && setIsEditingQuestion(true)} 
-                            className={isSaved && isAuthor ? "cursor-pointer hover:text-[#C82E31]/80 transition-colors border-b border-transparent hover:border-stone-200" : ""}
-                            title={isSaved && isAuthor ? "点击修改所占事项" : ""}
+                            onClick={handleQuestionEditClick} 
+                            className={canAttemptEditQuestion ? "cursor-pointer hover:text-[#C82E31]/80 transition-colors border-b border-transparent hover:border-stone-200" : ""}
+                            title={canAttemptEditQuestion ? "点击修改所占事项" : ""}
                           >
                             {question}
                           </span>
                         )}
                       </h1>
-                      {isSaved && isAuthor && !isEditingQuestion && (
+                      {canAttemptEditQuestion && !isEditingQuestion && (
                         <button 
-                          onClick={() => setIsEditingQuestion(true)}
+                          onClick={handleQuestionEditClick}
                           className="p-1 text-stone-400 hover:text-[#C82E31] transition-colors"
                         >
                           <PenLine className="w-4 h-4" />
@@ -966,7 +1169,7 @@ function ResultPageContent() {
                 )}
 
                 {/* 5. 私密笔记 */}
-                {isAuthor && (
+                {canViewPrivateNotes && (
                 <div className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm">
                    <div className="flex items-center gap-3 mb-4">
                       <BookOpen className="w-5 h-5 text-[#C82E31]" />
@@ -1023,23 +1226,25 @@ function ResultPageContent() {
                                      {formatDateTime(note.created_at)}
                                    </span>
                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <Button
-                                       variant="ghost"
-                                       size="sm"
-                                       className="h-6 w-6 p-0 hover:bg-stone-200 text-stone-400 hover:text-stone-600"
-                                       onClick={() => {
-                                         setEditingNoteId(note.id)
-                                         setEditNoteContent(note.content)
-                                       }}
-                                     >
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-stone-200 text-stone-400 hover:text-stone-600"
+                                      disabled={!isSaved || note.id.startsWith('local_') || noteLoading}
+                                      onClick={() => {
+                                        setEditingNoteId(note.id)
+                                        setEditNoteContent(note.content)
+                                      }}
+                                    >
                                        <Edit2 className="w-3.5 h-3.5" />
                                      </Button>
-                                     <Button
-                                       variant="ghost"
-                                       size="sm"
-                                       className="h-6 w-6 p-0 hover:bg-red-100 text-stone-400 hover:text-red-600"
-                                       onClick={() => handleDeleteNote(note.id)}
-                                     >
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-red-100 text-stone-400 hover:text-red-600"
+                                      disabled={!isSaved || note.id.startsWith('local_') || noteLoading}
+                                      onClick={() => handleDeleteNote(note.id)}
+                                    >
                                        <Trash2 className="w-3.5 h-3.5" />
                                      </Button>
                                    </div>
@@ -1088,7 +1293,7 @@ function ResultPageContent() {
                         <h3 className="font-serif font-bold text-base flex items-center gap-2"><Wand2 className="w-4 h-4" /> AI 智能详批</h3>
                         <p className="text-[10px] text-red-50/90 mt-0.5">深度解析吉凶应期，准确率提升30%</p>
                       </div>
-                      <Button onClick={() => setShowAI(true)} className="bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold text-xs h-8 px-4 rounded-full shadow-sm">立即分析</Button>
+                      <Button onClick={handleAiAnalyzeClick} className="bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold text-xs h-8 px-4 rounded-full shadow-sm">立即分析</Button>
                     </div>
                   </div>
                   <div>
@@ -1124,7 +1329,7 @@ function ResultPageContent() {
                <div className="relative p-6 text-white">
                  <div className="flex items-center gap-2 mb-2"><Sparkles className="w-5 h-5" /><h3 className="font-bold font-serif text-lg">AI 智能详批</h3></div>
                  <p className="text-red-100 text-xs mb-4 leading-relaxed opacity-90">基于《增删卜易》古法，结合大模型深度推理，为您解析吉凶应期。</p>
-                 <Button onClick={() => setShowAI(true)} className="w-full bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold shadow-sm h-9 text-xs">开始分析</Button>
+                 <Button onClick={handleAiAnalyzeClick} className="w-full bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold shadow-sm h-9 text-xs">开始分析</Button>
                </div>
             </Card>
             <Card className="bg-white border-none shadow-sm p-3">
@@ -1160,6 +1365,54 @@ function ResultPageContent() {
             </div>
           </div>
         </div>
+          <Dialog open={showAiSaveConfirm} onOpenChange={setShowAiSaveConfirm}>
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>需要先保存到云端</DialogTitle>
+                <DialogDescription>
+                  使用该功能前，需要先将本次排盘保存到云端。
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAiSaveConfirm(false)} disabled={saving}>取消</Button>
+                <Button onClick={handleConfirmSaveForAi} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white" disabled={saving}>
+                  保存到云端
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={showAiNotOwnerConfirm} onOpenChange={setShowAiNotOwnerConfirm}>
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>提示</DialogTitle>
+                <DialogDescription>
+                  你不是该排盘作者，AI 分析结果不会保存到该排盘记录，仅会在当前设备缓存。
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAiNotOwnerConfirm(false)}>取消</Button>
+                <Button onClick={handleConfirmAiNotOwner} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white">
+                  继续分析
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={showAiCostConfirm} onOpenChange={setShowAiCostConfirm}>
+            <DialogContent className="bg-white">
+              <DialogHeader>
+                <DialogTitle>确认 AI 分析</DialogTitle>
+                <DialogDescription>
+                  本次操作将扣除 50 易币，用于 AI 智能详批。
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAiCostConfirm(false)} disabled={aiBalanceChecking}>取消</Button>
+                <Button onClick={handleConfirmAiAnalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white" disabled={aiBalanceChecking}>
+                  继续分析
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showReanalyzeConfirm} onOpenChange={setShowReanalyzeConfirm}>
             <DialogContent className="bg-white">
               <DialogHeader>

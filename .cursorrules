@@ -1,0 +1,17 @@
+# 项目规范
+- 所有 API 调用必须有错误处理
+- 优先使用函数式组件和 Hooks
+- 所有代码必须有注释
+- 文档必须使用 Markdown 格式
+- 文档必须放在 docs 目录下 并遵循文档规范
+
+# 技术栈
+- React 18
+- Next.js 14 App Router
+- Tailwind CSS
+- Prisma ORM
+
+# 代码风格
+- 使用 2 空格缩进
+- 单引号优于双引号
+- 每行最多 80 字符

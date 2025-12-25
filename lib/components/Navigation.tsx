@@ -9,7 +9,7 @@ import { getTotalUnreadCount, subscribeToConversations } from '@/lib/services/me
 import { subscribeToNotifications } from '@/lib/services/notifications'
 import { getUserProfile, type UserProfile } from '@/lib/services/profile'
 import type { Session } from '@supabase/supabase-js'
-import { Bell, ChevronDown, FileText, LogOut, Menu, Search, User, X } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Menu, Search, User, X } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -187,12 +187,12 @@ export default function Navigation() {
     try {
       setUserMenuOpen(false)
       await signOut()
-      router.push('/login')
+      // router.push('/login')
       router.refresh()
     } catch (error) {
       console.error('退出登录失败:', error)
       // 即使退出失败，也跳转到登录页
-      router.push('/login')
+      // router.push('/login')
     }
   }
 
@@ -294,14 +294,14 @@ export default function Navigation() {
                       <User className="h-4 w-4" />
                       <span>个人中心</span>
                     </Link>
-                    <Link
+                    {/* <Link
                       href="/community/drafts"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 rounded-md transition-colors"
                     >
                       <FileText className="h-4 w-4" />
                       <span>我的草稿</span>
-                    </Link>
+                    </Link> */}
                     <Button
                       onClick={handleLogout}
                       className="flex items-center gap-2 px-3 py-2 text-sm text-ink-700 hover:bg-ink-50 rounded-md transition-colors text-left w-full justify-start"

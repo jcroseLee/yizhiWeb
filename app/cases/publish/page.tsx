@@ -26,7 +26,7 @@ import {
     X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 
 // -----------------------------------------------------------------------------
 // 样式定义
@@ -230,7 +230,7 @@ const RecordSelectionList = ({
 // -----------------------------------------------------------------------------
 // 主页面组件
 // -----------------------------------------------------------------------------
-export default function PublishCasePage() {
+function PublishCasePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -623,5 +623,22 @@ export default function PublishCasePage() {
         </main>
       </div>
     </>
+  )
+}
+
+export default function PublishCasePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F7F5EF] flex items-center justify-center text-stone-500">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            加载中...
+          </div>
+        </div>
+      }
+    >
+      <PublishCasePageContent />
+    </Suspense>
   )
 }

@@ -1,5 +1,5 @@
-import { getSupabaseClient } from './supabaseClient'
 import { getCurrentUser } from './auth'
+import { getSupabaseClient } from './supabaseClient'
 
 export type ReportReasonCategory = 
   | 'compliance'      // 违法违规 / 敏感信息
@@ -32,6 +32,18 @@ export interface SubmitReportInput {
   targetType: ReportTargetType
   reasonCategory: ReportReasonCategory
   description?: string
+}
+
+interface ReportRow {
+  id: string
+  reporter_id: string
+  post_id: string
+  reason: string
+  details: string | null
+  status: string
+  processed_by: string | null
+  processed_at: string | null
+  created_at: string
 }
 
 /**
@@ -98,7 +110,7 @@ export async function submitReport(input: SubmitReportInput): Promise<{ success:
     }
 
     return { success: true, message: '举报已提交，感谢您维护社区清朗' }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error submitting report:', error)
     return { success: false, message: '提交失败，请稍后重试' }
   }
@@ -178,7 +190,7 @@ export async function getReports(options?: {
     }
 
     // 转换数据格式以匹配 Report 接口
-    return (data || []).map((item: any) => ({
+    return (data || []).map((item: ReportRow) => ({
       id: item.id,
       reporter_id: item.reporter_id,
       target_id: item.post_id, // post_reports 使用 post_id
@@ -246,7 +258,7 @@ export async function resolveReport(
     }
 
     return { success: true, message: '处理成功' }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error resolving report:', error)
     return { success: false, message: '处理失败，请稍后重试' }
   }

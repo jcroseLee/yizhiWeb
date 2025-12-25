@@ -2,7 +2,7 @@
 
 import { Feather, History, Scroll, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 // UI Components
 import DivinationCasting from '@/lib/components/DivinationCasting'
@@ -25,6 +25,7 @@ import { getGanZhiInfo } from '@/lib/utils/lunar'
 
 // Components
 import DivinationForm from './components/DivinationForm'
+import { TurtleIcon } from './components/TurtleIcon'
 
 // -----------------------------------------------------------------------------
 // 样式补丁：增强纸质感与书写感
@@ -154,6 +155,17 @@ const styles = `
   .react-datepicker__navigation:hover *::before {
     border-color: #C82E31;
   }
+  
+  /* 错误震动动画 */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+  }
+  
+  .animate-shake {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
 `
 
 // 类型定义
@@ -179,6 +191,7 @@ export default function ToolsPage() {
   
   // 状态管理
   const [question, setQuestion] = useState('')
+  const questionInputRef = useRef<HTMLTextAreaElement>(null)
   const [questionError, setQuestionError] = useState(false)
   const [divinationTime, setDivinationTime] = useState(new Date())
   const [isTimeManuallySelected, setIsTimeManuallySelected] = useState(false)
@@ -315,7 +328,18 @@ export default function ToolsPage() {
     // 校验求测事项必填
     if (!question || question.trim().length === 0) {
       setQuestionError(true)
-      alert('请填写求测事项')
+      // alert('请填写求测事项') // 移除 alert
+      
+      // 聚焦并震动提示
+      // 检查 ref 是否存在且元素可见（offsetParent 不为 null 表示可见）
+      if (questionInputRef.current && questionInputRef.current.offsetParent !== null) {
+        questionInputRef.current.focus()
+        questionInputRef.current.classList.add('animate-shake')
+        setTimeout(() => questionInputRef.current?.classList.remove('animate-shake'), 500)
+      } else {
+        // PC 端或输入框不可见时，使用弹窗提示（后续可优化为 Toast）
+        alert('请填写求测事项')
+      }
       return false
     }
     if (question.trim().length > 100) {
@@ -341,7 +365,7 @@ export default function ToolsPage() {
       <div className="h-full flex relative bg-[#f5f5f7] paper-texture">
         
         {/* 左侧主内容区 - 摇卦台 */}
-        <main className="flex-1 overflow-hidden relative flex flex-col">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col">
           
           {/* 背景装饰：更具象的罗盘/太极底纹 */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
@@ -361,14 +385,15 @@ export default function ToolsPage() {
             </svg>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center p-4 lg:p-8 relative z-10">
+          <div className="min-h-full flex flex-col items-center justify-start lg:justify-center pt-24 pb-12 px-4 lg:p-8 relative z-10">
             <div className="w-full max-w-xl space-y-12">
               
               {/* 头部提示 */}
               {!isCasting && !isComplete && (
                 <div className="text-center space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-stone-100 mb-2">
-                    <Feather className="w-6 h-6 text-[#C82E31]" />
+                    {/* 草龟壳图标 SVG - 模拟三棱特征 */}
+                    <TurtleIcon className="w-8 h-8" />
                   </div>
                   <h1 className="text-3xl font-serif font-bold text-stone-800 tracking-widest">
                     诚心问道
@@ -376,6 +401,31 @@ export default function ToolsPage() {
                   <p className="text-stone-500 text-sm font-serif">
                     &ldquo;凡占，必诚必敬。右侧录入事项，静心点击下方。&rdquo;
                   </p>
+                </div>
+              )}
+
+              {/* 移动端主界面输入框 (仅在未摇卦时显示) */}
+              {!isCasting && !isComplete && (
+                <div className="lg:hidden w-full animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                  <div className="relative">
+                    <textarea
+                      ref={questionInputRef}
+                      value={question}
+                      onChange={(e) => handleQuestionChange(e.target.value)}
+                      placeholder="所占何事？在此处输入..."
+                      className={`w-full bg-white/40 backdrop-blur-sm border-0 border-b-2 rounded-t-lg px-4 py-4 text-lg min-h-[80px] resize-none text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:outline-none transition-all ${
+                        questionError 
+                          ? 'border-red-400 bg-red-50/20' 
+                          : 'border-stone-200 focus:border-[#C82E31] focus:bg-white/60'
+                      }`}
+                    />
+                    {/* 错误提示角标 */}
+                    {questionError && (
+                      <div className="absolute right-2 top-2 text-red-500 animate-pulse">
+                        <Feather className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

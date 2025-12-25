@@ -17,7 +17,7 @@ import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { createPost, getPost, publishDraft, saveDraft, updateDraft, updatePost, uploadPostCover } from '@/lib/services/community'
-import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord } from '@/lib/services/profile'
+import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord as ProfileDivinationRecord } from '@/lib/services/profile'
 import {
   ArrowLeft,
   Check,
@@ -138,10 +138,12 @@ interface RecordDisplay {
   gua: string
   date: string
   method: string
-  record: DivinationRecord
+  record: DivinationRecordLite
 }
 
-const convertRecordToDisplay = (record: DivinationRecord): RecordDisplay => {
+type DivinationRecordLite = Omit<Pick<ProfileDivinationRecord, 'id' | 'question' | 'divination_time' | 'method' | 'original_key'>, 'question'> & { question?: string | null }
+
+const convertRecordToDisplay = (record: DivinationRecordLite): RecordDisplay => {
   const originalKey = String(record.original_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
   const hexagram = getHexagramResult(originalKey)
   const guaName = hexagram.name || '未知卦'
@@ -260,6 +262,8 @@ function PublishPageContent() {
             const newSearchParams = new URLSearchParams(searchParams.toString())
             newSearchParams.delete('recordId')
             window.history.replaceState({}, '', `${window.location.pathname}?${newSearchParams.toString()}`)
+          } else {
+            toast({ title: '加载失败', description: '无法加载排盘记录，可能是您没有权限或记录不存在', variant: 'destructive' })
           }
         } catch (error) { console.error(error) }
       }
@@ -776,7 +780,7 @@ function PublishPageContent() {
                         </ul>
                       </div>
                       <p className="text-stone-400 pl-1 gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-type inline w-3 h-3 mr-1" aria-hidden="true"><path d="M12 4v16"></path><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"></path><path d="M9 20h6"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-type inline w-3 h-3 mr-1" aria-hidden="true"><path d="M12 4v16"></path><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"></path><path d="M9 20h6"></path></svg>
                         排版清晰的文章更容易获得“精选”推荐，展示在首页显眼位置。
                       </p>
                     </div>

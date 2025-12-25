@@ -78,14 +78,9 @@ function formatTime(dateString: string): string {
 }
 
 // 提取卦象信息辅助函数
-interface DivinationRecord {
-  original_key?: string
-  changed_key?: string
-  lines?: string[]
-  changing_flags?: boolean[]
-}
-
 const extractGuaInfo = getGuaInfo
+
+type SectionType = 'help' | 'theory' | 'debate' | 'chat'
 
 // 映射板块类型
 function mapSectionToType(
@@ -93,12 +88,12 @@ function mapSectionToType(
   type?: string | null,
   bounty?: number | null,
   divinationRecordId?: string | null
-): 'help' | 'theory' | 'debate' | 'chat' {
+): SectionType {
   if ((bounty && bounty > 0) || divinationRecordId) return 'help'
-  if (type && ['theory', 'help', 'debate', 'chat'].includes(type)) return type as any
+  if (type && ['theory', 'help', 'debate', 'chat'].includes(type)) return type as SectionType
   
   if (section) {
-    const sectionMap: Record<string, 'help' | 'theory' | 'debate' | 'chat'> = {
+    const sectionMap: Record<string, SectionType> = {
       'study': 'theory',
       'help': 'help',
       'casual': 'chat',
@@ -111,20 +106,8 @@ function mapSectionToType(
 
 // 转换数据格式
 function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] {
-  interface PostWithDivination extends Omit<Post, 'section'> {
-    divination_records?: DivinationRecord | DivinationRecord[] | null
-    section?: 'study' | 'help' | 'casual' | 'announcement' | null
-  }
-  
-  const postWithDivination = post as PostWithDivination
-  const divinationRecord = postWithDivination.divination_records
-    ? (Array.isArray(postWithDivination.divination_records) 
-        ? postWithDivination.divination_records[0] 
-        : postWithDivination.divination_records)
-    : null
-
-  const guaInfo = extractGuaInfo(divinationRecord)
-  const postType = mapSectionToType(postWithDivination.section, post.type, post.bounty, post.divination_record_id)
+  const guaInfo = extractGuaInfo(post.divination_record)
+  const postType = mapSectionToType(post.section, post.type, post.bounty, post.divination_record_id)
 
   return {
     id: post.id,
@@ -247,8 +230,8 @@ export default function CommunityPage() {
               </div>
 
               {/* 2. 频道 Tab */}
-              <div className="sticky top-0 lg:relative z-10 bg-[#fdfbf7] lg:bg-transparent pt-2 lg:pt-0">
-                <div className="flex items-center justify-between bg-white lg:bg-[#fdfbf7] px-4 py-3 border-b lg:border-b border-stone-200/60 lg:rounded-t-lg shadow-sm lg:shadow-none mx-0 lg:mx-0">
+              <div className="sticky top-0 lg:relative z-10 bg-paper-50 lg:bg-transparent pt-2 lg:pt-0">
+                <div className="flex items-center justify-between bg-white lg:bg-paper-50 px-4 py-3 border-b lg:border-b border-stone-200/60 lg:rounded-t-lg shadow-sm lg:shadow-none mx-0 lg:mx-0">
                   <div className="flex gap-6 lg:gap-8 overflow-x-auto scrollbar-hide pr-4 w-full lg:w-auto">
                     {CHANNELS.map(channel => {
                       const Icon = channel.icon;

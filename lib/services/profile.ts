@@ -85,7 +85,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
         // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
         // 静默处理，不记录日志
         if (error.code === 'PGRST116' || 
-            (error as any).status === 406 ||
+            (error as { status?: number }).status === 406 ||
             error.message?.includes('JSON object requested, multiple') || 
             error.message?.includes('0 rows') ||
             error.message?.includes('Not Acceptable')) {
@@ -121,7 +121,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       return data
     } catch (error) {
       // 处理意外的错误（非 Supabase 错误）
-      let errorInfo: any
+      let errorInfo: unknown
       
       if (error instanceof Error) {
         errorInfo = {
@@ -296,7 +296,7 @@ export async function getUserProfileWithGrowth(): Promise<{
         // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
         // 静默处理，不记录日志
         if (error.code === 'PGRST116' || 
-            (error as any).status === 406 ||
+            (error as { status?: number }).status === 406 ||
             error.message?.includes('JSON object requested, multiple') || 
             error.message?.includes('0 rows') ||
             error.message?.includes('Not Acceptable')) {
@@ -358,7 +358,7 @@ export async function getUserProfileWithGrowth(): Promise<{
       return { profile, growth }
     } catch (error) {
       // 处理意外的错误（非 Supabase 错误）
-      let errorInfo: any
+      let errorInfo: unknown
       
       if (error instanceof Error) {
         errorInfo = {
@@ -458,7 +458,7 @@ export async function uploadAvatar(file: File): Promise<string | null> {
       .getPublicUrl(fileName)
 
     return urlData.publicUrl
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error uploading avatar:', error)
     throw error
   }
@@ -480,7 +480,7 @@ export async function updateUserProfile(updates: {
 
   try {
     // Filter out undefined values to avoid sending them to the database
-    const cleanUpdates: Record<string, any> = {}
+    const cleanUpdates: Record<string, string | null> = {}
     if (updates.nickname !== undefined) cleanUpdates.nickname = updates.nickname
     if (updates.avatar_url !== undefined) cleanUpdates.avatar_url = updates.avatar_url
     if (updates.motto !== undefined) cleanUpdates.motto = updates.motto
@@ -500,10 +500,11 @@ export async function updateUserProfile(updates: {
     }
 
     return true
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating profile:', error)
     // Check if it's a schema cache issue
-    if (error?.code === 'PGRST204' && error?.message?.includes('motto')) {
+    const err = error as { code?: string; message?: string }
+    if (err?.code === 'PGRST204' && err?.message?.includes('motto')) {
       console.error('The motto column may not exist in the database. Please run the migration: 20251211_ensure_motto_column.sql')
     }
     return false
@@ -589,7 +590,7 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
 
       // 如果查询成功且第一条记录存在 verification_result 字段
       if (!queryError && allRecords && allRecords.length > 0) {
-        const firstRecord = allRecords[0] as any
+        const firstRecord = allRecords[0] as { verification_result?: unknown }
         if ('verification_result' in firstRecord) {
           // 字段存在，查询所有有验证结果的记录
           const { data: verifiedRecords } = await supabase
@@ -601,7 +602,7 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
           if (verifiedRecords && verifiedRecords.length > 0) {
             verifiedCases = verifiedRecords.length
             const accurateCount = verifiedRecords.filter(
-              (r: any) => r.verification_result === true || r.verification_result === 'accurate' || r.verification_result === 1
+              (r: { verification_result?: unknown }) => r.verification_result === true || r.verification_result === 'accurate' || r.verification_result === 1
             ).length
             accuracyRate = Math.round((accurateCount / verifiedRecords.length) * 100)
           }
@@ -782,9 +783,10 @@ export async function toggleFollowUser(userId: string): Promise<boolean> {
 
       return true
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error toggling follow:', error)
-    throw new Error(error.message || '操作失败，请稍后重试')
+    const err = error as { message?: string }
+    throw new Error(err.message || '操作失败，请稍后重试')
   }
 }
 
@@ -1030,7 +1032,7 @@ export async function getUserNotes(searchQuery?: string): Promise<Note[]> {
 
         // 将推演记录转换为笔记格式
     // 注意：divination_records 表没有 updated_at 字段，使用 created_at 作为替代
-    return (data || []).map((record: any) => ({
+    return (data || []).map((record: DivinationNoteRow) => ({
       id: record.id,
       title: record.question
         ? record.question.length > 20
@@ -1048,8 +1050,16 @@ export async function getUserNotes(searchQuery?: string): Promise<Note[]> {
   }
 }
 
+export interface DivinationNote {
+  id: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
 export interface DivinationRecord {
   id: string
+  user_id: string
   question: string | null
   divination_time: string
   method: number
@@ -1057,8 +1067,16 @@ export interface DivinationRecord {
   changing_flags: boolean[]
   original_key: string
   changed_key: string
-  original_json?: any
-  changed_json?: any
+  original_json?: Record<string, unknown>
+  changed_json?: Record<string, unknown>
+  created_at: string
+  note?: string | null
+  notes?: DivinationNote[]
+}
+
+export interface DivinationNoteRow {
+  id: string
+  question: string | null
   created_at: string
 }
 
@@ -1071,11 +1089,12 @@ export async function saveDivinationRecord(payload: {
   divinationMethod: number
   lines: string[]
   changingFlags: boolean[]
+  note?: string
   result: {
     originalKey: string
     changedKey: string
-    original: any
-    changed: any
+    original: Record<string, unknown>
+    changed: Record<string, unknown>
   }
 }): Promise<{ success: boolean; message: string; recordId?: string }> {
   const user = await getCurrentUser()
@@ -1111,6 +1130,7 @@ export async function saveDivinationRecord(payload: {
         changed_key: payload.result.changedKey,
         original_json: payload.result.original || {},
         changed_json: payload.result.changed || {},
+        note: payload.note || null,
       })
       .select('id')
       .single()
@@ -1125,9 +1145,10 @@ export async function saveDivinationRecord(payload: {
       message: '保存成功', 
       recordId: data?.id 
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving divination record:', error)
-    return { success: false, message: '保存失败：' + (error.message || '未知错误') }
+    const err = error as { message?: string }
+    return { success: false, message: '保存失败：' + (err.message || '未知错误') }
   }
 }
 
@@ -1169,14 +1190,16 @@ export async function deleteDivinationRecord(recordId: string): Promise<{ succes
 
     if (error) {
       console.error('Error deleting divination record:', error)
-      const message = (error as any)?.message || (error as any)?.hint || '未知错误'
+      const err = error as { message?: string; hint?: string }
+      const message = err?.message || err?.hint || '未知错误'
       return { success: false, message: '删除失败：' + message }
     }
 
     return { success: true, message: '删除成功' }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting divination record:', error)
-    return { success: false, message: '删除失败：' + (error.message || '未知错误') }
+    const err = error as { message?: string }
+    return { success: false, message: '删除失败：' + (err.message || '未知错误') }
   }
 }
 
@@ -1265,11 +1288,12 @@ export async function deleteDivinationRecords(recordIds: string[]): Promise<{
       deletedCount,
       failedIds: [] 
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting divination records:', error)
+    const err = error as { message?: string }
     return { 
       success: false, 
-      message: '删除失败：' + (error.message || '未知错误'), 
+      message: '删除失败：' + (err.message || '未知错误'), 
       deletedCount: 0, 
       failedIds: recordIds 
     }
@@ -1339,5 +1363,221 @@ export async function getUserDivinationRecords(limit: number = 50): Promise<Divi
   } catch (error) {
     console.error('Error fetching divination records:', error)
     return []
+  }
+}
+
+/**
+ * 获取排盘记录的所有笔记
+ */
+export async function getDivinationNotes(recordId: string): Promise<DivinationNote[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const supabase = getSupabaseClient()
+  if (!supabase) return []
+
+  try {
+    const { data, error } = await supabase
+      .from('divination_notes')
+      .select('*')
+      .eq('divination_record_id', recordId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching divination notes:', error)
+      return []
+    }
+
+    return (data || []) as DivinationNote[]
+  } catch (error) {
+    console.error('Error fetching divination notes:', error)
+    return []
+  }
+}
+
+/**
+ * 添加排盘记录笔记
+ */
+export async function addDivinationNote(recordId: string, content: string): Promise<{ success: boolean; message: string; note?: DivinationNote }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('divination_notes')
+      .insert({
+        user_id: user.id,
+        divination_record_id: recordId,
+        content: content
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error adding divination note:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return { success: false, message: '添加失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '添加成功', note: data as DivinationNote }
+  } catch (error: unknown) {
+    console.error('Error adding divination note:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '添加失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
+ * 更新排盘记录笔记
+ */
+export async function updateDivinationNote(noteId: string, content: string): Promise<{ success: boolean; message: string; note?: DivinationNote }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('divination_notes')
+      .update({ content: content })
+      .eq('id', noteId)
+      .eq('user_id', user.id)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating divination note:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return { success: false, message: '更新失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '更新成功', note: data as DivinationNote }
+  } catch (error: unknown) {
+    console.error('Error updating divination note:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '更新失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
+ * 删除排盘记录笔记
+ */
+export async function deleteDivinationNote(noteId: string): Promise<{ success: boolean; message: string }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    const { error } = await supabase
+      .from('divination_notes')
+      .delete()
+      .eq('id', noteId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error deleting divination note:', error)
+      return { success: false, message: '删除失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '删除成功' }
+  } catch (error: unknown) {
+    console.error('Error deleting divination note:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '删除失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
+ * 更新排盘记录的问题描述
+ */
+export async function updateDivinationQuestion(recordId: string, question: string): Promise<{ success: boolean; message: string }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    const { error } = await supabase
+      .from('divination_records')
+      .update({ question: question })
+      .eq('id', recordId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error updating divination question:', error)
+      return { success: false, message: '更新失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '更新成功' }
+  } catch (error: unknown) {
+    console.error('Error updating divination question:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '更新失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
+ * 更新排盘记录的笔记 (Deprecated: Use updateDivinationNote or addDivinationNote instead)
+ */
+export async function updateDivinationRecordNote(recordId: string, note: string): Promise<{ success: boolean; message: string }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    const { error } = await supabase
+      .from('divination_records')
+      .update({ note: note || null })
+      .eq('id', recordId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error updating divination note:', error)
+      return { success: false, message: '更新失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '更新成功' }
+  } catch (error: unknown) {
+    console.error('Error updating divination note:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '更新失败：' + (err.message || '未知错误') }
   }
 }

@@ -1,6 +1,6 @@
 import type { FullGuaData, GuaLineDetail } from '@/app/community/components/GuaPanelDual'
 import { Solar } from 'lunar-javascript'
-import { buildChangedLines, isYangLine, lineToNumber } from './divinationLineUtils'
+import { buildChangedLines, isChangingLine, lineToNumber } from './divinationLineUtils'
 import { calculateChangedLineDetails, calculateLineDetails, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature } from './liuyaoDetails'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from './lunar'
 import { solarTermTextFrom } from './solarTerms'
@@ -50,46 +50,26 @@ const parseMaybeJson = <T>(value: T | string | undefined): T | undefined => {
   }
 }
 
-// 辅助函数：提取 Lines 数组
-const extractLines = (json: any): BackendLine[] => {
-  if (!json) return []
-  if (Array.isArray(json.lines)) return json.lines
-  if (Array.isArray(json.lineData)) return json.lineData
-  if (Array.isArray(json.data)) return json.data
-  return []
-}
-
-// 辅助函数：获取阴阳属性
-const getLineType = (line: BackendLine | undefined, isMoving: boolean, lineStr?: string): 0 | 1 | 2 | 3 => {
-  // 1. 尝试直接读取 type
-  if (line?.type !== undefined) return line.type as 0 | 1 | 2 | 3
-
-  // 2. 尝试读取 yinYang
-  let isYang = false
-  if (line?.yinYang === 'yang') isYang = true
-  else if (line?.yinYang === 'yin') isYang = false
-  else if (lineStr) {
-    // 3. 使用统一的工具函数判断
-    isYang = isYangLine(lineStr)
-  }
-
-  if (isMoving) return isYang ? 3 : 2
-  return isYang ? 1 : 0
-}
-
 /**
  * 将 divination_record 转换为 FullGuaData 格式
  * 修复了 convertToLunar 未定义的问题，直接使用 lunar-javascript
  */
-export function convertDivinationRecordToFullGuaData(record: any): FullGuaData | null {
+export function convertDivinationRecordToFullGuaData(record: unknown): FullGuaData | null {
   if (!record) return null
 
   try {
+    const recordObj = (typeof record === 'object' && record !== null) ? (record as Record<string, unknown>) : {}
     const backendRecord = record as BackendRecord
     
     // 1. 解析 JSON
-    const originalJson = parseMaybeJson(backendRecord.original_json) || {}
-    const changedJson = parseMaybeJson(backendRecord.changed_json) || {}
+    type BackendGuaJson = {
+      name?: string
+      gong?: string
+      kongWang?: string
+      lines?: BackendLine[]
+    }
+    const originalJson = parseMaybeJson<BackendGuaJson>(backendRecord.original_json as unknown as BackendGuaJson | string | undefined) || {}
+    const changedJson = parseMaybeJson<BackendGuaJson>(backendRecord.changed_json as unknown as BackendGuaJson | string | undefined) || {}
 
     // 2. 时间处理 - 使用与排盘结果页相同的计算源
     const divinationTime = new Date(backendRecord.divination_time)
@@ -134,11 +114,37 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
     const kongWang = getKongWangPairForStemBranch(stems[2].char, branches[2]?.char || '')
 
     // 4. 爻线数据准备
-    const changingFlags = Array.isArray(backendRecord.changing_flags) 
-      ? backendRecord.changing_flags 
-      : Array(6).fill(false)
-      
     const lineStrings = Array.isArray(backendRecord.lines) ? backendRecord.lines : []
+    const inferMovingFromLineString = (line: string | undefined): boolean => {
+      if (!line) return false
+      const trimmed = line.trim()
+      if (trimmed === '6' || trimmed === '9') return true
+      return isChangingLine(trimmed)
+    }
+
+    const inferredChangingFlagsFromLines =
+      lineStrings.length === 6 ? lineStrings.map((l) => inferMovingFromLineString(l)) : undefined
+
+    const normalizeChangingFlags = (raw: unknown): boolean[] => {
+      const base = Array.isArray(raw) ? raw : []
+      const normalized = Array(6).fill(false).map((_, idx) => {
+        const v = base[idx]
+        if (typeof v === 'boolean') return v
+        if (typeof v === 'number') return v !== 0
+        if (typeof v === 'string') {
+          const s = v.trim().toLowerCase()
+          if (s === 'true' || s === 't' || s === '1') return true
+          if (s === 'false' || s === 'f' || s === '0') return false
+        }
+        return false
+      })
+
+      if (normalized.some(Boolean)) return normalized
+      if (inferredChangingFlagsFromLines) return inferredChangingFlagsFromLines
+      return normalized
+    }
+
+    const changingFlags = normalizeChangingFlags((backendRecord as { changing_flags?: unknown }).changing_flags)
     
     // 使用统一的工具函数解析爻线字符串为数值
     const parseLineToNumber = (line: string | undefined | null): number => {
@@ -156,12 +162,11 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
       return lineToNumber(line)
     }
     
-    const getHexKey = (lines: number[]) => {
-      return lines.map(v => (v === 7 || v === 9 ? '1' : '0')).join('')
-    }
-
     // 5. 计算本卦和变卦的 Key - 使用与排盘结果页相同的逻辑
-    const originalKey = (record as any).original_key || (() => {
+    const originalKeyFromRecord = typeof recordObj.original_key === 'string' ? recordObj.original_key : undefined
+    const changedKeyFromRecord = typeof recordObj.changed_key === 'string' ? recordObj.changed_key : undefined
+
+    const originalKey = originalKeyFromRecord || (() => {
       const nums = lineStrings.map(l => {
         const num = parseLineToNumber(l)
         return num === 7 || num === 9 ? '1' : '0'
@@ -169,21 +174,13 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
       return nums.join('')
     })()
     
-    const changedKey = (record as any).changed_key || (() => {
-      const originalNums = lineStrings.map(l => parseLineToNumber(l))
-      const changedNums = originalNums.map((val, idx) => {
-        const isMoving = changingFlags[idx]
-        if (!isMoving) {
-          if (val === 6) return 8
-          if (val === 9) return 7
-          return val
-        } else {
-          if (val === 6 || val === 8) return 7
-          if (val === 9 || val === 7) return 8
-        }
-        return val
+    const changedKey = changedKeyFromRecord || (() => {
+      const changedLines = buildChangedLines(lineStrings, changingFlags)
+      const nums = changedLines.map(l => {
+        const num = parseLineToNumber(l)
+        return num === 7 || num === 9 ? '1' : '0'
       })
-      return getHexKey(changedNums)
+      return nums.join('')
     })()
 
     // 6. 卦名处理 - 使用与排盘结果页相同的 getHexagramFullInfo 和 getHexagramNature
@@ -191,16 +188,16 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
     const changedFullInfo = getHexagramFullInfo(changedKey)
     
     // 获取卦象性质（宫位）
-    const originalNature = getHexagramNature(originalKey, (originalJson as any).name || originalFullInfo.fullName || '未知卦')
-    const changedNature = getHexagramNature(changedKey, (changedJson as any).name || changedFullInfo.fullName || '未知卦')
+    const originalNature = getHexagramNature(originalKey, originalJson.name || originalFullInfo.fullName || '未知卦')
+    const changedNature = getHexagramNature(changedKey, changedJson.name || changedFullInfo.fullName || '未知卦')
     
     // 使用完整卦名，如果没有则使用原始数据
-    const originalName = originalFullInfo.fullName || (originalJson as any).name || '未知卦'
-    const originalGong = originalNature.nature || (originalJson as any).gong || '本'
+    const originalName = originalFullInfo.fullName || originalJson.name || '未知卦'
+    const originalGong = originalNature.nature || originalJson.gong || '本'
 
-    const hasChange = changedFullInfo.fullName && (changedJson as any).name !== '未知'
-    const changedName = hasChange ? (changedFullInfo.fullName || (changedJson as any).name) : undefined
-    const changedGong = hasChange ? (changedNature.nature || (changedJson as any).gong || '变') : undefined
+    const hasChange = String(originalKey) !== String(changedKey)
+    const changedName = hasChange ? (changedFullInfo.fullName || changedJson.name) : undefined
+    const changedGong = hasChange ? (changedNature.nature || changedJson.gong || '变') : undefined
 
     // 7. 获取日干用于计算六兽（使用已获取的 stems）
     const dayStem = stems[2]?.char || ''
@@ -229,7 +226,7 @@ export function convertDivinationRecordToFullGuaData(record: any): FullGuaData |
       const changedDetail = changedLineDetails[i]
       const lineStr = lineStrings[i]
       const num = parseLineToNumber(lineStr)
-      const isMoving = !!changingFlags[i]
+      const isMoving = !!changingFlags[i] || inferMovingFromLineString(lineStr) || num === 6 || num === 9
       
       // 确定 type: 0=少阴, 1=少阳, 2=老阴, 3=老阳
       // num: 7=少阳（阳爻）, 8=少阴（阴爻）, 6=老阴, 9=老阳

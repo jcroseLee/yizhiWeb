@@ -83,7 +83,7 @@ export function extractHelpBackground(html: string, maxLength: number = 100): st
 export function getGuaInfo(divinationRecord: {
   original_key?: string
   lines?: string[]
-  changing_flags?: boolean[]
+  changing_flags?: boolean[] | number[]
 } | null | undefined) {
   if (!divinationRecord) return null
   const originalKey = String(divinationRecord.original_key || '').replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)

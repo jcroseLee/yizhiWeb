@@ -195,6 +195,12 @@ export default function DivinationCasting({
     // 动画总时长设为 1.0秒 (与 duration 匹配)
     setTimeout(() => {
       // 动画已完成，铜钱静止。
+      
+      // 触感反馈 (Haptic Feedback)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
       // 关键：这里什么都不做，只等待。让用户看清铜钱结果。
       
       // 5. 延迟 400ms 后，才出卦象

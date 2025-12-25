@@ -120,7 +120,7 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
       // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
       // 静默处理，不记录日志
       if (error.code === 'PGRST116' || 
-          (error as any).status === 406 ||
+          (error as { status?: number }).status === 406 ||
           error.message?.includes('JSON object requested, multiple') || 
           error.message?.includes('0 rows') ||
           error.message?.includes('Not Acceptable')) {
@@ -150,7 +150,7 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
     }
   } catch (error) {
     // 处理意外的错误（非 Supabase 错误）
-    let errorInfo: any
+    let errorInfo: Record<string, unknown>
     
     if (error instanceof Error) {
       errorInfo = {
@@ -164,7 +164,7 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
         errorInfo = {
           type: typeof error,
           stringified: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-          raw: error,
+          raw: error as unknown,
         }
       } catch (stringifyError) {
         // 如果序列化失败，使用更安全的方法
@@ -173,12 +173,12 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
           constructor: error.constructor?.name,
           keys: Object.keys(error),
           toString: String(error),
-          raw: error,
+          raw: error as unknown,
         }
       }
     } else {
       errorInfo = { 
-        raw: error,
+        raw: error as unknown,
         type: typeof error,
         stringified: String(error),
       }

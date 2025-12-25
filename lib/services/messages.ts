@@ -1,6 +1,6 @@
-import { getSupabaseClient } from './supabaseClient'
-import { getCurrentUser } from './auth'
 import { logError } from '../utils/errorLogger'
+import { getCurrentUser } from './auth'
+import { getSupabaseClient } from './supabaseClient'
 
 // -----------------------------------------------------------------------------
 // 类型定义
@@ -13,7 +13,7 @@ export interface Message {
   group_id: string | null
   content: string
   message_type?: string
-  metadata?: any
+  metadata?: Record<string, unknown> | null
   is_read: boolean
   created_at: string
   sender?: {
@@ -47,6 +47,19 @@ export interface ConversationSettings {
   mute_until?: string | null
   is_hidden?: boolean
   last_read_at?: string | null
+}
+
+interface ConversationRow {
+  other_user_id: string
+  last_message_id: string | null
+  last_message_created_at: string | null
+  last_message_content: string | null
+  last_message_type: string | null
+  unread_count: number
+  is_pinned: boolean
+  is_muted: boolean
+  mute_until: string | null
+  is_hidden: boolean
 }
 
 // -----------------------------------------------------------------------------
@@ -88,9 +101,10 @@ export async function getConversations(
     }
 
     // 获取对应用户的信息
-    const userIds = data
-      .map((conv: any) => conv.other_user_id)
-      .filter((id: string) => id)
+    const conversations = data as ConversationRow[]
+    const userIds = conversations
+      .map((conv) => conv.other_user_id)
+      .filter((id): id is string => !!id)
 
     if (userIds.length > 0) {
       const { data: profiles, error: profileError } = await supabase
@@ -103,15 +117,15 @@ export async function getConversations(
           profiles.map((p) => [p.id, { id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }])
         )
 
-        return data.map((conv: any) => ({
+        return conversations.map((conv) => ({
           ...conv,
           other_user: profileMap.get(conv.other_user_id),
         }))
       }
     }
 
-    return data
-  } catch (error: any) {
+    return conversations as unknown as Conversation[]
+  } catch (error) {
     logError('Error in getConversations:', error)
     throw error
   }
@@ -150,7 +164,7 @@ export async function setConversationSetting(
     }
 
     return true
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in setConversationSetting:', error)
     throw error
   }
@@ -220,7 +234,7 @@ export async function getMessages(
     }
 
     return data.reverse()
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in getMessages:', error)
     throw error
   }
@@ -233,7 +247,7 @@ export async function sendMessage(
   receiverId: string,
   content: string,
   messageType: string = 'chat',
-  metadata?: any
+  metadata?: Record<string, unknown> | null
 ): Promise<Message> {
   const user = await getCurrentUser()
   if (!user) {
@@ -250,7 +264,14 @@ export async function sendMessage(
   }
 
   try {
-    const messageData: any = {
+    const messageData: {
+      sender_id: string
+      receiver_id: string
+      content: string
+      message_type: string
+      is_read: boolean
+      metadata?: Record<string, unknown> | null
+    } = {
       sender_id: user.id,
       receiver_id: receiverId,
       content: content.trim(),
@@ -290,13 +311,9 @@ export async function sendMessage(
       ...data,
       sender: profile || undefined,
     }
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in sendMessage:', error)
-    // 如果已经是 Error 对象，直接抛出；否则包装成 Error
-    if (error instanceof Error) {
-      throw error
-    }
-    throw new Error(error?.message || '发送消息失败，请稍后重试')
+    throw error
   }
 }
 
@@ -326,7 +343,7 @@ export async function markMessagesAsRead(otherUserId: string): Promise<boolean> 
     }
 
     return true
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in markMessagesAsRead:', error)
     throw error
   }

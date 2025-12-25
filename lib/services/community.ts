@@ -1,6 +1,6 @@
+import { logError } from '../utils/errorLogger'
 import { getCurrentUser } from './auth'
 import { getSupabaseClient } from './supabaseClient'
-import { logError } from '../utils/errorLogger'
 
 // -----------------------------------------------------------------------------
 // 图片上传工具函数
@@ -76,7 +76,7 @@ export async function uploadPostCover(file: File): Promise<string | null> {
       .getPublicUrl(fileName)
 
     return urlData.publicUrl
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error uploading cover image:', error)
     throw error
   }
@@ -85,6 +85,17 @@ export async function uploadPostCover(file: File): Promise<string | null> {
 // -----------------------------------------------------------------------------
 // 类型定义
 // -----------------------------------------------------------------------------
+
+export interface DivinationRecord {
+  id: string
+  original_key: string
+  changed_key: string
+  lines: string[]
+  changing_flags: number[]
+  divination_time: string
+  question?: string
+  method: number
+}
 
 export interface Post {
   id: string
@@ -103,7 +114,7 @@ export interface Post {
     id: string
     nickname: string | null
     avatar_url: string | null
-  }
+  } | null
   // 是否已点赞
   is_liked?: boolean
   // 是否已收藏
@@ -117,7 +128,7 @@ export interface Post {
   // 关联的排盘记录ID
   divination_record_id?: string | null
   // 关联的排盘记录数据（用于显示卦象）
-  divination_record?: any
+  divination_record?: DivinationRecord | null
   // 文章封面图URL
   cover_image_url?: string | null
 }
@@ -140,7 +151,7 @@ export interface Comment {
     id: string
     nickname: string | null
     avatar_url: string | null
-  }
+  } | null
   // 是否已点赞
   is_liked?: boolean
   // 子评论（保留用于向后兼容，但平铺模式下不使用）
@@ -152,7 +163,7 @@ export interface Comment {
       id: string
       nickname: string | null
       avatar_url: string | null
-    }
+    } | null
   }
 }
 
@@ -170,6 +181,51 @@ export interface CreateCommentInput {
   post_id: string
   content: string
   parent_id?: string | null
+}
+
+export interface PostRow {
+  id: string
+  user_id: string
+  title: string
+  content: string
+  content_html?: string
+  view_count: number
+  like_count: number
+  comment_count: number
+  created_at: string
+  updated_at: string
+  status?: 'published' | 'draft' | 'archived'
+  bounty?: number
+  divination_record_id?: string | null
+  divination_records?: DivinationRecord | DivinationRecord[] | null
+  cover_image_url?: string | null
+  type?: 'theory' | 'help' | 'debate' | 'chat'
+  section?: 'study' | 'help' | 'casual' | 'announcement' | null
+}
+
+export interface ProfileRow {
+  id: string
+  nickname: string | null
+  avatar_url: string | null
+}
+
+export interface CommentRow {
+  id: string
+  user_id: string
+  post_id: string
+  parent_id: string | null
+  content: string
+  like_count: number
+  created_at: string
+  updated_at: string
+  is_adopted?: boolean
+  adopted_at?: string | null
+  adopted_by?: string | null
+  posts?: {
+    id: string
+    title: string
+    type: string
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -234,10 +290,10 @@ export async function getPosts(options?: {
   }
 
   // 获取所有唯一的 user_id
-  const userIds = [...new Set(data.map((post: any) => post.user_id).filter(Boolean))]
+  const userIds = [...new Set(data.map((post) => post.user_id).filter(Boolean))]
 
   // 批量查询用户信息
-  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
@@ -245,7 +301,7 @@ export async function getPosts(options?: {
       .in('id', userIds)
 
     if (profiles) {
-      profiles.forEach((profile: any) => {
+      profiles.forEach((profile) => {
         profilesMap.set(profile.id, profile)
       })
     }
@@ -265,12 +321,12 @@ export async function getPosts(options?: {
         .from('post_likes')
         .select('post_id')
         .eq('user_id', userId)
-        .in('post_id', data.map((p: any) => p.id)),
+        .in('post_id', data.map((p) => p.id)),
       supabase
         .from('post_favorites')
         .select('post_id')
         .eq('user_id', userId)
-        .in('post_id', data.map((p: any) => p.id))
+        .in('post_id', data.map((p) => p.id))
     ])
 
     likedPostIds = likesResult.data?.map(l => l.post_id) || []
@@ -279,14 +335,14 @@ export async function getPosts(options?: {
 
   // 格式化数据并合并用户信息
   // 注意：divination_records 可能是数组，需要处理
-  return data.map((post: any) => {
+  return data.map((post) => {
     // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
-    let divinationRecord = null
+    let divinationRecord: DivinationRecord | null = null
     if (post.divination_records) {
       if (Array.isArray(post.divination_records)) {
-        divinationRecord = post.divination_records.length > 0 ? post.divination_records[0] : null
+        divinationRecord = post.divination_records.length > 0 ? (post.divination_records[0] as DivinationRecord) : null
       } else {
-        divinationRecord = post.divination_records
+        divinationRecord = post.divination_records as DivinationRecord
       }
     }
 
@@ -704,12 +760,12 @@ export async function getUserPosts(options?: {
         .from('post_likes')
         .select('post_id')
         .eq('user_id', currentUser.id)
-        .in('post_id', data.map((p: any) => p.id)),
+        .in('post_id', data.map((p) => p.id)),
       supabase
         .from('post_favorites')
         .select('post_id')
         .eq('user_id', currentUser.id)
-        .in('post_id', data.map((p: any) => p.id))
+        .in('post_id', data.map((p) => p.id))
     ])
 
     likedPostIds = likesResult.data?.map(l => l.post_id) || []
@@ -717,14 +773,14 @@ export async function getUserPosts(options?: {
   }
 
   // 格式化数据并合并用户信息
-  return data.map((post: any) => {
+  return data.map((post) => {
     // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
-    let divinationRecord = null
+    let divinationRecord: DivinationRecord | null = null
     if (post.divination_records) {
       if (Array.isArray(post.divination_records)) {
-        divinationRecord = post.divination_records.length > 0 ? post.divination_records[0] : null
+        divinationRecord = post.divination_records.length > 0 ? (post.divination_records[0] as DivinationRecord) : null
       } else {
-        divinationRecord = post.divination_records
+        divinationRecord = post.divination_records as DivinationRecord
       }
     }
 
@@ -807,10 +863,10 @@ export async function getUserFavoritePosts(options?: {
   }
 
   // 获取所有唯一的 user_id
-  const userIds = [...new Set(posts.map((post: any) => post.user_id).filter(Boolean))]
+  const userIds = [...new Set(posts.map((post: PostRow) => post.user_id).filter(Boolean))]
 
   // 批量查询用户信息
-  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
@@ -818,7 +874,7 @@ export async function getUserFavoritePosts(options?: {
       .in('id', userIds)
 
     if (profiles) {
-      profiles.forEach((profile: any) => {
+      profiles.forEach((profile: ProfileRow) => {
         profilesMap.set(profile.id, profile)
       })
     }
@@ -826,7 +882,7 @@ export async function getUserFavoritePosts(options?: {
 
   // 获取当前用户点赞的帖子ID列表
   let likedPostIds: string[] = []
-  let favoritedPostIds: string[] = postIds
+  const favoritedPostIds: string[] = postIds
   const [likesResult] = await Promise.all([
     supabase
       .from('post_likes')
@@ -838,7 +894,7 @@ export async function getUserFavoritePosts(options?: {
   likedPostIds = likesResult.data?.map(l => l.post_id) || []
 
   // 格式化数据并合并用户信息
-  return posts.map((post: any) => {
+  return posts.map((post: PostRow) => {
     // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
     let divinationRecord = null
     if (post.divination_records) {
@@ -928,10 +984,10 @@ export async function getUserLikedPosts(options?: {
   }
 
   // 获取所有唯一的 user_id
-  const userIds = [...new Set(posts.map((post: any) => post.user_id).filter(Boolean))]
+  const userIds = [...new Set(posts.map((post: PostRow) => post.user_id).filter(Boolean))]
 
   // 批量查询用户信息
-  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
@@ -939,14 +995,14 @@ export async function getUserLikedPosts(options?: {
       .in('id', userIds)
 
     if (profiles) {
-      profiles.forEach((profile: any) => {
+      profiles.forEach((profile: ProfileRow) => {
         profilesMap.set(profile.id, profile)
       })
     }
   }
 
   // 获取当前用户收藏的帖子ID列表
-  let likedPostIds: string[] = postIds
+  const likedPostIds: string[] = postIds
   let favoritedPostIds: string[] = []
   const [favoritesResult] = await Promise.all([
     supabase
@@ -959,7 +1015,7 @@ export async function getUserLikedPosts(options?: {
   favoritedPostIds = favoritesResult.data?.map(f => f.post_id) || []
 
   // 格式化数据并合并用户信息
-  return posts.map((post: any) => {
+  return posts.map((post: PostRow) => {
     // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
     let divinationRecord = null
     if (post.divination_records) {
@@ -1150,10 +1206,10 @@ export async function getComments(postId: string): Promise<Comment[]> {
   }
 
   // 获取所有唯一的 user_id
-  const userIds = [...new Set(data.map((comment: any) => comment.user_id).filter(Boolean))]
+  const userIds = [...new Set(data.map((comment) => comment.user_id).filter(Boolean))]
 
   // 批量查询用户信息
-  let profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
@@ -1161,7 +1217,7 @@ export async function getComments(postId: string): Promise<Comment[]> {
       .in('id', userIds)
 
     if (profiles) {
-      profiles.forEach((profile: any) => {
+      profiles.forEach((profile) => {
         profilesMap.set(profile.id, profile)
       })
     }
@@ -1178,18 +1234,18 @@ export async function getComments(postId: string): Promise<Comment[]> {
       .from('comment_likes')
       .select('comment_id')
       .eq('user_id', userId)
-      .in('comment_id', data.map((c: any) => c.id))
+      .in('comment_id', data.map((c: CommentRow) => c.id))
 
     likedCommentIds = likes?.map(l => l.comment_id) || []
   }
 
   // 格式化数据并创建评论映射（用于查找被回复的评论）
-  const commentMap = new Map<string, any>()
-  const allComments = data.map((comment: any) => {
-    const formattedComment = {
+  const commentMap = new Map<string, Comment>()
+  const allComments = data.map((comment: CommentRow) => {
+    const formattedComment: Comment = {
       ...comment,
       // 确保 is_adopted 字段被正确保留（对所有用户可见）
-      is_adopted: comment.is_adopted === true,
+      is_adopted: comment.is_adopted === true || !!comment.adopted_by,
       adopted_at: comment.adopted_at || null,
       adopted_by: comment.adopted_by || null,
       author: profilesMap.get(comment.user_id) || null,
@@ -1289,13 +1345,13 @@ export async function getUserComments(options?: {
       .from('comment_likes')
       .select('comment_id')
       .eq('user_id', currentUser.id)
-      .in('comment_id', data.map((c: any) => c.id))
+      .in('comment_id', data.map((c: CommentRow) => c.id))
 
     likedCommentIds = likes?.map(l => l.comment_id) || []
   }
 
   // 格式化数据
-  return data.map((comment: any) => ({
+  return data.map((comment: CommentRow) => ({
     ...comment,
     author,
     is_liked: likedCommentIds.includes(comment.id),
@@ -1558,7 +1614,7 @@ export async function adoptComment(commentId: string, postId: string): Promise<{
 
     // 6. 更新评论的采纳状态
     // 注意：数据库触发器会自动增加评论作者的声望值
-    const { error: updateError } = await supabase
+    const { error: updateError, data: updatedData } = await supabase
       .from('comments')
       .update({
         is_adopted: true,
@@ -1566,10 +1622,20 @@ export async function adoptComment(commentId: string, postId: string): Promise<{
         adopted_by: currentUser.id,
       })
       .eq('id', commentId)
+      .select()
 
     if (updateError) {
       console.error('Error adopting comment:', updateError)
       return { success: false, message: '采纳失败，请重试' }
+    }
+
+    // 检查是否真正更新了数据（防止 RLS 静默拦截）
+    if (!updatedData || updatedData.length === 0) {
+      console.error('Adoption failed: No rows updated. Likely RLS permission issue.')
+      return { 
+        success: false, 
+        message: '采纳失败：数据库权限限制。请管理员执行 SQL 修复 RLS 策略 (add_comment_adoption_policy.sql)。' 
+      }
     }
 
     // 7. 手动调用声望增加函数（作为备份，因为触发器已经处理）
@@ -1748,7 +1814,7 @@ export async function saveDraft(input: CreatePostInput): Promise<Post> {
   }
 
   // 构建插入数据，只包含有值的字段
-  const insertData: Record<string, any> = {
+  const insertData: Record<string, string | number | null | undefined> = {
     user_id: currentUser.id,
     title: input.title || '未命名草稿',
     content: input.content || '',
@@ -2063,7 +2129,7 @@ export async function getUserDrafts(
   } : null
 
   // 格式化数据
-  return data.map((post: any) => {
+  return data.map((post: PostRow) => {
     // 处理 divination_records
     let divinationRecord = null
     if (post.divination_records) {

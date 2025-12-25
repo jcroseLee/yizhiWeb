@@ -14,7 +14,7 @@ export interface Notification {
   related_type: 'post' | 'comment' | 'user'
   actor_id: string | null
   content: string | null
-  metadata: any
+  metadata: Record<string, unknown> | null
   is_read: boolean
   created_at: string
   actor?: {
@@ -93,7 +93,7 @@ export async function getNotifications(
     }
 
     return data
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in getNotifications:', error)
     throw error
   }
@@ -159,7 +159,7 @@ export async function markNotificationAsRead(notificationId: string): Promise<bo
     }
 
     return true
-  } catch (error: any) {
+  } catch (error) {
     logError('Error in markNotificationAsRead:', error)
     throw error
   }
@@ -277,7 +277,7 @@ export async function createNotification(
   relatedType: Notification['related_type'],
   actorId?: string | null,
   content?: string | null,
-  metadata?: any
+  metadata?: Record<string, unknown> | null
 ): Promise<boolean> {
   const supabase = getSupabaseClient()
   if (!supabase) {

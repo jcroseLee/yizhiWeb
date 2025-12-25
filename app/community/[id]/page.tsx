@@ -7,7 +7,6 @@ import {
   Coins,
   FileText,
   Flag,
-  Flame,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -125,21 +124,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     }
   }, [post?.author?.id, currentUserProfile])
 
-  useEffect(() => {
-    if (post?.author?.id) {
-      loadAuthorStats()
-      checkFollowingStatus()
-    }
-  }, [post?.author?.id, checkFollowingStatus])
-
-  const loadCurrentUserProfile = async () => {
-    try {
-      const profile = await getUserProfile()
-      setCurrentUserProfile(profile)
-    } catch (error) { console.error(error) }
-  }
-
-  const loadAuthorStats = async () => {
+  const loadAuthorStats = React.useCallback(async () => {
     if (!post?.author?.id) return
     try {
       const supabase = getSupabaseClient()
@@ -153,6 +138,20 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
         coins: profile?.yi_coins || 0,
         level: calculateLevel(profile?.exp || 0),
       })
+    } catch (error) { console.error(error) }
+  }, [post?.author?.id])
+
+  useEffect(() => {
+    if (post?.author?.id) {
+      loadAuthorStats()
+      checkFollowingStatus()
+    }
+  }, [post?.author?.id, checkFollowingStatus, loadAuthorStats])
+
+  const loadCurrentUserProfile = async () => {
+    try {
+      const profile = await getUserProfile()
+      setCurrentUserProfile(profile)
     } catch (error) { console.error(error) }
   }
 
@@ -426,9 +425,12 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                   </>
                 )}
 
-                {/* Author Info (Non-Help Post) */}
-                {!isHelpPost && post.author?.id && (
-                  <Link href={`/u/${post.author.id}`} className="flex items-center gap-3 mb-6 group hover:bg-stone-50/50 p-2 -m-2 rounded-lg transition-colors">
+                {/* Author Info */}
+                {post.author?.id && (
+                  <Link 
+                    href={`/u/${post.author.id}`} 
+                    className={`flex items-center gap-3 mb-6 group hover:bg-stone-50/50 p-2 -m-2 rounded-lg transition-colors ${isHelpPost ? 'lg:hidden' : ''}`}
+                  >
                     <Avatar className="w-10 h-10 border border-stone-200 group-hover:ring-2 group-hover:ring-[#C82E31]/20 transition-all">
                       <AvatarImage src={post.author.avatar_url || ''} />
                       <AvatarFallback>{post.author.nickname?.[0] || 'U'}</AvatarFallback>
@@ -481,7 +483,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 )}
 
                 {/* Footer Actions */}
-                <div className="flex items-center justify-between pt-6 mt-6 border-t border-stone-100">
+                <div className="hidden lg:flex items-center justify-between pt-6 mt-6 border-t border-stone-100">
                   <div className="flex gap-2 sm:gap-4">
                     <Button 
                       variant="ghost" size="sm" onClick={handleLike} disabled={isLiking}
@@ -547,15 +549,17 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     暂无评论，快来发表第一条评论吧
                   </div>
                 ) : (
-                  comments.map(comment => (
-                    <div 
-                      key={comment.id} 
-                      className="group"
-                      ref={(el) => {
-                        if (el) commentRefs.current.set(comment.id, el)
-                        else commentRefs.current.delete(comment.id)
-                      }}
-                    >
+                  comments.map(comment => {
+                    const isAdopted = !!comment.is_adopted;
+                    return (
+                      <div 
+                        key={comment.id} 
+                        className="group"
+                        ref={(el) => {
+                          if (el) commentRefs.current.set(comment.id, el)
+                          else commentRefs.current.delete(comment.id)
+                        }}
+                      >
                       <div className="flex gap-3">
                         <Link href={comment.author?.id ? `/u/${comment.author.id}` : '#'} className="mt-1 shrink-0">
                           <Avatar className="w-8 h-8 border border-stone-200">
@@ -570,7 +574,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                                 <span className="font-bold text-stone-900 text-sm truncate max-w-[120px] sm:max-w-none">
                                   {comment.author?.nickname}
                                 </span>
-                                {comment.is_adopted === true && (
+                                {isAdopted && (
                                   <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full border border-amber-200">
                                     <CheckCircle className="h-3 w-3 fill-amber-500 text-amber-600" />
                                     已采纳
@@ -603,12 +607,20 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                              </Button>
                              
                              {/* 更多操作 */}
-                             {isPostAuthor && !comment.is_adopted && (
+                             {isPostAuthor && !isAdopted && (
                                <Button 
                                  variant="ghost" size="sm" onClick={() => handleAdoptCommentClick(comment.id)}
                                  className="flex items-center gap-1 text-xs text-stone-400 hover:text-amber-600 font-medium px-0 h-auto"
                                >
                                  采纳
+                               </Button>
+                             )}
+                             {currentUserProfile?.id === comment.author?.id && (
+                               <Button
+                                 variant="ghost" size="sm" onClick={() => setConfirmDeleteCommentId(comment.id)}
+                                 className="flex items-center gap-1 text-xs text-stone-400 hover:text-red-600 font-medium px-0 h-auto"
+                               >
+                                 删除
                                </Button>
                              )}
                              {/* ... 其他按钮逻辑同上，添加 h-auto 和 px-0 ... */}
@@ -617,7 +629,8 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                       </div>
                       <div className="my-4 h-px bg-stone-50 group-last:hidden"></div>
                     </div>
-                  ))
+                  )
+                  })
                 )}
               </div>
 
@@ -719,28 +732,49 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
             {/* Desktop Only: Gua Panel */}
             {fullGuaData && (
-              <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4">
-                 <h4 className="text-sm font-bold text-stone-800 mb-3 flex items-center gap-2">
-                    <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
-                 </h4>
-                 <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+              <div className="lg:sticky lg:top-20 lg:z-10">
+                <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
               </div>
             )}
-
-            {/* Recommendations */}
-            <div className="bg-white rounded-xl border border-stone-100 p-5 shadow-sm">
-              <h4 className="font-bold text-stone-800 text-sm mb-4 flex items-center gap-2">
-                <Flame className="h-4 w-4 text-[#C82E31]" /> 相关案例
-              </h4>
-              <ul className="space-y-3">
-                {["测项目上线能否顺利？", "官鬼持世，是否意味着阻力重重？", "进神发动的应期判断技巧"].map((t, i) => (
-                  <li key={i} className="text-sm text-stone-600 hover:text-[#C82E31] cursor-pointer hover:underline truncate">{t}</li>
-                ))}
-              </ul>
-            </div>
             
           </aside>
         </main>
+
+        {/* Mobile Bottom Action Bar */}
+        <div 
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 px-6 pt-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex items-center justify-between"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))', height: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex items-center gap-8">
+            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+              <ThumbsUp className={`h-5 w-5 ${post.is_liked ? 'fill-[#C82E31] text-[#C82E31]' : ''}`} />
+              <span className="text-[10px] font-medium">{post.like_count > 0 ? post.like_count : '点赞'}</span>
+            </button>
+            <button onClick={handleFavorite} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+              <Bookmark className={`h-5 w-5 ${post.is_favorited ? 'fill-amber-500 text-amber-500' : ''}`} />
+              <span className="text-[10px] font-medium">{post.is_favorited ? '已收藏' : '收藏'}</span>
+            </button>
+            <button 
+              onClick={() => toast({ title: '分享功能开发中' })}
+              className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
+            >
+              <Share2 className="h-5 w-5" />
+              <span className="text-[10px] font-medium">分享</span>
+            </button>
+          </div>
+          <Button 
+            className="rounded-full bg-[#C82E31] hover:bg-[#a61b1f] text-white px-8 shadow-sm shadow-red-100 active:scale-95 transition-transform h-9"
+            onClick={() => {
+              const textarea = document.querySelector('textarea');
+              if (textarea) {
+                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                textarea.focus();
+              }
+            }}
+          >
+            写评论
+          </Button>
+        </div>
       </div>
 
       {/* Dialogs (Delete/Adopt) - 保持不变，省略以节省空间，直接复用原逻辑 */}

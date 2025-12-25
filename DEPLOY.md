@@ -84,6 +84,7 @@ certbot --nginx -d yilogic.cn -d www.yilogic.cn
 
 **手动步骤：**
 ```bash
+ssh root@47.101.171.131
 # 1. 进入目录
 cd /var/www/yilogic
 

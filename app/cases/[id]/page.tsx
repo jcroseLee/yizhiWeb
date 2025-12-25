@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Bookmark,
   CheckCircle2,
-  ChevronRight,
   MessageSquare,
   Printer,
   Share2,
@@ -27,6 +26,9 @@ const styles = `
     background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
   
+  .font-serif-sc {
+    font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  }
   
   /* 验证印章动画 */
   .stamp-animate {
@@ -183,78 +185,97 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
   return (
     <>
       <style jsx global>{styles}</style>
-      <div className="min-h-screen paper-texture font-sans text-stone-800">
+      <div className="min-h-screen paper-texture font-sans text-stone-800 pb-20 lg:pb-8">
         
         {/* 顶部导航 (面包屑与操作) */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-stone-200 h-14 flex items-center justify-between px-4 lg:px-8">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-stone-200 h-14 flex items-center justify-between px-4 lg:px-8 shadow-sm">
           <div className="flex items-center gap-2 text-sm text-stone-500">
             <Button 
               variant="ghost" 
-              className="hover:text-stone-900 flex items-center h-auto p-0"
+              className="hover:text-stone-900 flex items-center h-auto p-1.5 -ml-2 sm:ml-0"
               onClick={handleBackToCases}
             >
-              <ArrowLeft className="h-4 w-4 mr-1"/> 案例库
+              <ArrowLeft className="h-5 w-5 sm:mr-1"/> <span className="hidden sm:inline">案例库</span>
             </Button>
-            <ChevronRight className="h-3 w-3 text-stone-300" />
-            <span className="text-stone-800 font-medium">案例 #{id}</span>
+            <span className="hidden sm:inline text-stone-300">/</span>
+            <span className="text-stone-800 font-medium truncate max-w-[150px] sm:max-w-none">案例 #{id}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="rounded-full">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <Button variant="ghost" size="icon" className="rounded-full text-stone-500">
               <Printer className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="icon" className="rounded-full text-stone-500">
               <Share2 className="h-4 w-4" />
             </Button>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 lg:px-6 py-8 flex gap-8 relative">
+        <main className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-6 py-4 lg:py-8 flex flex-col lg:flex-row gap-6 lg:gap-8 relative">
           
           {/* 中间内容区 (Article) - 增加纸张背景 */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             
             {/* 文章头部 */}
-            <div className="mb-8">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <span className="bg-[#C82E31] text-white text-xs font-bold px-2 py-0.5 rounded-sm shadow-sm">事业</span>
-                <span className="bg-green-100 text-green-700 border border-green-200 text-xs px-2 py-0.5 rounded-sm flex items-center gap-1">
+            <div className="px-4 sm:px-0 mb-6 lg:mb-8">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                <span className="bg-[#C82E31] text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-sm shadow-sm">事业</span>
+                <span className="bg-green-100 text-green-700 border border-green-200 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-sm flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" /> 已验证 · 准确
                 </span>
-                <span className="text-stone-400 text-xs">{caseData.publishTime} 发布</span>
+                <span className="text-stone-400 text-[10px] sm:text-xs">{caseData.publishTime} 发布</span>
               </div>
-              <h1 className="text-3xl font-serif font-bold text-stone-900 leading-tight mb-6">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif-sc font-bold text-stone-900 leading-tight mb-4 sm:mb-6">
                 {caseData.question}
               </h1>
+
+              {/* 移动端作者信息 */}
+              <div className="lg:hidden flex items-center gap-3 mb-4 p-3 bg-white rounded-lg border border-stone-100 shadow-sm">
+                 <div className="w-10 h-10 rounded-full bg-stone-200 border border-white shadow-sm flex items-center justify-center text-base font-serif text-stone-600">
+                    {caseData.author.name[0]}
+                 </div>
+                 <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-stone-900">{caseData.author.name}</span>
+                      <span className="text-[10px] bg-[#C82E31] text-white px-1.5 py-0.5 rounded-sm">LV.{caseData.author.level}</span>
+                    </div>
+                    <div className="text-xs text-stone-500 mt-0.5 line-clamp-1">{caseData.author.bio}</div>
+                 </div>
+              </div>
             </div>
 
             {/* 纸张卡片容器 */}
-            <div className="bg-white border border-stone-100 shadow-sm rounded-xl p-8 lg:p-12 relative overflow-hidden">
+            <div className="bg-white border-y sm:border sm:rounded-xl shadow-sm p-5 sm:p-8 lg:p-12 relative overflow-hidden">
               
               {/* 装饰：顶部红线 */}
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-stone-200 via-[#C82E31]/40 to-stone-200"></div>
 
               {/* 背景部分 */}
-              <div className="mb-10 relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-1 h-5 bg-stone-300 rounded-full"></div>
-                  <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">Background / 背景</h3>
+              <div className="mb-8 lg:mb-10 relative">
+                <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                  <div className="w-1 h-4 sm:h-5 bg-stone-300 rounded-full"></div>
+                  <h3 className="text-xs sm:text-sm font-bold text-stone-400 uppercase tracking-widest">Background / 背景</h3>
                 </div>
-                <p className="text-lg text-stone-700 leading-loose text-justify font-serif indent-8">
+                <p className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8">
                   {caseData.content.background}
                 </p>
+              </div>
+
+              {/* 移动端卦象面板 */}
+              <div className="lg:hidden mb-8 bg-stone-50 rounded-lg p-1 border border-stone-100">
+                <GuaPanel info={caseData.divinationInfo} gua={caseData.gua} />
               </div>
 
               {/* 分割线 */}
               <Divider />
 
               {/* 推演部分 */}
-              <div className="mb-12">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-1 h-5 bg-[#C82E31] rounded-full"></div>
-                  <h3 className="text-sm font-bold text-[#C82E31] uppercase tracking-widest">Analysis / 卦理推演</h3>
+              <div className="mb-10 lg:mb-12">
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                  <div className="w-1 h-4 sm:h-5 bg-[#C82E31] rounded-full"></div>
+                  <h3 className="text-xs sm:text-sm font-bold text-[#C82E31] uppercase tracking-widest">Analysis / 卦理推演</h3>
                 </div>
                 
-                <div className="space-y-6 text-stone-800 leading-relaxed text-lg">
+                <div className="space-y-5 sm:space-y-6 text-stone-800 leading-relaxed text-base sm:text-lg">
                   {caseData.content.analysis.map((para, idx) => {
                     // 提取标题部分
                     const titleMatch = para.match(/^(\d+\.\s+\*\*.*?\*\*：?)/)
@@ -271,7 +292,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                             return (
                               <React.Fragment key={i}>
                                 {part}
-                                <span className="bg-stone-100 text-stone-900 px-1 mx-1 rounded border border-stone-200 font-medium font-serif">日破</span>
+                                <span className="bg-stone-100 text-stone-900 px-1 mx-1 rounded border border-stone-200 font-medium font-serif-sc text-sm">日破</span>
                               </React.Fragment>
                             )
                           })}
@@ -282,7 +303,7 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
                     if (para.includes('综合推断')) {
                       const content = para.replace(/^4\.\s+\*\*综合推断\*\*：\s*/, '')
                       return (
-                        <div key={idx} className="bg-[#fcfbf9] border-l-4 border-[#C82E31] p-4 my-6 italic text-stone-600">
+                        <div key={idx} className="bg-[#fcfbf9] border-l-4 border-[#C82E31] p-3 sm:p-4 my-4 sm:my-6 italic text-stone-600 text-sm sm:text-base">
                           <span className="font-bold text-[#C82E31] not-italic mr-2">4. 综合推断：</span>
                           {content}
                         </div>
@@ -321,24 +342,24 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
               </div>
 
               {/* 结果反馈 (印章效果) */}
-              <div className="relative mt-12 p-6 pr-40 rounded-lg bg-green-50/50 border border-green-100/50">
-                {/* 印章 */}
-                <div className="absolute right-6 top-1/2 -translate-y-1/2 w-32 h-32 border-[3px] border-green-700/20 rounded-full flex items-center justify-center stamp-animate pointer-events-none">
-                  <div className="w-28 h-28 border border-green-700/30 rounded-full flex items-center justify-center">
-                    <span className="text-green-800 font-black text-xl tracking-widest -rotate-12 opacity-80">验证·准确</span>
+              <div className="relative mt-10 sm:mt-12 p-5 sm:p-6 pb-12 sm:pb-6 pr-6 sm:pr-40 rounded-lg bg-green-50/50 border border-green-100/50 overflow-hidden">
+                {/* 印章 - 移动端缩小 */}
+                <div className="absolute -right-4 -bottom-4 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 border-[3px] border-green-700/10 sm:border-green-700/20 rounded-full flex items-center justify-center stamp-animate pointer-events-none opacity-40 sm:opacity-100 rotate-[-15deg]">
+                  <div className="w-20 h-20 sm:w-28 sm:h-28 border border-green-700/20 sm:border-green-700/30 rounded-full flex items-center justify-center">
+                    <span className="text-green-800 font-black text-sm sm:text-xl tracking-widest opacity-60 sm:opacity-80">验证·准确</span>
                   </div>
                 </div>
                 
-                <h3 className="text-sm font-bold text-green-800 mb-2 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" /> Result / 实际反馈
+                <h3 className="text-xs sm:text-sm font-bold text-green-800 mb-2 flex items-center gap-2 relative z-10">
+                  <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Result / 实际反馈
                 </h3>
-                <p className="text-green-900/80 leading-relaxed relative z-10 font-serif">
+                <p className="text-green-900/80 leading-relaxed relative z-10 font-serif-sc text-sm sm:text-base">
                   {caseData.content.feedback.text.replace(/【反馈】/, '')}
                 </p>
               </div>
 
-              {/* 文章底部操作栏 */}
-              <div className="mt-8 pt-6 border-t border-stone-200 flex items-center justify-between">
+              {/* 文章底部操作栏 - 仅桌面端显示 */}
+              <div className="hidden lg:flex mt-8 pt-6 border-t border-stone-200 items-center justify-between">
                 <div className="flex items-center gap-6">
                   <Button
                     onClick={handleLike}
@@ -497,6 +518,39 @@ export default function CaseDetailPage({ params }: CaseDetailPageProps) {
             </div>
           </aside>
         </main>
+
+        {/* Mobile Bottom Action Bar */}
+        <div 
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 px-6 pt-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex items-center justify-between"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))', height: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex items-center gap-8">
+            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+              <ThumbsUp className={`h-5 w-5 ${isLiked ? 'fill-[#C82E31] text-[#C82E31]' : ''}`} />
+              <span className="text-[10px] font-medium">{likeCount}</span>
+            </button>
+            <button onClick={() => setIsSaved(!isSaved)} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+              <Bookmark className={`h-5 w-5 ${isSaved ? 'fill-amber-500 text-amber-500' : ''}`} />
+              <span className="text-[10px] font-medium">{isSaved ? '已收藏' : '收藏'}</span>
+            </button>
+            <button className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+              <Share2 className="h-5 w-5" />
+              <span className="text-[10px] font-medium">分享</span>
+            </button>
+          </div>
+          <Button 
+            className="rounded-full bg-[#C82E31] hover:bg-[#a61b1f] text-white px-8 shadow-sm shadow-red-100 active:scale-95 transition-transform h-9"
+            onClick={() => {
+              const textarea = document.querySelector('textarea');
+              if (textarea) {
+                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                textarea.focus();
+              }
+            }}
+          >
+            写评论
+          </Button>
+        </div>
       </div>
     </>
   )

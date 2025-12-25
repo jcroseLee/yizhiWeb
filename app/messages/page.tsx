@@ -261,7 +261,8 @@ function MessagesPageContent() {
       social.forEach(n => {
         if (n.related_type === 'post') postIds.add(n.related_id)
         if (n.related_type === 'comment') commentIds.add(n.related_id)
-        if ((n.type === 'comment' || n.type === 'reply') && n.metadata?.comment_id) commentIds.add(n.metadata.comment_id)
+        const commentIdFromMetadata = typeof n.metadata?.comment_id === 'string' ? n.metadata.comment_id : null
+        if ((n.type === 'comment' || n.type === 'reply') && commentIdFromMetadata) commentIds.add(commentIdFromMetadata)
       })
 
       // 加载帖子
@@ -476,7 +477,8 @@ function MessagesPageContent() {
                 let post = null, comment = null, postId = null
                 if (notify.related_type === 'post') {
                   postId = notify.related_id; post = postInfoMap.get(postId) || null
-                  if (['comment', 'reply'].includes(notify.type) && notify.metadata?.comment_id) comment = commentInfoMap.get(notify.metadata.comment_id) || null
+                  const commentIdFromMetadata = typeof notify.metadata?.comment_id === 'string' ? notify.metadata.comment_id : null
+                  if (['comment', 'reply'].includes(notify.type) && commentIdFromMetadata) comment = commentInfoMap.get(commentIdFromMetadata) || null
                 } else if (notify.related_type === 'comment') {
                   comment = commentInfoMap.get(notify.related_id) || null
                   if (comment) { postId = comment.post_id; post = postInfoMap.get(postId) || null }
@@ -530,6 +532,9 @@ function MessagesPageContent() {
                                     msg.type === 'report_rejected' ? 'group-hover:bg-orange-100' : 
                                     'group-hover:bg-blue-100'
                 const title = isReportNotif ? `举报${reportAction}` : '系统通知'
+                const postIdFromMetadata = typeof msg.metadata?.post_id === 'string' ? msg.metadata.post_id : null
+                const postTitleFromMetadata = typeof msg.metadata?.post_title === 'string' ? msg.metadata.post_title : null
+                const adminNoteFromMetadata = typeof msg.metadata?.admin_note === 'string' ? msg.metadata.admin_note : null
                 
                 return (
                   <div key={msg.id} onClick={async () => {
@@ -539,8 +544,8 @@ function MessagesPageContent() {
                       setSystemNotifications(prev => prev.map(n => n.id === msg.id ? { ...n, is_read: true } : n))
                     }
                     // 如果是举报通知且有帖子ID，可以跳转到帖子
-                    if (isReportNotif && msg.metadata?.post_id) {
-                      router.push(`/community/${msg.metadata.post_id}`)
+                    if (isReportNotif && postIdFromMetadata) {
+                      router.push(`/community/${postIdFromMetadata}`)
                     }
                   }} className="flex items-start gap-4 p-4 rounded-xl border border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer group">
                     <div className={`p-2.5 rounded-full shrink-0 ${bgColor} ${hoverBgColor} transition-colors`}>
@@ -553,11 +558,11 @@ function MessagesPageContent() {
                       </div>
                       <p className="text-sm text-stone-600 mt-1">{msg.content}</p>
                       {/* 显示举报相关的元数据 */}
-                      {isReportNotif && msg.metadata?.post_title && (
+                      {isReportNotif && postTitleFromMetadata && (
                         <div className="mt-2 p-2 bg-stone-50 rounded text-xs text-stone-500 border border-stone-100">
-                          <div className="font-medium">相关帖子: {msg.metadata.post_title}</div>
-                          {msg.metadata.admin_note && (
-                            <div className="mt-1 text-stone-400">备注: {msg.metadata.admin_note}</div>
+                          <div className="font-medium">相关帖子: {postTitleFromMetadata}</div>
+                          {adminNoteFromMetadata && (
+                            <div className="mt-1 text-stone-400">备注: {adminNoteFromMetadata}</div>
                           )}
                         </div>
                       )}

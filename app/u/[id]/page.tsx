@@ -211,7 +211,7 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
         lines = post.divination_record.lines.map((line: string) => line === '-----' || line === '---O---')
       }
       if (post.divination_record.changing_flags && Array.isArray(post.divination_record.changing_flags)) {
-        changingLines = post.divination_record.changing_flags.map((flag: boolean, index: number) => (flag ? index : -1)).filter((index: number) => index >= 0)
+        changingLines = post.divination_record.changing_flags.map((flag, index) => (Boolean(flag) ? index : -1)).filter((index) => index >= 0)
       }
     }
 

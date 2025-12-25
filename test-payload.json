@@ -1,0 +1,11 @@
+{
+  "question": "财运如何",
+  "background": "",
+  "guaData": {
+    "date": "2024-05-20",
+    "stems": [{"char":"甲"},{"char":"乙"},{"char":"丙"},{"char":"丁"}],
+    "branches": [{"char":"子"},{"char":"丑"},{"char":"寅"},{"char":"卯"}],
+    "originalFullInfo": {"name": "乾为天"},
+    "lineDetails": []
+  }
+}

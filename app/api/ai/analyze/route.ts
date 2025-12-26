@@ -153,6 +153,33 @@ export async function POST(req: Request) {
             p_request_id: requestId, 
             p_reason: error instanceof Error ? error.message : String(error) 
         });
+    } else if (supabase && user && !requestId) {
+        // Fallback refund logic (when requestId is null, likely used fallback payment)
+        const COST = 50;
+        // 1. Get current balance
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('yi_coins')
+            .eq('id', user.id)
+            .single();
+            
+        if (profile) {
+            // 2. Refund
+             await supabase
+                .from('profiles')
+                .update({ yi_coins: (profile.yi_coins || 0) + COST })
+                .eq('id', user.id);
+                
+             // 3. Record refund transaction
+             await supabase
+                .from('coin_transactions')
+                .insert({
+                    user_id: user.id,
+                    amount: COST,
+                    type: 'refund',
+                    description: `AI Analysis Refund: ${error instanceof Error ? error.message : String(error)}`
+                });
+        }
     }
 
     return new Response(JSON.stringify({ 

@@ -9,18 +9,19 @@ import {
   ChevronDown, ChevronUp,
   CloudFog, Download,
   Edit2,
+  Loader2,
   Moon,
   PenLine,
   Plus,
   RefreshCw,
-  RotateCcw, Save, Share2, Sparkles,
+  RotateCcw, Save, Send,
+  Share2, Sparkles,
   Sun,
   Trash2,
-  Wand2,
   X
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
@@ -33,7 +34,7 @@ import {
   RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
 import { useToast } from '@/lib/hooks/use-toast'
-import { getCurrentUser } from '@/lib/services/auth'
+import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
   addDivinationNote,
@@ -47,10 +48,11 @@ import {
 } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
 import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
-import { calculateChangedLineDetails, calculateLineDetails, getExtendedShenSha, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature, type LineDetail, type ShenShaItem } from '@/lib/utils/liuyaoDetails'
+import { calculateChangedLineDetails, calculateLineDetails, getExtendedShenSha, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature } from '@/lib/utils/liuyaoDetails'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
 import { solarTermTextFrom } from '@/lib/utils/solarTerms'
-import AIResultDialog from '../components/AIResultDialog'
+import { HexagramLine } from '../components/HexagramLine'
+import { ShenShaList } from '../components/ShenShaList'
 
 const GLOBAL_STYLES = `
   .font-serif-sc { font-family: "Noto Serif SC", "Songti SC", serif; }
@@ -64,6 +66,17 @@ const stripAiNotePrefix = (content: string) => content.replace(/^【AI详批】\
 
 // --- 纯函数工具类 ---
 const isUUID = (str: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+
+// Generate UUID for idempotency
+const generateIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 const formatDateTime = (iso: string) => {
   const date = new Date(iso)
@@ -84,214 +97,26 @@ const loadLocalNotes = (resultId: string): DivinationNote[] => {
   }
 }
 
+const saveLocalNotes = (resultId: string, notes: DivinationNote[]) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`, JSON.stringify(notes))
+  } catch (e) {
+    console.error("Failed to save local notes:", e)
+  }
+}
+
 const buildChangedLines = buildChangedLinesUtil
 
 // --- 子组件: 爻行显示 (核心修改) ---
+// Moved to ../components/HexagramLine.tsx
 
-interface HexagramLineProps {
-  line: { barType: 'yin' | 'yang', isChanging: boolean, status: string }
-  detail?: LineDetail
-  changedDetail?: LineDetail
-  isChanged?: boolean
-  fuShen?: string
-  guaShen?: string
-}
-
-const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged = false, fuShen, guaShen }: HexagramLineProps) => {
-  const displayType = isChanged 
-    ? (line.isChanging ? (line.barType === 'yang' ? 'yin' : 'yang') : line.barType)
-    : line.barType
-
-  const lineColor = line.isChanging ? 'bg-[#C82E31]' : 'bg-stone-800'
-  const isYang = displayType === 'yang'
-  
-  // 高度：移动端 h-10，PC 端严格恢复 h-14
-  const heightClass = "h-10 lg:h-14"
-
-  // 1. 变卦显示模式 (右侧)
-  if (isChanged) {
-    const opacityClass = line.isChanging ? 'opacity-100 text-stone-800' : 'opacity-30 grayscale text-stone-400'
-    
-    return (
-      <div className={`flex flex-col ${heightClass} border-b border-dashed border-stone-100/50 justify-center`}>
-        <div className="flex items-center">
-          
-          {/* 1. 爻线图形 */}
-          {/* 移动端 w-16，PC 端严格恢复 w-16 (保持与左侧本卦对齐) */}
-          <div className="w-16 h-4 flex items-center justify-between relative shrink-0 mr-1 lg:mr-0">
-            {isYang ? (
-              <div className={`w-full lg:w-full h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor}`} />
-            ) : (
-              <>
-                <div className={`w-[42%] lg:w-[42%] h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor}`} />
-                <div className={`w-[42%] lg:w-[42%] h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor}`} />
-              </>
-            )}
-          </div>
-          
-          {/* 2. 变卦文字 */}
-          {/* PC端：ml-4 (间距恢复) */}
-          <div className={`flex flex-col justify-center ml-2 lg:ml-4 ${opacityClass}`}>
-            <span className="font-bold font-serif text-stone-700 text-xs lg:text-sm leading-none mb-0.5">
-              {changedDetail?.relationShort}
-            </span>
-            <span className="font-serif text-[10px] lg:text-xs text-stone-500 leading-none scale-90 lg:scale-100 origin-left">
-              {changedDetail?.stem}{changedDetail?.branch}{changedDetail?.element}
-            </span>
-          </div>
-
-          {/* 移动端：六兽简写 */}
-          <div className={`lg:hidden flex flex-col justify-center ml-3 ${opacityClass}`}>
-             <span className="text-[10px] font-serif text-stone-500">
-               {detail?.animalShort}
-             </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // 2. 本卦显示模式 (左侧)
-  return (
-    <div className={`relative group hover:bg-stone-50/80 transition-colors rounded-lg border-b border-dashed border-stone-100 ${heightClass} flex items-center justify-end lg:justify-start -mx-1 lg:-mx-3 px-1 lg:px-3`}>
-      
-      <div className="flex items-center w-full lg:w-auto">
-        
-        {/* 第一列：六兽 */}
-        {/* 移动端：隐藏 (hidden)，PC端：显示 (lg:flex, w-8) - 严格恢复 */}
-        <div className="hidden lg:flex w-8 flex-col items-center justify-center shrink-0 border-r border-stone-100 pr-2 mr-3 h-8">
-           <span className="text-xs font-bold text-stone-500 font-serif whitespace-nowrap">
-             {detail?.animalShort}
-           </span>
-        </div>
-
-        {/* 第二列：文字信息 (六亲+干支) */}
-        {/* 移动端 w-20，PC端 w-28 - 严格恢复 */}
-        <div className="w-20 lg:w-28 flex flex-col items-end lg:justify-center shrink-0 mr-1 lg:mr-2">
-           {/* 六亲 */}
-           <div className="flex items-baseline gap-1 lg:gap-2">
-             <span className="font-bold text-stone-800 font-serif text-sm lg:text-[15px] leading-none mb-0.5 lg:mb-0">
-               {detail?.relationShort}
-             </span>
-             {/* PC端干支 */}
-             <span className="text-stone-600 font-serif text-[10px] lg:text-sm leading-none scale-95 lg:scale-100 origin-right lg:origin-left">
-                {detail?.stem}{detail?.branch}<span className="text-stone-400 ml-0.5 text-[9px] lg:text-xs">{detail?.element}</span>
-             </span>
-           </div>
-           
-           {/* 移动端：伏神/卦身/世应 (挤在一起) */}
-           <div className="lg:hidden flex items-center gap-1 mt-0.5">
-              {detail?.isShi && <span className="text-[9px] text-white bg-[#C82E31] px-0.5 rounded-[2px] leading-none scale-90">世</span>}
-              {detail?.isYing && <span className="text-[9px] text-stone-500 border border-stone-200 px-0.5 rounded-[2px] leading-none scale-90">应</span>}
-              {fuShen && <span className="text-[8px] text-[#C82E31] font-serif scale-75 origin-right">伏:{fuShen}</span>}
-           </div>
-
-           {/* PC端：伏神/卦身 (独立一行显示，红色高亮 - 严格恢复) */}
-           <div className="hidden lg:flex items-center gap-2 mt-0.5">
-               {fuShen && (
-                 <span className="text-[10px] text-[#C82E31] font-serif tracking-wide">
-                   伏神: {fuShen}
-                 </span>
-               )}
-               {guaShen && (
-                 <span className="text-[10px] text-stone-400 font-serif scale-90 origin-left">
-                   身: {guaShen}
-                 </span>
-               )}
-           </div>
-        </div>
-
-        {/* 第三列：爻线图形 */}
-        {/* 移动端 w-16，PC端 w-24 - 严格恢复 */}
-        <div className="relative flex items-center justify-center w-16 lg:w-24 shrink-0">
-          <div className="w-12 lg:w-20 h-4 flex items-center justify-between relative cursor-default">
-            {isYang ? (
-              <div className={`w-full h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor} opacity-90`} />
-            ) : (
-              <>
-                <div className={`w-[42%] h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor} opacity-90`} />
-                <div className={`w-[42%] h-[5px] lg:h-[8px] rounded-[1px] lg:rounded-[2px] shadow-sm ${lineColor} opacity-90`} />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 第四列：PC端专属状态栏 (世应/动爻标记 - 严格恢复) */}
-        <div className="hidden lg:flex items-center gap-2 ml-3 w-12 shrink-0">
-           {/* 世应 */}
-           <div className="w-5 flex justify-center">
-             {detail?.isShi && (
-               <div className="w-5 h-5 flex items-center justify-center border border-[#C82E31] rounded-[4px] bg-[#C82E31]/5 text-[#C82E31]">
-                 <span className="text-[10px] font-bold font-serif leading-none mt-[1px]">世</span>
-               </div>
-             )}
-             {detail?.isYing && (
-               <div className="w-5 h-5 flex items-center justify-center border border-stone-300 rounded-[4px] bg-stone-50 text-stone-500">
-                 <span className="text-[10px] font-serif leading-none mt-[1px]">应</span>
-               </div>
-             )}
-           </div>
-
-           {/* 动爻 */}
-           <div className="w-4 flex justify-center">
-             {line.isChanging && (
-                <span className="text-xs font-serif text-[#C82E31] animate-pulse font-bold">
-                  {line.barType === 'yin' ? '✕' : '○'}
-                </span>
-             )}
-           </div>
-        </div>
-
-        {/* 移动端 动爻标记 (浮动在右侧) */}
-        <div className="lg:hidden w-4 flex justify-center ml-1">
-             {line.isChanging && (
-                <span className="text-xs font-serif text-[#C82E31] font-bold">
-                  {line.barType === 'yin' ? '✕' : '○'}
-                </span>
-             )}
-        </div>
-
-      </div>
-    </div>
-  )
-})
-HexagramLine.displayName = 'HexagramLine'
 
 // --- 子组件: 神煞列表 ---
-const ShenShaList = ({ list }: { list: ShenShaItem[] }) => (
-  <div className="flex flex-wrap gap-2 lg:gap-4 text-xs">
-    {list.map((ss, idx) => (
-      <span key={idx} className="text-stone-500 font-serif flex items-center bg-white px-2 py-1 rounded border border-stone-100 shadow-sm">
-         <span className="text-stone-400 mr-1.5">{ss.name}</span>
-         <span className="font-medium text-stone-700">{ss.value}</span>
-      </span>
-    ))}
-  </div>
-)
+// Moved to ../components/ShenShaList.tsx
 
 // --- 子组件: 功能按钮 (移动端专用) ---
-interface ActionButtonProps {
-  icon: React.ElementType
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  active?: boolean
-}
-
-const ActionButton = ({ icon: Icon, label, onClick, disabled = false, active = false }: ActionButtonProps) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border transition-all active:scale-95 ${
-      active 
-        ? 'bg-[#C82E31]/5 border-[#C82E31] text-[#C82E31]' 
-        : 'bg-white border-stone-100 text-stone-600 hover:bg-stone-50'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'shadow-sm'}`}
-  >
-    <Icon className={`w-5 h-5 ${active ? 'fill-current' : ''}`} />
-    <span className="text-[10px] font-medium">{label}</span>
-  </button>
-)
+// Moved to ../components/ActionButton.tsx
 
 const HexagramBackground = () => (
   <div className="absolute inset-0 z-0 pointer-events-none">
@@ -318,6 +143,22 @@ function ResultPageContent() {
   const normalizedResultId = resultId.startsWith('db-') ? resultId.substring(3) : resultId
   const isLocalResult = !isUUID(normalizedResultId)
   
+  const handleLoginRedirect = useCallback(() => {
+    // 构造登录重定向 URL，包含当前页面路径
+    const currentPath = `/6yao/${resultId}`
+    const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}`
+    
+    toast({
+      title: '需要登录',
+      description: '请先登录以继续操作，即将跳转...',
+    })
+    
+    // 延迟跳转，让用户看清提示
+    setTimeout(() => {
+      router.push(loginUrl)
+    }, 1500)
+  }, [resultId, router, toast])
+
   const [payload, setPayload] = useState<StoredDivinationPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -326,7 +167,6 @@ function ResultPageContent() {
   const [showShenSha, setShowShenSha] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isAuthor, setIsAuthor] = useState(false)
-  const [showAI, setShowAI] = useState(false)
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false)
   const [showAiSaveConfirm, setShowAiSaveConfirm] = useState(false)
   const [showAiNotOwnerConfirm, setShowAiNotOwnerConfirm] = useState(false)
@@ -334,6 +174,16 @@ function ResultPageContent() {
   const [aiBalanceChecking, setAiBalanceChecking] = useState(false)
   const [pendingSaveAction, setPendingSaveAction] = useState<'ai' | 'note' | 'title' | null>(null)
   const [forceAiAnalyze, setForceAiAnalyze] = useState(false)
+  
+  // AI Streaming state
+  const [aiStreamContent, setAiStreamContent] = useState('')
+  const [isAiStreaming, setIsAiStreaming] = useState(false)
+  const [aiStreamError, setAiStreamError] = useState<Error | null>(null)
+  const aiAbortControllerRef = useRef<AbortController | null>(null)
+  const aiIdempotencyKeyRef = useRef<string | null>(null)
+  const aiSectionRef = useRef<HTMLDivElement>(null)
+  const savedOnceRef = useRef(false)
+  const noteSectionRef = useRef<HTMLDivElement>(null)
   
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
@@ -359,8 +209,9 @@ function ResultPageContent() {
 
   const handleConfirmReanalyze = () => {
     setShowReanalyzeConfirm(false)
-    setForceAiAnalyze(true)
-    setShowAI(true)
+    aiIdempotencyKeyRef.current = null; // Force new analysis
+    startAiAnalysis();
+    setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
 
   const persistQuestionUpdate = useCallback(async (nextQuestion: string) => {
@@ -609,16 +460,19 @@ function ResultPageContent() {
       })
       if (res.success) {
         setIsSaved(true)
+        setIsAuthor(true)
         setSavedRecordId(res.recordId || null)
         setHasUnsavedChanges(false)
         if (showToast) toast({ title: '保存成功' })
         const newRecordId = res.recordId
         if (newRecordId && isLocalResult) {
-          const localNotes = loadLocalNotes(resultId).filter((n) => !n.content.startsWith(AI_NOTE_PREFIX))
-          if (localNotes.length > 0 && typeof window !== 'undefined') {
+          const localNotes = notes.filter((n) => !n.content.startsWith(AI_NOTE_PREFIX))
+          if (localNotes.length > 0) {
             try {
               await Promise.all(localNotes.map((n) => addDivinationNote(newRecordId, n.content)))
-              window.localStorage.removeItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`)
+              if (typeof window !== 'undefined') {
+                window.localStorage.removeItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`)
+              }
               const fetchedNotes = await getDivinationNotes(newRecordId)
               setNotes(fetchedNotes)
             } catch {
@@ -628,7 +482,11 @@ function ResultPageContent() {
         }
         return res.recordId || null
       } else {
-        if (showToast) toast({ title: '保存失败', description: res.message, variant: 'destructive' })
+        if (res.message === '请先登录') {
+          handleLoginRedirect()
+        } else if (showToast) {
+          toast({ title: '保存失败', description: res.message, variant: 'destructive' })
+        }
         return null
       }
     } catch {
@@ -637,12 +495,139 @@ function ResultPageContent() {
     } finally {
       setSaving(false)
     }
-  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges, isLocalResult])
+  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges, isLocalResult, notes, handleLoginRedirect])
+
+  const persistAiResult = useCallback(async (result: string) => {
+    if (!result.trim()) return;
+    if (savedOnceRef.current) return;
+    savedOnceRef.current = true;
+
+    const recordId = recordIdForAi;
+    if (recordId && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(`${AI_RESULT_STORAGE_PREFIX}${recordId}`, result);
+      } catch {
+      }
+    }
+
+    if (recordId && isUUID(recordId)) {
+      try {
+        const notes = await getDivinationNotes(recordId);
+        const aiNote = notes.find((n) => n.content.startsWith(AI_NOTE_PREFIX));
+        if (aiNote) {
+          await updateDivinationNote(aiNote.id, `${AI_NOTE_PREFIX}\n${result}`);
+        } else {
+          await addDivinationNote(recordId, `${AI_NOTE_PREFIX}\n${result}`);
+        }
+      } catch {
+      }
+    }
+    
+    // Update state to show as final result
+    setAiResult(result);
+    setAiResultAt(new Date().toISOString());
+  }, [recordIdForAi]);
+
+  const startAiAnalysis = useCallback(async () => {
+    if (!calculatedData) {
+        console.warn('Cannot analyze: guaData is missing');
+        return;
+    }
+
+    // Abort previous request if any
+    aiAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
+
+    savedOnceRef.current = false;
+    setAiStreamContent('');
+    setAiStreamError(null);
+    setIsAiStreaming(true);
+    setForceAiAnalyze(false); 
+
+    // Generate idempotency key if not exists
+    if (!aiIdempotencyKeyRef.current) {
+      aiIdempotencyKeyRef.current = generateIdempotencyKey();
+    }
+
+    try {
+      // Get session for token
+      const session = await getSession();
+      const token = session?.access_token;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          question,
+          background: '',
+          guaData: calculatedData,
+          idempotencyKey: aiIdempotencyKeyRef.current,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        
+        // Check if it's a handled error (JSON)
+        let isHandledError = false;
+        let errorMessage = text;
+        try {
+           const json = JSON.parse(text);
+           if (json.error) {
+             isHandledError = true;
+             errorMessage = json.error;
+           }
+        } catch {}
+
+        // If handled error (e.g. 402, 500 with refund), clear key to allow fresh retry
+        if (isHandledError) {
+           aiIdempotencyKeyRef.current = null;
+        }
+
+        throw new Error(errorMessage || `HTTP ${response.status}`);
+      }
+      
+      if (!response.body) throw new Error('Empty response body');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedContent = '';
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value, { stream: !done });
+        accumulatedContent += chunkValue;
+        setAiStreamContent(accumulatedContent);
+      }
+
+      // Analysis complete
+      setIsAiStreaming(false);
+      persistAiResult(accumulatedContent);
+      
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        // Ignore abort
+        return;
+      }
+      console.error('AI Analysis Error:', err);
+      setAiStreamError(err);
+      setIsAiStreaming(false);
+    }
+  }, [calculatedData, question, persistAiResult]);
 
   const handleAiAnalyzeClick = useCallback(async () => {
     const user = await getCurrentUser()
     if (!user) {
-      toast({ title: '请先登录', description: '登录后才能使用 AI 分析', variant: 'destructive' })
+      handleLoginRedirect()
       return
     }
 
@@ -650,7 +635,7 @@ function ResultPageContent() {
       if (isSaved && !isAuthor) {
         toast({ title: '提示', description: '你不是该排盘作者，AI 分析结果不会保存到该排盘记录' })
       }
-      setShowAI(true)
+      setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       return
     }
 
@@ -672,7 +657,7 @@ function ResultPageContent() {
     if (!canAttemptEditQuestion) return
     const user = await getCurrentUser()
     if (!user) {
-      toast({ title: '请先登录', description: '登录后才能修改标题', variant: 'destructive' })
+      handleLoginRedirect()
       return
     }
     if (!isSaved) {
@@ -722,7 +707,7 @@ function ResultPageContent() {
       const user = await getCurrentUser()
       if (!user) {
         setShowAiCostConfirm(false)
-        toast({ title: '请先登录', description: '登录后才能使用 AI 分析', variant: 'destructive' })
+        handleLoginRedirect()
         return
       }
 
@@ -747,8 +732,8 @@ function ResultPageContent() {
       }
 
       setShowAiCostConfirm(false)
-      setForceAiAnalyze(true)
-      setShowAI(true)
+      startAiAnalysis()
+      setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     } finally {
       setAiBalanceChecking(false)
     }
@@ -764,15 +749,25 @@ function ResultPageContent() {
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) return
     
-    const user = await getCurrentUser()
-    if (!user) {
-      toast({ title: '请先登录', description: '登录后才能添加笔记', variant: 'destructive' })
-      return
+    // 如果是本地结果，直接保存到本地，不需要登录
+    if (!isSaved) {
+       const newNote: DivinationNote = {
+         id: `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+         content: newNoteContent,
+         created_at: new Date().toISOString(),
+         updated_at: new Date().toISOString(),
+       }
+       const updatedNotes = [newNote, ...notes]
+       setNotes(updatedNotes)
+       saveLocalNotes(resultId, updatedNotes)
+       setNewNoteContent('')
+       toast({ title: '本地笔记已添加', description: '保存到云端后将自动同步' })
+       return
     }
 
-    if (!isSaved) {
-      setPendingSaveAction('note')
-      setShowAiSaveConfirm(true)
+    const user = await getCurrentUser()
+    if (!user) {
+      handleLoginRedirect()
       return
     }
 
@@ -802,19 +797,20 @@ function ResultPageContent() {
   const handleUpdateNote = async (noteId: string) => {
     if (!editNoteContent.trim()) return
 
+    // 如果是本地笔记或未保存到云端，直接更新本地
+    if (noteId.startsWith('local_') || !isSaved) {
+        const updatedNotes = notes.map(n => n.id === noteId ? { ...n, content: editNoteContent, updated_at: new Date().toISOString() } : n)
+        setNotes(updatedNotes)
+        saveLocalNotes(resultId, updatedNotes)
+        setEditingNoteId(null)
+        setEditNoteContent('')
+        toast({ title: '本地笔记已更新' })
+        return
+    }
+
     const user = await getCurrentUser()
     if (!user) {
-      toast({ title: '请先登录', description: '登录后才能修改笔记', variant: 'destructive' })
-      return
-    }
-    if (!isSaved) {
-      setPendingSaveAction('note')
-      setShowAiSaveConfirm(true)
-      return
-    }
-    if (noteId.startsWith('local_')) {
-      setPendingSaveAction('note')
-      setShowAiSaveConfirm(true)
+      handleLoginRedirect()
       return
     }
 
@@ -839,19 +835,18 @@ function ResultPageContent() {
   const handleDeleteNote = async (noteId: string) => {
     if (!confirm('确定要删除这条笔记吗？')) return
 
+    // 如果是本地笔记或未保存到云端，直接删除本地
+    if (noteId.startsWith('local_') || !isSaved) {
+        const updatedNotes = notes.filter(n => n.id !== noteId)
+        setNotes(updatedNotes)
+        saveLocalNotes(resultId, updatedNotes)
+        toast({ title: '本地笔记已删除' })
+        return
+    }
+
     const user = await getCurrentUser()
     if (!user) {
-      toast({ title: '请先登录', description: '登录后才能删除笔记', variant: 'destructive' })
-      return
-    }
-    if (!isSaved) {
-      setPendingSaveAction('note')
-      setShowAiSaveConfirm(true)
-      return
-    }
-    if (noteId.startsWith('local_')) {
-      setPendingSaveAction('note')
-      setShowAiSaveConfirm(true)
+      handleLoginRedirect()
       return
     }
 
@@ -1148,29 +1143,41 @@ function ResultPageContent() {
                    </div>
                 </div>
 
-                {isAuthor && aiResult && (
-                <div className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm">
+                {(aiResult || isAiStreaming || aiStreamError) && (
+                <div ref={aiSectionRef} className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm scroll-mt-20">
                    <div className="flex items-center gap-3 mb-4">
                       <Sparkles className="w-5 h-5 text-[#C82E31]" />
                       <h4 className="font-serif font-bold text-stone-800 text-base lg:text-lg tracking-wide">
                         AI 分析结果
                       </h4>
-                      {aiResultAt && <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
+                      {isAiStreaming && <Loader2 className="w-4 h-4 animate-spin text-stone-400" />}
+                      {!isAiStreaming && aiResultAt && <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
                    </div>
-                   <div className="prose prose-stone max-w-none font-serif text-stone-800 prose-headings:text-[#C82E31] prose-strong:text-[#C82E31]">
-                     <ReactMarkdown>{aiResult}</ReactMarkdown>
-                   </div>
+                   
+                   {aiStreamError ? (
+                     <div className="p-4 bg-red-50 text-red-600 rounded-md text-sm mb-4">
+                       分析出错: {aiStreamError.message}
+                       <Button variant="outline" size="sm" onClick={startAiAnalysis} className="ml-4 border-red-200 hover:bg-red-100">重试</Button>
+                      </div>
+                   ) : (
+                     <div className="prose prose-stone max-w-none font-serif text-stone-800 prose-headings:text-[#C82E31] prose-strong:text-[#C82E31]">
+                       <ReactMarkdown>{isAiStreaming ? aiStreamContent : aiResult}</ReactMarkdown>
+                     </div>
+                   )}
+
+                   {!isAiStreaming && aiResult && (
                    <div className="flex justify-end pt-4">
-                     <Button variant="outline" className="gap-2 text-[#C82E31] border-[#C82E31]/30 hover:bg-red-50" onClick={() => setShowReanalyzeConfirm(true)}>
+                      <Button variant="outline" className="gap-2 text-[#C82E31] border-[#C82E31]/30 hover:bg-red-50" onClick={() => setShowReanalyzeConfirm(true)}>
                        <RefreshCw className="w-4 h-4" /> 重新分析
                      </Button>
                    </div>
+                   )}
                 </div>
                 )}
 
                 {/* 5. 私密笔记 */}
                 {canViewPrivateNotes && (
-                <div className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm">
+                <div ref={noteSectionRef} className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm scroll-mt-20">
                    <div className="flex items-center gap-3 mb-4">
                       <BookOpen className="w-5 h-5 text-[#C82E31]" />
                       <h4 className="font-serif font-bold text-stone-800 text-base lg:text-lg tracking-wide">
@@ -1230,23 +1237,23 @@ function ResultPageContent() {
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 w-6 p-0 hover:bg-stone-200 text-stone-400 hover:text-stone-600"
-                                      disabled={!isSaved || note.id.startsWith('local_') || noteLoading}
+                                      disabled={noteLoading}
                                       onClick={() => {
                                         setEditingNoteId(note.id)
                                         setEditNoteContent(note.content)
                                       }}
                                     >
-                                       <Edit2 className="w-3.5 h-3.5" />
-                                     </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0 hover:bg-red-100 text-stone-400 hover:text-red-600"
-                                      disabled={!isSaved || note.id.startsWith('local_') || noteLoading}
-                                      onClick={() => handleDeleteNote(note.id)}
-                                    >
-                                       <Trash2 className="w-3.5 h-3.5" />
-                                     </Button>
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                   <Button
+                                     variant="ghost"
+                                     size="sm"
+                                     className="h-6 w-6 p-0 hover:bg-red-100 text-stone-400 hover:text-red-600"
+                                     disabled={noteLoading}
+                                     onClick={() => handleDeleteNote(note.id)}
+                                   >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
                                    </div>
                                  </div>
                                  <p className="text-sm text-stone-700 font-serif whitespace-pre-wrap leading-relaxed">
@@ -1284,36 +1291,16 @@ function ResultPageContent() {
                 </div>
                 )}
 
-                {/* 5. 底部工具栏 (移动端专属 Grid) */}
-                <div className="lg:hidden space-y-4 pb-8">
-                  <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#C82E31] to-[#D94F4F] shadow-lg shadow-red-900/10 p-4">
-                    <div className="absolute right-0 top-0 opacity-10 pointer-events-none"><Sparkles className="w-24 h-24 text-white -rotate-12 translate-x-4 -translate-y-4" /></div>
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="text-white">
-                        <h3 className="font-serif font-bold text-base flex items-center gap-2"><Wand2 className="w-4 h-4" /> AI 智能详批</h3>
-                        <p className="text-[10px] text-red-50/90 mt-0.5">深度解析吉凶应期，准确率提升30%</p>
-                      </div>
-                      <Button onClick={handleAiAnalyzeClick} className="bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold text-xs h-8 px-4 rounded-full shadow-sm">立即分析</Button>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold text-stone-400 mb-2 px-1 uppercase tracking-wider">工具箱</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      <ActionButton 
-                        icon={Save} 
-                        label={isSaved && !hasUnsavedChanges ? "已保存" : hasUnsavedChanges ? "更新" : "保存"} 
-                        active={isSaved && !hasUnsavedChanges} 
-                        onClick={() => saveRecordToCloud(true)} 
-                        disabled={(isSaved && !hasUnsavedChanges) || saving} 
-                      />
-                      {isAuthor && <ActionButton icon={Share2} label="发布" onClick={handlePublish} disabled={saving} />}
-                      <ActionButton icon={Download} label="存图" onClick={() => toast({ title: "功能开发中" })} />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1 h-9 text-xs text-stone-600 border-stone-200 bg-white" onClick={() => router.back()}><ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> 返回</Button>
-                    <Button variant="outline" className="flex-1 h-9 text-xs text-stone-600 border-stone-200 bg-white" onClick={() => router.push('/6yao')}><RotateCcw className="w-3.5 h-3.5 mr-1.5" /> 重排</Button>
-                  </div>
+                {/* 返回上一页按钮 */}
+                <div className="lg:hidden mt-4 mb-8">
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-11 text-stone-500 border-stone-200 bg-transparent hover:bg-stone-50"
+                    onClick={() => router.back()}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    返回上一页
+                  </Button>
                 </div>
 
               </div>
@@ -1343,7 +1330,7 @@ function ResultPageContent() {
                     <Save className={`w-4 h-4 ${isSaved && !hasUnsavedChanges ? 'text-green-600' : ''}`} /> 
                     {saving || questionLoading ? '保存中...' : isSaved && !hasUnsavedChanges ? '已保存到云端' : hasUnsavedChanges ? '更新到云端' : '保存到云端'}
                  </Button>
-                 {isAuthor && (
+                 {(isAuthor || isLocalResult) && (
                  <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9 text-sm" onClick={handlePublish} disabled={saving}>
                     <Share2 className="w-4 h-4" /> {saving ? '保存中...' : '发布到社区'}
                  </Button>
@@ -1363,96 +1350,131 @@ function ResultPageContent() {
                  </Button>
                </div>
             </div>
+        </div>
+
+          {/* 移动端底部固定工具栏 */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+             <div className="flex items-center gap-4 flex-1 justify-between pr-4">
+               <button onClick={() => router.push('/6yao')} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+                  <RotateCcw className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">重排</span>
+               </button>
+               <button 
+                 onClick={() => saveRecordToCloud(true)} 
+                 className={`flex flex-col items-center gap-0.5 active:scale-95 transition-transform ${isSaved && !hasUnsavedChanges ? 'text-green-600' : 'text-stone-500'}`}
+                 disabled={saving}
+               >
+                  <Save className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">{isSaved && !hasUnsavedChanges ? '已存' : '保存'}</span>
+               </button>
+               {canViewPrivateNotes && (
+                 <button 
+                   onClick={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })} 
+                   className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
+                 >
+                   <BookOpen className="w-5 h-5" />
+                   <span className="text-[10px] font-medium">笔记</span>
+                 </button>
+               )}
+               {(isAuthor || isLocalResult) && (
+                 <button onClick={handlePublish} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform" disabled={saving}>
+                   <Send className="w-5 h-5" />
+                   <span className="text-[10px] font-medium">发布</span>
+                 </button>
+               )}
+               <button 
+                 onClick={() => {
+                   if (navigator.share) {
+                     navigator.share({
+                       title: '六爻排盘结果',
+                       text: `我正在查看排盘结果：${originalFullInfo.fullName} ${hasMovingLines ? `之 ${changedFullInfo.fullName}` : ''}`,
+                       url: window.location.href,
+                     }).catch(() => {})
+                   } else {
+                     navigator.clipboard.writeText(window.location.href)
+                     toast({ title: '链接已复制', description: '请粘贴分享给好友' })
+                   }
+                 }} 
+                 className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
+               >
+                 <Share2 className="w-5 h-5" />
+                 <span className="text-[10px] font-medium">分享</span>
+               </button>
+             </div>
+
+             <Button 
+               onClick={handleAiAnalyzeClick} 
+               className="shrink-0 rounded-full bg-gradient-to-r from-[#C82E31] to-[#D94F4F] hover:from-[#A61B1F] hover:to-[#C82E31] text-white shadow-lg shadow-red-900/20 h-10 w-10 p-0 border-none flex items-center justify-center"
+               title="AI 智能详批"
+             >
+               <Sparkles className="w-5 h-5" />
+             </Button>
           </div>
         </div>
           <Dialog open={showAiSaveConfirm} onOpenChange={setShowAiSaveConfirm}>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
               <DialogHeader>
                 <DialogTitle>需要先保存到云端</DialogTitle>
                 <DialogDescription>
                   使用该功能前，需要先将本次排盘保存到云端。
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAiSaveConfirm(false)} disabled={saving}>取消</Button>
-                <Button onClick={handleConfirmSaveForAi} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white" disabled={saving}>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowAiSaveConfirm(false)} disabled={saving} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
+                <Button onClick={handleConfirmSaveForAi} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10" disabled={saving}>
                   保存到云端
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Dialog open={showAiNotOwnerConfirm} onOpenChange={setShowAiNotOwnerConfirm}>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
               <DialogHeader>
                 <DialogTitle>提示</DialogTitle>
                 <DialogDescription>
                   你不是该排盘作者，AI 分析结果不会保存到该排盘记录，仅会在当前设备缓存。
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAiNotOwnerConfirm(false)}>取消</Button>
-                <Button onClick={handleConfirmAiNotOwner} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white">
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowAiNotOwnerConfirm(false)} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
+                <Button onClick={handleConfirmAiNotOwner} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10">
                   继续分析
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Dialog open={showAiCostConfirm} onOpenChange={setShowAiCostConfirm}>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
               <DialogHeader>
                 <DialogTitle>确认 AI 分析</DialogTitle>
                 <DialogDescription>
                   本次操作将扣除 50 易币，用于 AI 智能详批。
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAiCostConfirm(false)} disabled={aiBalanceChecking}>取消</Button>
-                <Button onClick={handleConfirmAiAnalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white" disabled={aiBalanceChecking}>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowAiCostConfirm(false)} disabled={aiBalanceChecking} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
+                <Button onClick={handleConfirmAiAnalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10" disabled={aiBalanceChecking}>
                   继续分析
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Dialog open={showReanalyzeConfirm} onOpenChange={setShowReanalyzeConfirm}>
-            <DialogContent className="bg-white">
+            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
               <DialogHeader>
                 <DialogTitle>确认重新分析</DialogTitle>
                 <DialogDescription>
                   本次操作将扣除 50 易币，重新分析的结果会覆盖之前的 AI 分析结果。
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)}>取消</Button>
-                <Button onClick={handleConfirmReanalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white">
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
+                <Button onClick={handleConfirmReanalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10">
                   继续分析
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <AIResultDialog 
-            guaData={calculatedData} 
-            open={showAI} 
-            setOpen={(open) => {
-              setShowAI(open)
-              if (!open) setForceAiAnalyze(false)
-            }} 
-            question={question}
-            recordId={aiStorageKey}
-            initialResult={aiResult}
-            forceAnalyze={forceAiAnalyze}
-            onForceAnalyzeConsumed={() => setForceAiAnalyze(false)}
-            onResultSaved={(result) => {
-              setAiResult(result)
-              setAiResultAt(new Date().toISOString())
-              if (recordIdForAi) {
-                getDivinationNotes(recordIdForAi).then((fetched) => {
-                  setNotes(fetched)
-                  const aiNote = fetched.find((n) => n.content.startsWith(AI_NOTE_PREFIX))
-                  if (aiNote) setAiResultAt(aiNote.created_at)
-                }).catch(() => {})
-              }
-            }}
-          />
       </div>
     </>
   )

@@ -20,6 +20,7 @@ interface AIResultDialogProps {
   forceAnalyze?: boolean;
   onForceAnalyzeConsumed?: () => void;
   onResultSaved?: (result: string) => void;
+  canPersistToCloud?: boolean;
 }
 
 const AI_NOTE_PREFIX = '【AI详批】';
@@ -38,6 +39,7 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
   const [error, setError] = useState<Error | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const savedOnceRef = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   // 鉴权逻辑
   useEffect(() => {
@@ -57,6 +59,9 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
     
     if (open) {
       checkAuth();
+    } else {
+      // Reset idempotency key when dialog closes to ensure fresh start on reopen
+      idempotencyKeyRef.current = null;
     }
   }, [open]);
 
@@ -67,6 +72,11 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
       setCompletion('');
       setError(null);
       setIsLoading(false);
+      // Force analyze implies a new attempt, but let's let handleAnalyze manage the key
+      // If forceAnalyze is true, we might want to clear key?
+      // handleAnalyze checks if key exists.
+      // If we want to force NEW analysis, we should clear key.
+      idempotencyKeyRef.current = null;
       return;
     }
     if (initialResult) {
@@ -113,6 +123,17 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
     onResultSaved?.(result);
   };
 
+  // Generate UUID for idempotency
+  const generateIdempotencyKey = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   // 开始分析
   const handleAnalyze = () => {
     if (!token && process.env.NODE_ENV !== 'development') return; // 开发环境允许无token
@@ -130,6 +151,11 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
     setError(null);
     setIsLoading(true);
 
+    // Generate idempotency key if not exists
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey();
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -142,13 +168,32 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
         question,
         background: '',
         guaData,
+        idempotencyKey: idempotencyKeyRef.current,
       }),
       signal: controller.signal,
     })
       .then(async (response) => {
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(text || `HTTP ${response.status}`);
+          
+          // Check if it's a handled error (JSON)
+          let isHandledError = false;
+          let errorMessage = text;
+          try {
+             const json = JSON.parse(text);
+             if (json.error) {
+               isHandledError = true;
+               errorMessage = json.error;
+             }
+          } catch {}
+
+          // If handled error (e.g. 402, 500 with refund), clear key to allow fresh retry
+          if (isHandledError) {
+             idempotencyKeyRef.current = null;
+          }
+          // If unhandled error (e.g. 502, 504), keep key for idempotency
+
+          throw new Error(errorMessage || `HTTP ${response.status}`);
         }
         if (!response.body) throw new Error('Empty response body');
 

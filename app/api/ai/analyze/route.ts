@@ -62,22 +62,51 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
+  let body;
+  try {
+    body = await req.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
+  }
+  const { question, background, guaData, idempotencyKey } = body;
+
   // 3. 扣费逻辑
+  let requestId: string | null = null;
+  let isReplay = false;
+
   // In development, we skip payment to allow easier testing
   if (process.env.NODE_ENV === 'development') {
       console.log('Dev mode detected: Skipping payment deduction logic.');
   } else if (user && !skipPayment && supabase) {
     const COST = 50;
-    const { data: profile } = await supabase.from('profiles').select('yi_coins').eq('id', user.id).single();
-    if (!profile || (profile.yi_coins || 0) < COST) {
-      return new Response(JSON.stringify({ error: '余额不足，请先充值' }), { status: 402 });
+    // 使用 RPC 进行幂等扣费
+    const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`; // Fallback key
+    
+    const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
+         p_user_id: user.id,
+         p_amount: COST,
+         p_idempotency_key: key,
+         p_description: `AI 详批：${question ? question.substring(0, 10) + '...' : '未知问题'}`
+    });
+
+    if (transactionError) {
+         console.error('Payment RPC Error:', transactionError);
+         return new Response(JSON.stringify({ error: '支付系统错误，请联系客服' }), { status: 500 });
     }
-    await supabase.from('profiles').update({ yi_coins: (profile.yi_coins || 0) - COST }).eq('id', user.id);
+
+    if (!transactionResult.success) {
+         // 如果是重复请求且状态为 failed/refunded，RPC 返回 false
+         // 或者余额不足
+         const msg = transactionResult.message === 'Insufficient balance' ? '余额不足，请先充值' : transactionResult.message;
+         return new Response(JSON.stringify({ error: msg }), { status: 402 });
+    }
+
+    requestId = transactionResult.request_id;
+    isReplay = transactionResult.is_replay;
   }
 
   // 4. 执行 AI 分析
   try {
-    const { question, background, guaData } = await req.json();
     const promptContext = constructPrompt(question, background, guaData);
 
     console.log('Calling DeepSeek API...');
@@ -97,6 +126,11 @@ export async function POST(req: Request) {
         { role: 'user', content: promptContext }
       ],
       temperature: 0.3,
+      onFinish: async () => {
+        if (requestId && supabase) {
+            await supabase.rpc('complete_ai_analysis', { p_request_id: requestId });
+        }
+      }
     });
 
     console.log('StreamText Result Keys:', Object.keys(result));
@@ -106,6 +140,21 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('AI Analysis Error:', error);
+
+    // 失败退款逻辑
+    // 只要有 requestId，且 AI 分析失败，就尝试退款。
+    // 即使是重放请求 (isReplay=true)，如果本次尝试失败了，说明用户最终没有得到结果。
+    // 为了防止"白扣"（扣了钱没给结果），我们执行退款。
+    // RPC `refund_ai_analysis` 内部有状态检查，防止重复退款。
+    // 虽然存在极端竞态（原请求成功但连接断开，重试请求失败导致退款），
+    // 但优先保障用户资金安全是首要原则。
+    if (requestId && supabase) {
+        await supabase.rpc('refund_ai_analysis', { 
+            p_request_id: requestId, 
+            p_reason: error instanceof Error ? error.message : String(error) 
+        });
+    }
+
     return new Response(JSON.stringify({ 
       error: 'AI 服务暂时繁忙，请重试',
       details: error instanceof Error ? error.message : String(error)

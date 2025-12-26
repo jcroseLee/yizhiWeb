@@ -78,7 +78,7 @@ export default function ReportDialog({ targetId, targetType, trigger, postTitle 
           variant: 'destructive',
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: '提交失败',
         description: '请稍后重试',
@@ -185,4 +185,3 @@ export default function ReportDialog({ targetId, targetType, trigger, postTitle 
     </Dialog>
   )
 }
-

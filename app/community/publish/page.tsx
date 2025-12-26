@@ -374,7 +374,7 @@ function PublishPageContent() {
         title: title.trim(),
         content: content.trim(),
         type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
-        bounty: bounty > 0 ? bounty : undefined,
+        bounty: bounty > 0 ? bounty : 0,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
       }
@@ -420,7 +420,7 @@ function PublishPageContent() {
         title: title.trim() || '未命名草稿',
         content: content.trim() || '',
         type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
-        bounty: bounty > 0 ? bounty : undefined,
+        bounty: bounty > 0 ? bounty : 0,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
       }

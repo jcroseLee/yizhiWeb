@@ -44,6 +44,7 @@
     "dayjs": "^1.11.19",
     "framer-motion": "^12.23.25",
     "gsap": "^3.13.0",
+    "isomorphic-dompurify": "^2.34.0",
     "lucide-react": "^0.555.0",
     "lunar-javascript": "^1.7.7",
     "next": "16.0.7",

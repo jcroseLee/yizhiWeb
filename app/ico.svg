@@ -1,24 +1,16 @@
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <!-- 背景：圆角矩形，白色。用于在深色模式下衬托图标 -->
-  <rect width="256" height="256" rx="60" fill="#ffffff"/>
-  
-  <!-- 居中编组 -->
-  <g transform="translate(28, 28) scale(0.78)">
-    <!-- 外圈：眼睛/天地轮廓 -->
-    <path d="M100 40 C 50 40, 20 80, 20 100 C 20 120, 50 160, 100 160 C 150 160, 180 120, 180 100 C 180 80, 150 40, 100 40 Z" 
-          fill="none" stroke="#2C3E50" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-
-    <!-- 瞳孔/核心：离卦 (☲) -->
-    <!-- 上爻：阳 -->
-    <line x1="60" y1="75" x2="140" y2="75" stroke="#2C3E50" stroke-width="14" stroke-linecap="round" />
-    
-    <!-- 中爻：阴 (离中虚) -->
-    <line x1="55" y1="100" x2="80" y2="100" stroke="#2C3E50" stroke-width="14" stroke-linecap="round" />
-    <line x1="120" y1="100" x2="145" y2="100" stroke="#2C3E50" stroke-width="14" stroke-linecap="round" />
-    <!-- 朱砂红点 -->
-    <circle cx="100" cy="100" r="14" fill="#C82E31" />
-
-    <!-- 下爻：阳 -->
-    <line x1="60" y1="125" x2="140" y2="125" stroke="#2C3E50" stroke-width="14" stroke-linecap="round" />
-  </g>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_845_277)">
+<path d="M196 0H60C26.8629 0 0 26.8629 0 60V196C0 229.137 26.8629 256 60 256H196C229.137 256 256 229.137 256 196V60C256 26.8629 229.137 0 196 0Z" fill="white"/>
+<path d="M128.2 44C61.825 44 22 100.267 22 128.4C22 156.533 61.825 212.8 128.2 212.8C194.575 212.8 234.4 156.533 234.4 128.4C234.4 100.267 194.575 44 128.2 44Z" stroke="#2C3E50" stroke-width="13.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M75.0999 93.2334H181.3" stroke="#2C3E50" stroke-width="19.92" stroke-linecap="round"/>
+<path d="M68.4626 128.4H97.6526" stroke="#2C3E50" stroke-width="19.92" stroke-linecap="round"/>
+<path d="M159.75 128.4H188.94" stroke="#2C3E50" stroke-width="19.92" stroke-linecap="round"/>
+<path d="M128.2 148.093C138.464 148.093 146.785 139.276 146.785 128.4C146.785 117.523 138.464 108.706 128.2 108.706C117.936 108.706 109.615 117.523 109.615 128.4C109.615 139.276 117.936 148.093 128.2 148.093Z" fill="#C82E31"/>
+<path d="M75.0999 163.567H181.3" stroke="#2C3E50" stroke-width="19.92" stroke-linecap="round"/>
+</g>
+<defs>
+<clipPath id="clip0_845_277">
+<rect width="256" height="256" fill="white"/>
+</clipPath>
+</defs>
 </svg>

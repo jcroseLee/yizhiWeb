@@ -1,5 +1,6 @@
 'use client'
 
+import DOMPurify from 'isomorphic-dompurify'
 import {
   ArrowLeft,
   Bookmark,
@@ -27,7 +28,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/pop
 import { useToast } from '@/lib/hooks/use-toast'
 import {
   adoptComment,
-  cancelAdoptComment,
   createComment,
   deleteComment,
   getComments,
@@ -95,9 +95,9 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   const [authorStats, setAuthorStats] = useState<AuthorStats | null>(null)
   const [isFollowingAuthor, setIsFollowingAuthor] = useState(false)
   const [isFollowingLoading, setIsFollowingLoading] = useState(false)
-  const [adoptingCommentId, setAdoptingCommentId] = useState<string | null>(null)
+  const [, setAdoptingCommentId] = useState<string | null>(null)
   const [confirmAdoptCommentId, setConfirmAdoptCommentId] = useState<string | null>(null)
-  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
+  const [, setDeletingCommentId] = useState<string | null>(null)
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null)
   
   const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -251,24 +251,6 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     }
   }
 
-  const handleCancelAdoptComment = async (commentId: string) => {
-    if (!post) return
-    try {
-      setAdoptingCommentId(commentId)
-      const result = await cancelAdoptComment(commentId, postId)
-      if (result.success) {
-        setComments(prev => prev.map(c => c.id === commentId ? { ...c, is_adopted: false, adopted_at: null, adopted_by: null } : c))
-        toast({ title: '取消采纳成功', description: result.message })
-      } else {
-        toast({ title: '取消采纳失败', description: result.message, variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: '取消采纳失败', variant: 'destructive' })
-    } finally {
-      setAdoptingCommentId(null)
-    }
-  }
-
   const handleDeleteComment = async (commentId: string) => {
     if (!post) return
     try {
@@ -307,6 +289,38 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
       toast({ title: '评论失败', description: errorMessage, variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleMessageAuthor = () => {
+    if (!post?.author?.id) return
+    if (!currentUserProfile) {
+      router.push(`/login?redirect=${encodeURIComponent(`/messages?userId=${post.author.id}`)}`)
+      return
+    }
+    if (currentUserProfile.id === post.author.id) {
+      toast({ title: '不能给自己发私信', variant: 'destructive' })
+      return
+    }
+    router.push(`/messages?userId=${post.author.id}`)
+  }
+
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/community/${postId}` : `/community/${postId}`
+    const title = post?.title || '社区帖子'
+    try {
+      if (typeof window !== 'undefined' && 'share' in window.navigator) {
+        await window.navigator.share({ title, url })
+        return
+      }
+      if (typeof window !== 'undefined' && window.navigator.clipboard?.writeText) {
+        await window.navigator.clipboard.writeText(url)
+        toast({ title: '链接已复制' })
+        return
+      }
+      toast({ title: '无法分享', description: url })
+    } catch (error) {
+      toast({ title: '分享失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
     }
   }
 
@@ -393,7 +407,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="ghost" size="icon" className="text-stone-500"><Share2 className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="text-stone-500" onClick={handleShare}><Share2 className="h-4 w-4" /></Button>
           </div>
         </header>
 
@@ -722,7 +736,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     >
                       {isFollowingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : isFollowingAuthor ? '已关注' : <><UserPlus size={12} className="mr-1" /> 关注</>}
                     </Button>
-                    <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => toast({ title: '私信功能开发中' })}>
+                    <Button variant="outline" size="sm" className="text-xs h-8" onClick={handleMessageAuthor}>
                       <MessageSquare size={12} className="mr-1" /> 私信
                     </Button>
                   </div>
@@ -755,7 +769,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
               <span className="text-[10px] font-medium">{post.is_favorited ? '已收藏' : '收藏'}</span>
             </button>
             <button 
-              onClick={() => toast({ title: '分享功能开发中' })}
+              onClick={handleShare}
               className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
             >
               <Share2 className="h-5 w-5" />

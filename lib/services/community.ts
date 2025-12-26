@@ -108,7 +108,7 @@ export interface Post {
   comment_count: number
   created_at: string
   updated_at: string
-  status?: 'published' | 'draft' | 'archived'  // 帖子状态
+  status?: 'published' | 'draft' | 'archived' | 'pending' | 'hidden' | 'rejected'  // 帖子状态
   // 关联的用户信息
   author?: {
     id: string
@@ -269,7 +269,7 @@ export async function getPosts(options?: {
         changing_flags
       )
     `)
-    .eq('status', 'published')  // 只显示已发布的帖子，排除草稿
+    .in('status', ['published', 'hidden', 'deleted'])  // 显示发布、隐藏和删除的帖子（隐藏/删除的显示占位符）
     .order(orderBy, { ascending: orderDirection === 'asc' })
     .range(offset, offset + limit - 1)
 
@@ -624,14 +624,18 @@ export async function updatePost(
     throw new Error('User not authenticated')
   }
 
+  const updateData: Record<string, unknown> = {}
+  if ('title' in updates) updateData.title = updates.title
+  if ('content' in updates) updateData.content = updates.content
+  if ('content_html' in updates) updateData.content_html = updates.content_html ?? updates.content
+  if ('cover_image_url' in updates) updateData.cover_image_url = updates.cover_image_url
+  if ('type' in updates) updateData.type = updates.type
+  if ('bounty' in updates) updateData.bounty = updates.bounty
+  if ('divination_record_id' in updates) updateData.divination_record_id = updates.divination_record_id
+
   const { data, error } = await supabase
     .from('posts')
-    .update({
-      title: updates.title,
-      content: updates.content,
-      content_html: updates.content_html || updates.content,
-      cover_image_url: updates.cover_image_url,
-    })
+    .update(updateData)
     .eq('id', postId)
     .eq('user_id', currentUser.id)
     .select('*')
@@ -723,8 +727,8 @@ export async function getUserPosts(options?: {
   if (!isOwnPosts) {
     query = query.eq('status', 'published')
   } else {
-    // 明确包含已发布和草稿（排除已归档的）
-    query = query.in('status', ['published', 'draft'])
+    // 明确包含已发布、草稿、待审核、隐藏、已拒绝（排除已归档的）
+    query = query.in('status', ['published', 'draft', 'pending', 'hidden', 'rejected'])
   }
 
   const { data, error } = await query
@@ -2176,4 +2180,3 @@ export async function deleteDraft(draftId: string): Promise<void> {
     throw error
   }
 }
-

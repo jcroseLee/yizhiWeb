@@ -6,13 +6,11 @@ import { Button } from '@/lib/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
 import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
-import { getCurrentUser } from '@/lib/services/auth'
 import { togglePostFavorite, togglePostLike } from '@/lib/services/community'
 import { Bookmark, Coins, Flag, Heart, MessageSquare, MoreHorizontal } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import ReportDialog from './ReportDialog'
 
 // -----------------------------------------------------------------------------
@@ -123,6 +121,7 @@ export interface Post {
   changingLines?: number[]
   isLiked?: boolean
   isFavorited?: boolean
+  status?: string
 }
 
 const POST_TYPE_CONFIG = {
@@ -136,24 +135,31 @@ const POST_TYPE_CONFIG = {
 // PostCard 组件
 // -----------------------------------------------------------------------------
 export default function PostCard({ post }: { post: Post }) {
+  if (post.status === 'hidden' || post.status === 'deleted') {
+    return (
+      <div className="bg-stone-50 rounded-xl p-6 text-center text-stone-400 text-sm border border-stone-100 my-4 select-none">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-stone-200/50 flex items-center justify-center">
+            <span className="text-stone-400 font-bold">!</span>
+          </div>
+          此内容因违反《易知社区公约》已被屏蔽
+        </div>
+      </div>
+    )
+  }
+
   const { toast } = useToast()
-  const router = useRouter()
   const [isLiking, setIsLiking] = useState(false)
   const [isFavoriting, setIsFavoriting] = useState(false)
   const [likeCount, setLikeCount] = useState(post.stats.likes)
   const [liked, setLiked] = useState(!!post.isLiked)
   const [favorited, setFavorited] = useState(!!post.isFavorited)
-  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
   
   const showMedia = (post.hasGua && post.guaName) || post.coverImage;
   const bountyAmount = typeof post.bounty === 'number' ? post.bounty : Number(post.bounty) || 0;
   const hasBounty = bountyAmount > 0;
   const typeConfig = POST_TYPE_CONFIG[post.type] || POST_TYPE_CONFIG.chat;
 
-  useEffect(() => {
-    getCurrentUser().then(setCurrentUser)
-  }, [])
-  
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (isLiking) return
@@ -186,20 +192,6 @@ export default function PostCard({ post }: { post: Post }) {
     }
   }
 
-  const handleMessageClick = async (e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!post.author.id) return
-    if (!currentUser) {
-      router.push(`/login?redirect=${encodeURIComponent(`/messages?userId=${post.author.id}`)}`)
-      return
-    }
-    if (currentUser.id === post.author.id) {
-      toast({ title: '不能给自己发私信', variant: 'destructive' })
-      return
-    }
-    router.push(`/messages?userId=${post.author.id}`)
-  }
-  
   return (
     <>
     <style jsx global>{styles}</style>

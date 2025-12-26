@@ -1,6 +1,12 @@
 'use client'
 
 import { Button } from '@/lib/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/lib/components/ui/dropdown-menu'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getPosts, type Post } from '@/lib/services/community'
 import {
@@ -10,6 +16,8 @@ import {
   Compass,
   Flame,
   HelpCircle,
+  ListFilter,
+  Loader2,
   TrendingUp
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -137,6 +145,7 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     lines: guaInfo?.lines,
     changingLines: guaInfo?.changingLines,
     coverImage: post.cover_image_url || undefined,
+    status: post.status,
   }
 }
 
@@ -147,8 +156,11 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
 export default function CommunityPage() {
   const router = useRouter()
   const [activeChannel, setActiveChannel] = useState('recommend')
+  const [sortBy, setSortBy] = useState<'newest' | 'hottest' | 'viewed'>('newest')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const { toast } = useToast()
 
@@ -165,16 +177,38 @@ export default function CommunityPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const loadPosts = async () => {
+  const loadPosts = async (isLoadMore = false) => {
     try {
-      setLoading(true)
+      if (isLoadMore) {
+        setLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+
       const type = activeChannel === 'recommend' ? undefined : activeChannel as 'theory' | 'help' | 'debate' | 'chat'
+      
+      let orderBy: 'created_at' | 'like_count' | 'view_count' = 'created_at'
+      if (sortBy === 'hottest') orderBy = 'like_count'
+      if (sortBy === 'viewed') orderBy = 'view_count'
+
+      const limit = 20
+      const offset = isLoadMore ? posts.length : 0
+
       const data = await getPosts({
-        limit: 20,
+        limit,
+        offset,
         type,
-        orderBy: activeChannel === 'recommend' ? 'created_at' : 'like_count',
+        orderBy,
+        orderDirection: 'desc',
       })
-      setPosts(data)
+
+      if (isLoadMore) {
+        setPosts(prev => [...prev, ...data])
+      } else {
+        setPosts(data)
+      }
+
+      setHasMore(data.length === limit)
     } catch (error) {
       console.error('Failed to load posts:', error)
       const errorMessage = error instanceof Error ? error.message : '无法加载帖子列表'
@@ -185,13 +219,20 @@ export default function CommunityPage() {
       })
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
   useEffect(() => {
-    loadPosts()
+    loadPosts(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChannel])
+  }, [activeChannel, sortBy])
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadPosts(true)
+    }
+  }
 
   // 监听页面滚动位置，控制"回到顶部"按钮
   useEffect(() => {
@@ -252,12 +293,30 @@ export default function CommunityPage() {
                   </div>
                   
                   {/* 筛选按钮 */}
-                  {/* <Button
-                    variant="outline"
-                    className="hidden lg:flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0 ml-2"
-                  >
-                    <ListFilter className="h-3 w-3" /> 筛选
-                  </Button> */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="hidden lg:flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0 ml-2"
+                      >
+                        <ListFilter className="h-3 w-3" /> 
+                        {sortBy === 'newest' && '最新'}
+                        {sortBy === 'hottest' && '最热'}
+                        {sortBy === 'viewed' && '浏览'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setSortBy('newest')} className={sortBy === 'newest' ? 'bg-stone-100 font-bold' : ''}>
+                        最新发布
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('hottest')} className={sortBy === 'hottest' ? 'bg-stone-100 font-bold' : ''}>
+                        最多点赞
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSortBy('viewed')} className={sortBy === 'viewed' ? 'bg-stone-100 font-bold' : ''}>
+                        最多浏览
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -281,8 +340,30 @@ export default function CommunityPage() {
                     {posts.map(post => (
                       <PostCard key={post.id} post={convertPostForCard(post)} />
                     ))}
-                    <div className="py-8 text-center text-xs font-serif text-stone-300">
-                      —— 问道无止境 ——
+                    
+                    {/* 加载更多 / 底部提示 */}
+                    <div className="py-8 text-center">
+                      {hasMore ? (
+                        <Button
+                          variant="ghost"
+                          onClick={handleLoadMore}
+                          disabled={loadingMore}
+                          className="text-stone-500 hover:text-stone-800 hover:bg-stone-100"
+                        >
+                          {loadingMore ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              加载中...
+                            </>
+                          ) : (
+                            '加载更多'
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="text-xs font-serif text-stone-300">
+                          —— 问道无止境 ——
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

@@ -8,17 +8,15 @@ import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Edit, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export default function DraftsPage() {
   const [drafts, setDrafts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
-  const router = useRouter()
 
-  const loadDrafts = async () => {
+  const loadDrafts = useCallback(async () => {
     try {
       setLoading(true)
       const data = await getUserDrafts({ limit: 50 })
@@ -33,11 +31,11 @@ export default function DraftsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadDrafts()
-  }, [])
+  }, [loadDrafts])
 
   const handleDelete = async (draftId: string) => {
     if (!confirm('确定要删除这个草稿吗？此操作无法撤销。')) {
@@ -48,7 +46,7 @@ export default function DraftsPage() {
       setDeletingId(draftId)
       await deleteDraft(draftId)
       toast({ title: '草稿已删除' })
-      setDrafts(drafts.filter(d => d.id !== draftId))
+      setDrafts(prev => prev.filter(d => d.id !== draftId))
     } catch (error) {
       console.error('Failed to delete draft:', error)
       toast({
@@ -194,4 +192,3 @@ export default function DraftsPage() {
     </div>
   )
 }
-

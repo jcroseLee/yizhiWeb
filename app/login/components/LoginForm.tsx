@@ -5,7 +5,7 @@ import { Checkbox } from '@/lib/components/ui/checkbox'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
 import { getCurrentUser } from '@/lib/services/auth'
-import { getSupabaseClient } from '@/lib/services/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { Github } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -64,7 +64,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     }
 
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         setLoading(false)
@@ -186,7 +186,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
   const handleGoogleLogin = async () => {
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         return
@@ -214,7 +214,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
   const handleGitHubLogin = async () => {
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         return

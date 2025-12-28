@@ -468,6 +468,18 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                       <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif-sc font-bold text-stone-900 leading-tight">
                         {divinationInfo.question || '未填写事项'}
                       </h1>
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {post.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-xs px-2 py-1 rounded-full bg-stone-50 text-stone-600 border border-stone-200"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -482,6 +494,18 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 ) : (
                   <div className="mb-6">
                     <h1 className="text-xl sm:text-2xl font-serif-sc font-bold text-stone-900 mb-4">{post.title}</h1>
+                    {post.tags && post.tags.length > 0 && (
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {post.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-xs px-2 py-1 rounded-full bg-stone-50 text-stone-600 border border-stone-200"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="prose prose-stone max-w-none text-stone-700 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: post.content_html || post.content }} />
                   </div>
                 )}

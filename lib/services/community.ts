@@ -97,6 +97,19 @@ export interface DivinationRecord {
   method: number
 }
 
+export type DivinationMethodType = 'liuyao' | 'bazi' | 'qimen' | 'meihua' | 'ziwei' | 'general'
+export type TagCategory = 'subject' | 'technique' | 'custom'
+
+export interface Tag {
+  id: string
+  name: string
+  category: TagCategory
+  scope: DivinationMethodType | null
+  usage_count: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface Post {
   id: string
   user_id: string
@@ -109,6 +122,8 @@ export interface Post {
   created_at: string
   updated_at: string
   status?: 'published' | 'draft' | 'archived' | 'pending' | 'hidden' | 'rejected'  // 帖子状态
+  method?: DivinationMethodType | null
+  tags?: string[]
   // 关联的用户信息
   author?: {
     id: string
@@ -175,6 +190,7 @@ export interface CreatePostInput {
   bounty?: number
   divination_record_id?: string | null
   cover_image_url?: string | null
+  method?: DivinationMethodType | null
 }
 
 export interface CreateCommentInput {
@@ -194,7 +210,9 @@ export interface PostRow {
   comment_count: number
   created_at: string
   updated_at: string
-  status?: 'published' | 'draft' | 'archived'
+  status?: 'published' | 'draft' | 'archived' | 'pending' | 'hidden' | 'rejected'
+  method?: DivinationMethodType | null
+  tags?: string[]
   bounty?: number
   divination_record_id?: string | null
   divination_records?: DivinationRecord | DivinationRecord[] | null
@@ -241,6 +259,7 @@ export async function getPosts(options?: {
   type?: 'theory' | 'help' | 'debate' | 'chat'
   orderBy?: 'created_at' | 'like_count' | 'comment_count' | 'view_count'
   orderDirection?: 'asc' | 'desc'
+  followed?: boolean
 }): Promise<Post[]> {
   const supabase = getSupabaseClient()
   if (!supabase) {
@@ -253,7 +272,28 @@ export async function getPosts(options?: {
     type,
     orderBy = 'created_at',
     orderDirection = 'desc',
+    followed = false,
   } = options || {}
+
+  // 如果是关注列表，先获取关注的用户ID
+  let followedUserIds: string[] = []
+  if (followed) {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return []
+    }
+    
+    const { data: follows } = await supabase
+      .from('user_follows')
+      .select('following_id')
+      .eq('follower_id', currentUser.id)
+      
+    if (!follows || follows.length === 0) {
+      return []
+    }
+    
+    followedUserIds = follows.map(f => f.following_id)
+  }
 
   // 查询帖子，同时获取关联的排盘记录
   // 只查询已发布的帖子（status = 'published'），排除草稿
@@ -276,6 +316,11 @@ export async function getPosts(options?: {
   // 如果指定了类型，添加过滤
   if (type) {
     query = query.eq('type', type)
+  }
+
+  // 如果是关注列表，过滤用户ID
+  if (followed) {
+    query = query.in('user_id', followedUserIds)
   }
 
   const { data, error } = await query
@@ -568,6 +613,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
       bounty: input.bounty || 0,
       divination_record_id: input.divination_record_id || null,
       cover_image_url: input.cover_image_url || null,
+      method: input.method ?? null,
     })
     .select('*')
     .single()
@@ -632,6 +678,7 @@ export async function updatePost(
   if ('type' in updates) updateData.type = updates.type
   if ('bounty' in updates) updateData.bounty = updates.bounty
   if ('divination_record_id' in updates) updateData.divination_record_id = updates.divination_record_id
+  if ('method' in updates) updateData.method = updates.method
 
   const { data, error } = await supabase
     .from('posts')
@@ -1824,6 +1871,7 @@ export async function saveDraft(input: CreatePostInput): Promise<Post> {
     content: input.content || '',
     content_html: input.content_html || input.content || '',
     type: input.type || 'theory',
+    method: input.method ?? null,
   }
 
   // 只添加有值的可选字段
@@ -1969,6 +2017,7 @@ export async function updateDraft(
       type: updates.type,
       bounty: updates.bounty,
       divination_record_id: updates.divination_record_id,
+      method: updates.method,
     })
     .eq('id', draftId)
     .eq('user_id', currentUser.id)
@@ -2179,4 +2228,135 @@ export async function deleteDraft(draftId: string): Promise<void> {
     logError('Error deleting draft:', error)
     throw error
   }
+}
+
+export async function getTags(options?: {
+  category?: TagCategory
+  scope?: DivinationMethodType | null
+  search?: string
+  limit?: number
+}, client?: SupabaseClient): Promise<Tag[]> {
+  const supabase = client || getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const { category, scope, search, limit = 50 } = options || {}
+
+  let query = supabase.from('tags').select('*')
+
+  if (category) query = query.eq('category', category)
+
+  if (scope === null) query = query.is('scope', null)
+  else if (scope) query = query.eq('scope', scope)
+
+  if (search && search.trim()) query = query.ilike('name', `%${search.trim()}%`)
+
+  const { data, error } = await query
+    .order('usage_count', { ascending: false })
+    .order('name', { ascending: true })
+    .range(0, limit - 1)
+
+  if (error) {
+    logError('Error fetching tags:', error)
+    throw error
+  }
+
+  return (data || []) as Tag[]
+}
+
+export async function getPostTags(postId: string): Promise<Tag[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const { data, error } = await supabase
+    .from('post_tags')
+    .select('tag_id, tags ( id, name, category, scope, usage_count )')
+    .eq('post_id', postId)
+
+  if (error) {
+    logError('Error fetching post tags:', error)
+    throw error
+  }
+
+  const rows = (data || []) as Array<{ tag_id: string; tags: Tag | Tag[] | null }>
+  const tags: Tag[] = []
+  for (const row of rows) {
+    if (!row.tags) continue
+    if (Array.isArray(row.tags)) {
+      if (row.tags[0]) tags.push(row.tags[0])
+    } else {
+      tags.push(row.tags)
+    }
+  }
+  return tags
+}
+
+export async function setPostTags(postId: string, tagIds: string[], client?: SupabaseClient): Promise<void> {
+  const supabase = client || getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const { error: deleteError } = await supabase.from('post_tags').delete().eq('post_id', postId)
+  if (deleteError) {
+    logError('Error deleting post tags:', deleteError)
+    throw deleteError
+  }
+
+  const uniqueTagIds = Array.from(new Set(tagIds.filter(Boolean)))
+  if (uniqueTagIds.length === 0) return
+
+  const { error: insertError } = await supabase.from('post_tags').insert(
+    uniqueTagIds.map((tagId) => ({
+      post_id: postId,
+      tag_id: tagId,
+    }))
+  )
+
+  if (insertError) {
+    logError('Error inserting post tags:', insertError)
+    throw insertError
+  }
+}
+
+import { SupabaseClient } from '@supabase/supabase-js'
+
+export async function createCustomTag(input: {
+  name: string
+  scope?: DivinationMethodType | null
+}, client?: SupabaseClient): Promise<Tag> {
+  const supabase = client || getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('User not authenticated')
+  }
+
+  const name = input.name.trim()
+  if (!name) {
+    throw new Error('标签名不能为空')
+  }
+
+  const { data, error } = await supabase
+    .from('tags')
+    .insert({
+      name,
+      category: 'custom',
+      scope: input.scope ?? null,
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    logError('Error creating custom tag:', error)
+    throw error
+  }
+
+  return data as Tag
 }

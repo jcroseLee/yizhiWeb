@@ -170,13 +170,17 @@ const TextType = ({
   const shouldHideCursor =
     hideCursorWhileTyping && (currentCharIndex < textArray[currentTextIndex].length || isDeleting);
 
+  const elementProps: Record<string, unknown> = {
+    className: `inline-block whitespace-pre-wrap tracking-tight ${className}`,
+    ...props
+  }
+  if (typeof Component === 'string') {
+    elementProps.ref = containerRef
+  }
+
   return createElement(
     Component,
-    {
-      ref: containerRef,
-      className: `inline-block whitespace-pre-wrap tracking-tight ${className}`,
-      ...props
-    },
+    elementProps,
     <span className="inline" style={{ color: getCurrentTextColor() || 'inherit' }}>
       {displayedText}
     </span>,

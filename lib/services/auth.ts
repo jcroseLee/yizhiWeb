@@ -1,12 +1,12 @@
-import { getSupabaseClient } from './supabaseClient'
-import type { User, Session } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
+import type { Session, User } from '@supabase/supabase-js'
 
 /**
  * 获取当前用户会话
  * @returns Promise<Session | null>
  */
 export async function getSession(): Promise<Session | null> {
-  const supabase = getSupabaseClient()
+  const supabase = createClient()
   if (!supabase) return null
 
   try {
@@ -45,7 +45,7 @@ export async function isAuthenticated(): Promise<boolean> {
  * @returns Promise<void>
  */
 export async function signOut(): Promise<void> {
-  const supabase = getSupabaseClient()
+  const supabase = createClient()
   if (!supabase) return
 
   try {
@@ -68,7 +68,7 @@ export async function signOut(): Promise<void> {
 export function onAuthStateChange(
   callback: (event: string, session: Session | null) => void
 ): () => void {
-  const supabase = getSupabaseClient()
+  const supabase = createClient()
   if (!supabase) {
     return () => {}
   }

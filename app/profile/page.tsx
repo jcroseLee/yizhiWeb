@@ -1,25 +1,25 @@
 'use client'
 
 import {
-  ArrowDown,
-  ArrowUp,
-  Award,
-  BookOpen,
-  CalendarCheck,
-  CheckCircle2,
-  CheckSquare,
-  Circle,
-  Coins,
-  Edit2,
-  HelpCircle,
-  Loader2,
-  Trash2,
-  TrendingUp,
-  Users,
-  X
+    ArrowDown,
+    ArrowUp,
+    Award,
+    BookOpen,
+    CalendarCheck,
+    CheckCircle2,
+    CheckSquare,
+    Circle,
+    Coins,
+    Edit2,
+    HelpCircle,
+    Loader2,
+    Trash2,
+    TrendingUp,
+    Users,
+    X
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
 
 import PostCard, { extractTextFromHTML } from '@/app/community/components/PostCard'
 import { EditProfileDialog } from '@/lib/components/EditProfileDialog'
@@ -35,13 +35,13 @@ import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { deleteDraft, deletePost, getUserDrafts, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
-  calculateLevel,
-  checkIn,
-  getCoinTransactions,
-  getTitleName,
-  getUserGrowth,
-  hasCheckedInToday,
-  type CoinTransaction
+    calculateLevel,
+    checkIn,
+    getCoinTransactions,
+    getTitleName,
+    getUserGrowth,
+    hasCheckedInToday,
+    type CoinTransaction
 } from '@/lib/services/growth'
 import { deleteDivinationRecord, deleteDivinationRecords, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
@@ -51,6 +51,7 @@ import { DeletePostDialog } from './components/DeletePostDialog'
 import { DeleteRecordDialog } from './components/DeleteRecordDialog'
 import { ExpRulesDialog } from './components/ExpRulesDialog'
 import ProfileSkeleton from './components/ProfileSkeleton'
+import { ReportsList } from './components/ReportsList'
 import { StatCard } from './components/StatCard'
 import { UserCard } from './components/UserCard'
 
@@ -77,13 +78,16 @@ const styles = `
 export default function ProfilePage() {
   return (
     <ToastProviderWrapper>
-      <ProfilePageContent />
+      <Suspense fallback={<ProfileSkeleton />}>
+        <ProfilePageContent />
+      </Suspense>
     </ToastProviderWrapper>
   )
 }
 
 function ProfilePageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   
   // State definitions (保持不变)
@@ -114,7 +118,7 @@ function ProfilePageContent() {
   const [followersUsers, setFollowersUsers] = useState<UserProfile[]>([])
   const [followTab, setFollowTab] = useState<'following' | 'followers'>('following')
   const [loadingFollows, setLoadingFollows] = useState(false)
-  const [activeMainTab, setActiveMainTab] = useState<'notes' | 'divinations' | 'follows' | 'wallet'>('notes')
+  const [activeMainTab, setActiveMainTab] = useState<'notes' | 'divinations' | 'follows' | 'wallet' | 'reports'>('notes')
   const tabsRef = useRef<HTMLDivElement>(null)
   const [coinRulesDialogOpen, setCoinRulesDialogOpen] = useState(false)
   const [expRulesDialogOpen, setExpRulesDialogOpen] = useState(false)
@@ -124,6 +128,17 @@ function ProfilePageContent() {
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set())
   const [isSelectMode, setIsSelectMode] = useState(false)
   const [batchDeleting, setBatchDeleting] = useState(false)
+
+  // Handle URL tab param
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['notes', 'divinations', 'follows', 'wallet', 'reports'].includes(tab)) {
+      setActiveMainTab(tab as any)
+      if (tabsRef.current) {
+        tabsRef.current.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
+  }, [searchParams])
 
   // Data fetching (保持不变)
   useEffect(() => {
@@ -388,12 +403,13 @@ function ProfilePageContent() {
             }} className="w-full">
               <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0">
                 <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-stone-200 mb-6 flex-nowrap min-w-max">
-                  {['notes', 'divinations', 'follows', 'wallet'].map((tab) => (
+                  {['notes', 'divinations', 'follows', 'wallet', 'reports'].map((tab) => (
                     <TabsTrigger key={tab} value={tab} className="nav-tab-trigger rounded-none border-b-2 border-transparent px-4 lg:px-6 py-3 text-stone-500 font-medium text-sm lg:text-base hover:text-stone-800 transition-colors bg-transparent data-[state=active]:bg-transparent cursor-pointer">
                       {tab === 'notes' && '我的帖子'}
                       {tab === 'divinations' && '排盘记录'}
                       {tab === 'follows' && '关注'}
                       {tab === 'wallet' && '易币明细'}
+                      {tab === 'reports' && '我的举报'}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -731,6 +747,11 @@ function ProfilePageContent() {
                   </div>
                 )}
               </div>
+            </TabsContent>
+
+            {/* -------------------- 举报记录 -------------------- */}
+            <TabsContent value="reports" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <ReportsList />
             </TabsContent>
           </Tabs>
           </div>

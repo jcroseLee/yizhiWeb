@@ -135,7 +135,14 @@ const POST_TYPE_CONFIG = {
 // PostCard 组件
 // -----------------------------------------------------------------------------
 export default function PostCard({ post }: { post: Post }) {
-  if (post.status === 'hidden' || post.status === 'deleted') {
+  const { toast } = useToast()
+  const [isLiking, setIsLiking] = useState(false)
+  const [isFavoriting, setIsFavoriting] = useState(false)
+  const [likeCount, setLikeCount] = useState(post.stats.likes)
+  const [liked, setLiked] = useState(!!post.isLiked)
+  const [favorited, setFavorited] = useState(!!post.isFavorited)
+  const isBlocked = post.status === 'hidden' || post.status === 'deleted'
+  if (isBlocked) {
     return (
       <div className="bg-stone-50 rounded-xl p-6 text-center text-stone-400 text-sm border border-stone-100 my-4 select-none">
         <div className="flex flex-col items-center gap-2">
@@ -147,13 +154,6 @@ export default function PostCard({ post }: { post: Post }) {
       </div>
     )
   }
-
-  const { toast } = useToast()
-  const [isLiking, setIsLiking] = useState(false)
-  const [isFavoriting, setIsFavoriting] = useState(false)
-  const [likeCount, setLikeCount] = useState(post.stats.likes)
-  const [liked, setLiked] = useState(!!post.isLiked)
-  const [favorited, setFavorited] = useState(!!post.isFavorited)
   
   const showMedia = (post.hasGua && post.guaName) || post.coverImage;
   const bountyAmount = typeof post.bounty === 'number' ? post.bounty : Number(post.bounty) || 0;
@@ -228,6 +228,38 @@ export default function PostCard({ post }: { post: Post }) {
               {post.excerpt}
             </p>
           </Link>
+
+          {/* 移动端媒体显示 (位于摘要下方，标签上方) */}
+          {showMedia && (
+            <div className="sm:hidden w-full pt-2">
+              {post.hasGua && post.guaName ? (
+                <div className="flex justify-center bg-stone-50 rounded-lg p-2">
+                  <GuaBlock name={post.guaName} lines={post.lines} changingLines={post.changingLines} />
+                </div>
+              ) : post.coverImage ? (
+                <Link href={`/community/${post.id}`} className="block media-container rounded-lg overflow-hidden border border-stone-100 bg-stone-50 relative w-full h-[160px]">
+                  <Image 
+                    src={post.coverImage} 
+                    alt={post.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="100vw"
+                  />
+                </Link>
+              ) : null}
+            </div>
+          )}
+
+          {/* 标签 (移动到内容下方，作者信息上方) */}
+          {post.tags.length > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              {post.tags.slice(0, 3).map((tag, i) => (
+                <span key={i} className="bg-stone-50 px-1.5 py-0.5 rounded text-xs text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer border border-stone-100/50">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
           
           {/* 3. 底部信息栏 (作者 + 按钮) */}
           <div className="flex flex-wrap items-center justify-between mt-2 gap-y-2">
@@ -246,17 +278,6 @@ export default function PostCard({ post }: { post: Post }) {
                 <span className="text-stone-300">•</span>
                 <span>{post.time}</span>
               </div>
-              
-              {/* 标签 (移动端空间不足时，自动隐藏多余标签) */}
-              {post.tags.length > 0 && (
-                <div className="hidden sm:flex items-center gap-2">
-                  {post.tags.slice(0, 3).map((tag, i) => (
-                    <span key={i} className="bg-stone-50 px-1.5 py-0.5 rounded text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 操作按钮组 (自动换行) */}
@@ -308,24 +329,23 @@ export default function PostCard({ post }: { post: Post }) {
           </div>
         </div>
 
-        {/* 右侧 (移动端为下方)：媒体区域 */}
-        {/* 关键优化：移动端全宽显示，增强视觉冲击力 */}
+        {/* 右侧 (移动端为下方)：媒体区域 - 仅大屏显示 */}
         {showMedia && (
-          <div className="shrink-0 w-full sm:w-auto pt-2 sm:pt-1 sm:pl-2">
+          <div className="hidden sm:block shrink-0 sm:w-auto sm:pt-1 sm:pl-2">
             {post.hasGua && post.guaName ? (
-              // 卦象：移动端居中+浅色背景，大屏靠右
-              <div className="flex justify-center sm:block sm:scale-95 sm:origin-top-right bg-stone-50 sm:bg-transparent rounded-lg sm:rounded-none p-2 sm:p-0">
+              // 卦象：大屏靠右
+              <div className="block scale-95 origin-top-right bg-transparent">
                 <GuaBlock name={post.guaName} lines={post.lines} changingLines={post.changingLines} />
               </div>
             ) : post.coverImage ? (
-              // 图片：移动端宽幅 Banner (h-40)，大屏缩略图 (140x105)
-              <Link href={`/community/${post.id}`} className="block media-container rounded-lg overflow-hidden border border-stone-100 bg-stone-50 relative w-full h-[160px] sm:w-[140px] sm:h-[105px]">
+              // 图片：大屏缩略图 (140x105)
+              <Link href={`/community/${post.id}`} className="block media-container rounded-lg overflow-hidden border border-stone-100 bg-stone-50 relative w-[140px] h-[105px]">
                 <Image 
                   src={post.coverImage} 
                   alt={post.title}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="(max-width: 640px) 100vw, 140px"
+                  sizes="140px"
                 />
               </Link>
             ) : null}

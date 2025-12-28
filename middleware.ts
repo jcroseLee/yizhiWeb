@@ -1,4 +1,4 @@
-import { getServerSession } from '@/lib/utils/createServerClient'
+import { updateSession } from '@/lib/supabase/middleware'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
@@ -24,33 +24,28 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
-  // 如果既不是受保护路由也不是公开路由，直接放行
-  if (!isProtectedRoute && !isPublicRoute) {
-    return NextResponse.next()
-  }
+  // 对所有匹配的路由都运行 updateSession，以刷新 session
+  const { supabaseResponse, user } = await updateSession(request)
 
-  // 尝试获取 session
-  // 注意：Supabase 的 session 主要在客户端管理（localStorage）
-  // 在中间件中可能无法准确读取，所以我们使用宽松的策略
-  // 让客户端组件做最终的认证检查
-  const session = await getServerSession(request)
+  // 如果既不是受保护路由也不是公开路由，直接返回更新后的 response
+  if (!isProtectedRoute && !isPublicRoute) {
+    return supabaseResponse
+  }
 
   // 如果是受保护的路由
   if (isProtectedRoute) {
-    // 如果检测到 session，允许访问
-    if (session) {
-      return NextResponse.next()
+    // 如果检测到 user，允许访问
+    if (user) {
+      return supabaseResponse
     }
     
-    // 如果没有检测到 session，我们仍然允许访问
+    // 如果没有检测到 user，我们仍然允许访问
     // 让客户端组件做最终的认证检查
-    // 这样可以避免因为中间件无法读取 localStorage 中的 session 而误判
-    // 客户端组件会检查用户是否登录，如果未登录会重定向
-    return NextResponse.next()
+    return supabaseResponse
   }
 
-  // 如果是公开路由（登录/注册页）且有 session，重定向
-  if (isPublicRoute && session) {
+  // 如果是公开路由（登录/注册页）且有 user，重定向
+  if (isPublicRoute && user) {
     const redirect = request.nextUrl.searchParams.get('redirect')
     if (redirect) {
       return NextResponse.redirect(new URL(redirect, request.url))
@@ -58,7 +53,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {
@@ -74,4 +69,3 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

@@ -3,11 +3,11 @@
 import { Button } from '@/lib/components/ui/button'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
-import { getSupabaseClient } from '@/lib/services/supabaseClient'
+import { getCurrentUser } from '@/lib/services/auth'
+import { createClient } from '@/lib/supabase/client'
 import { Github } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { getCurrentUser } from '@/lib/services/auth'
+import { useEffect, useState } from 'react'
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void
@@ -55,7 +55,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     setLoading(true)
 
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         setLoading(false)
@@ -136,7 +136,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
   const handleGoogleLogin = async () => {
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         return
@@ -159,7 +159,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
   const handleGitHubLogin = async () => {
     try {
-      const supabase = getSupabaseClient()
+      const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         return
@@ -220,7 +220,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
           <button
             type="button"
             onClick={async () => {
-              const supabase = getSupabaseClient()
+              const supabase = createClient()
               if (supabase) {
                 try {
                   const { error } = await supabase.auth.resend({

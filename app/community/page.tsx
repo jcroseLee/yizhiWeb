@@ -15,6 +15,7 @@ import {
   Coffee,
   Compass,
   Flame,
+  Heart,
   HelpCircle,
   ListFilter,
   Loader2,
@@ -43,7 +44,7 @@ const styles = `
   .tab-active::after {
     content: '';
     position: absolute;
-    bottom: -6px;
+    bottom: 0px;
     left: 50%;
     transform: translateX(-50%);
     width: 28px;
@@ -62,6 +63,7 @@ const styles = `
 // 频道导航
 // -----------------------------------------------------------------------------
 const CHANNELS = [
+  { id: 'follow', label: '关注', icon: Heart },
   { id: 'recommend', label: '推荐', icon: Flame },
   { id: 'theory', label: '论道', icon: BookOpen },
   { id: 'help', label: '悬卦', icon: HelpCircle },
@@ -130,7 +132,7 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     excerpt: postType === 'help'
       ? extractHelpBackground(post.content_html || post.content, 100)
       : extractTextFromHTML(post.content_html || post.content, 100),
-    tags: [],
+    tags: post.tags || [],
     bounty: post.bounty || 0,
     stats: {
       likes: post.like_count,
@@ -185,7 +187,9 @@ export default function CommunityPage() {
         setLoading(true)
       }
 
-      const type = activeChannel === 'recommend' ? undefined : activeChannel as 'theory' | 'help' | 'debate' | 'chat'
+      const type = ['recommend', 'follow'].includes(activeChannel) 
+        ? undefined 
+        : activeChannel as 'theory' | 'help' | 'debate' | 'chat'
       
       let orderBy: 'created_at' | 'like_count' | 'view_count' = 'created_at'
       if (sortBy === 'hottest') orderBy = 'like_count'
@@ -200,6 +204,7 @@ export default function CommunityPage() {
         type,
         orderBy,
         orderDirection: 'desc',
+        followed: activeChannel === 'follow',
       })
 
       if (isLoadMore) {
@@ -271,52 +276,60 @@ export default function CommunityPage() {
               </div>
 
               {/* 2. 频道 Tab */}
-              <div className="sticky top-0 lg:relative z-10 bg-paper-50 lg:bg-transparent pt-2 lg:pt-0">
+              <div className="sticky top-0 lg:relative z-20 bg-paper-50 lg:bg-transparent pt-2 lg:pt-0">
                 <div className="flex items-center justify-between bg-white lg:bg-paper-50 px-4 py-3 border-b lg:border-b border-stone-200/60 lg:rounded-t-lg shadow-sm lg:shadow-none mx-0 lg:mx-0">
-                  <div className="flex gap-6 lg:gap-8 overflow-x-auto scrollbar-hide pr-4 w-full lg:w-auto">
+                  <div className="flex-1 flex gap-6 lg:gap-8 pr-4 min-w-0 overflow-x-auto overflow-y-hidden scrollbar-hide">
                     {CHANNELS.map(channel => {
                       const Icon = channel.icon;
                       const isActive = activeChannel === channel.id;
                       return (
-                        <button
+                        <Button
                           key={channel.id}
+                          variant="ghost"
                           onClick={() => setActiveChannel(channel.id)}
-                          className={`flex items-center gap-1.5 text-sm transition-colors pb-2 relative whitespace-nowrap outline-none ${
+                          className={`flex items-center gap-1.5 text-sm transition-colors pb-2 relative whitespace-nowrap outline-none rounded-none hover:bg-transparent h-auto px-0 ${
                             isActive ? 'tab-active text-stone-900' : 'text-stone-500 hover:text-stone-800'
                           }`}
                         >
                           <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-[#C82E31]' : ''}`} />
                           {channel.label}
-                        </button>
+                        </Button>
                       )
                     })}
                   </div>
                   
                   {/* 筛选按钮 */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="hidden lg:flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0 ml-2"
-                      >
-                        <ListFilter className="h-3 w-3" /> 
-                        {sortBy === 'newest' && '最新'}
-                        {sortBy === 'hottest' && '最热'}
-                        {sortBy === 'viewed' && '浏览'}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setSortBy('newest')} className={sortBy === 'newest' ? 'bg-stone-100 font-bold' : ''}>
-                        最新发布
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSortBy('hottest')} className={sortBy === 'hottest' ? 'bg-stone-100 font-bold' : ''}>
-                        最多点赞
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSortBy('viewed')} className={sortBy === 'viewed' ? 'bg-stone-100 font-bold' : ''}>
-                        最多浏览
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="relative shrink-0 ml-2">
+                    {/* 移动端左侧渐变遮罩 */}
+                    <div className="absolute right-full top-0 bottom-0 w-8 bg-linear-to-l from-white to-transparent pointer-events-none lg:hidden z-10" />
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-2 sm:px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0"
+                        >
+                          <ListFilter className="h-3 w-3" /> 
+                          <span className="hidden sm:inline">
+                            {sortBy === 'newest' && '最新'}
+                            {sortBy === 'hottest' && '最热'}
+                            {sortBy === 'viewed' && '浏览'}
+                          </span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="z-20 bg-white">
+                        <DropdownMenuItem onClick={() => setSortBy('newest')} className={sortBy === 'newest' ? 'bg-stone-100 font-bold' : ''}>
+                          最新发布
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSortBy('hottest')} className={sortBy === 'hottest' ? 'bg-stone-100 font-bold' : ''}>
+                          最多点赞
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSortBy('viewed')} className={sortBy === 'viewed' ? 'bg-stone-100 font-bold' : ''}>
+                          最多浏览
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
 
@@ -333,7 +346,7 @@ export default function CommunityPage() {
                     <div className="flex justify-center mb-2">
                       <HelpCircle className="w-8 h-8 text-stone-200" />
                     </div>
-                    暂无帖子，快来发布第一条吧
+                    {activeChannel === 'follow' ? '暂无关注用户的帖子，快去发现感兴趣的道友吧' : '暂无帖子，快来发布第一条吧'}
                   </div>
                 ) : (
                   <>

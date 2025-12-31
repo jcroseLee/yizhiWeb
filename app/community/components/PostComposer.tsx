@@ -464,19 +464,7 @@ export default function PostComposer() {
                     </div>
                   </div>
                   
-                  {/* 分类选择按钮组 - 使用 Tag 组件 */}
-                  <div className={`category-group ${isFocused ? 'visible' : ''} mt-2`}>
-                    <div className="inline-flex h-auto items-center justify-start gap-2">
-                      {CATEGORIES.map((category) => (
-                        <CategoryTag
-                          key={category.id}
-                          category={category}
-                          isSelected={selectedCategory === category.id}
-                          onClick={() => handleCategoryChange(category.id)}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  {/* 分类选择按钮组 (已移除) */}
                 </div>
               )}
             </div>

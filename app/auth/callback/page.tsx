@@ -1,6 +1,7 @@
 'use client'
 
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
+import { syncProfileFromAuthUser } from '@/lib/services/profile'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
@@ -54,17 +55,11 @@ function AuthCallbackContent() {
           }
 
           if (data?.user) {
-            // 确保 profiles 记录存在
             try {
-              await supabase
-                .from('profiles')
-                .upsert({
-                  id: data.user.id,
-                  nickname: data.user.email?.split('@')[0] || '用户',
-                  role: 'user',
-                }, {
-                  onConflict: 'id',
-                })
+              await syncProfileFromAuthUser(
+                { user: data.user, defaultNickname: data.user.email?.split('@')[0] || '用户', role: 'user' },
+                supabase
+              )
             } catch (err) {
               console.warn('Error ensuring profile:', err)
               // 不阻止验证流程
@@ -105,17 +100,11 @@ function AuthCallbackContent() {
           }
 
           if (data?.user) {
-            // 确保 profiles 记录存在
             try {
-              await supabase
-                .from('profiles')
-                .upsert({
-                  id: data.user.id,
-                  nickname: data.user.email?.split('@')[0] || '用户',
-                  role: 'user',
-                }, {
-                  onConflict: 'id',
-                })
+              await syncProfileFromAuthUser(
+                { user: data.user, defaultNickname: data.user.email?.split('@')[0] || '用户', role: 'user' },
+                supabase
+              )
             } catch (err) {
               console.warn('Error ensuring profile:', err)
               // 不阻止验证流程

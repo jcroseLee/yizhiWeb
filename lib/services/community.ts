@@ -122,6 +122,8 @@ export interface Post {
   created_at: string
   updated_at: string
   status?: 'published' | 'draft' | 'archived' | 'pending' | 'hidden' | 'rejected'  // 帖子状态
+  section?: 'study' | 'help' | 'casual' | 'announcement' | null
+  subsection?: string | null
   method?: DivinationMethodType | null
   tags?: string[]
   // 关联的用户信息
@@ -136,8 +138,6 @@ export interface Post {
   is_favorited?: boolean
   // 帖子类型（从content或tags推断，或添加type字段）
   type?: 'theory' | 'help' | 'debate' | 'chat'
-  // 帖子分类（section字段，兼容旧数据）
-  section?: 'study' | 'help' | 'casual' | 'announcement' | null
   // 悬赏金额（如果有）
   bounty?: number
   // 关联的排盘记录ID
@@ -218,7 +218,6 @@ export interface PostRow {
   divination_records?: DivinationRecord | DivinationRecord[] | null
   cover_image_url?: string | null
   type?: 'theory' | 'help' | 'debate' | 'chat'
-  section?: 'study' | 'help' | 'casual' | 'announcement' | null
 }
 
 export interface ProfileRow {
@@ -309,7 +308,7 @@ export async function getPosts(options?: {
         changing_flags
       )
     `)
-    .in('status', ['published', 'hidden', 'deleted'])  // 显示发布、隐藏和删除的帖子（隐藏/删除的显示占位符）
+    .in('status', ['published', 'hidden', 'archived'])  // 显示发布、隐藏和已结案的帖子
     .order(orderBy, { ascending: orderDirection === 'asc' })
     .range(offset, offset + limit - 1)
 
@@ -410,23 +409,18 @@ export async function getPost(postId: string): Promise<Post | null> {
     throw new Error('Supabase client not initialized')
   }
 
-  // 增加浏览量（使用手动更新，失败不影响主流程）
+  // 增加浏览量（使用RPC原子更新，失败不影响主流程）
   try {
-    const { data: currentPost } = await supabase
-      .from('posts')
-      .select('view_count')
-      .eq('id', postId)
-      .single()
+    const { error } = await supabase.rpc('increment_post_view_count', { 
+      post_id: postId 
+    })
     
-    if (currentPost) {
-      await supabase
-        .from('posts')
-        .update({ view_count: (currentPost.view_count || 0) + 1 })
-        .eq('id', postId)
+    if (error) {
+      console.warn('Failed to increment view count:', error)
     }
   } catch (err) {
     // 浏览量更新失败不影响获取帖子
-    console.warn('Failed to update view count:', err)
+    console.warn('Failed to call increment_post_view_count rpc:', err)
   }
 
   // 浏览帖子时自动增加修业值（防刷机制：每个帖子每天只能获得一次EXP）
@@ -673,7 +667,11 @@ export async function updatePost(
   const updateData: Record<string, unknown> = {}
   if ('title' in updates) updateData.title = updates.title
   if ('content' in updates) updateData.content = updates.content
-  if ('content_html' in updates) updateData.content_html = updates.content_html ?? updates.content
+  if ('content_html' in updates) {
+    updateData.content_html = updates.content_html ?? updates.content
+  } else if ('content' in updates && typeof updates.content !== 'undefined') {
+    updateData.content_html = updates.content
+  }
   if ('cover_image_url' in updates) updateData.cover_image_url = updates.cover_image_url
   if ('type' in updates) updateData.type = updates.type
   if ('bounty' in updates) updateData.bounty = updates.bounty
@@ -772,10 +770,10 @@ export async function getUserPosts(options?: {
   // 如果不是查看自己的帖子，只显示已发布的
   // 如果是查看自己的帖子，包括已发布和草稿（不限制 status）
   if (!isOwnPosts) {
-    query = query.eq('status', 'published')
+    query = query.in('status', ['published', 'archived'])
   } else {
-    // 明确包含已发布、草稿、待审核、隐藏、已拒绝（排除已归档的）
-    query = query.in('status', ['published', 'draft', 'pending', 'hidden', 'rejected'])
+    // 明确包含已发布、草稿、待审核、隐藏、已拒绝、已归档
+    query = query.in('status', ['published', 'draft', 'pending', 'hidden', 'rejected', 'archived'])
   }
 
   const { data, error } = await query
@@ -901,7 +899,7 @@ export async function getUserFavoritePosts(options?: {
       )
     `)
     .in('id', postIds)
-    .eq('status', 'published')  // 只显示已发布的帖子
+    .in('status', ['published', 'archived'])  // 只显示已发布和已结案的帖子
     .order('created_at', { ascending: false })
 
   if (postsError) {
@@ -1022,7 +1020,7 @@ export async function getUserLikedPosts(options?: {
       )
     `)
     .in('id', postIds)
-    .eq('status', 'published')  // 只显示已发布的帖子
+    .in('status', ['published', 'archived'])  // 只显示已发布和已结案的帖子
     .order('created_at', { ascending: false })
 
   if (postsError) {

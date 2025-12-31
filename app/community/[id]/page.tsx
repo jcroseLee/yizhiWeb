@@ -1,6 +1,5 @@
 'use client'
 
-import DOMPurify from 'isomorphic-dompurify'
 import {
   ArrowLeft,
   Bookmark,
@@ -24,8 +23,11 @@ import PostDetailSkeleton from '@/app/community/components/PostDetailSkeleton'
 import ReportDialog from '@/app/community/components/ReportDialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/lib/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
+import { Textarea } from '@/lib/components/ui/textarea'
 import { useToast } from '@/lib/hooks/use-toast'
+import { getSession } from '@/lib/services/auth'
 import {
   adoptComment,
   createComment,
@@ -44,6 +46,7 @@ import { getSupabaseClient } from '@/lib/services/supabaseClient'
 import { convertDivinationRecordToFullGuaData } from '@/lib/utils/divinationToFullGuaData'
 import { getGanZhiInfo, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
 import { solarTermTextFrom } from '@/lib/utils/solarTerms'
+import DOMPurify from 'isomorphic-dompurify'
 
 // -----------------------------------------------------------------------------
 // 类型定义 & 辅助
@@ -64,6 +67,72 @@ const styles = `
   }
   .font-serif-sc {
     font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  }
+  .prose h1, .prose h2, .prose h3 {
+    font-weight: bold;
+    margin-top: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .prose h1 {
+    font-size: 2rem;
+  }
+  .prose h2 {
+    font-size: 1.5rem;
+  }
+  .prose h3 {
+    font-size: 1.25rem;
+  }
+  .prose p {
+    margin: 0.5rem 0;
+  }
+  .prose ul, .prose ol {
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+  }
+  .prose strong {
+    font-weight: bold;
+  }
+  .prose em {
+    font-style: italic;
+  }
+  .prose u {
+    text-decoration: underline;
+  }
+  .prose s {
+    text-decoration: line-through;
+  }
+  .prose code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-family: monospace;
+  }
+  .prose a {
+    color: #C82E31;
+    text-decoration: underline;
+  }
+  .prose a:hover {
+    color: #a61b1f;
+  }
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 0.5rem 0;
+  }
+  .prose blockquote {
+    border-left: 3px solid #C82E31;
+    padding-left: 1rem;
+    margin: 0.5rem 0;
+    font-style: italic;
+    color: #57534e;
+  }
+  .prose p[style*="text-align: center"] {
+    text-align: center;
+  }
+  .prose p[style*="text-align: right"] {
+    text-align: right;
   }
 `
 
@@ -99,6 +168,13 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   const [confirmAdoptCommentId, setConfirmAdoptCommentId] = useState<string | null>(null)
   const [, setDeletingCommentId] = useState<string | null>(null)
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null)
+
+  const [caseExists, setCaseExists] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiveSubmitting, setArchiveSubmitting] = useState(false)
+  const [archiveAccuracy, setArchiveAccuracy] = useState<'accurate' | 'inaccurate' | 'partial'>('accurate')
+  const [archiveOccurredAt, setArchiveOccurredAt] = useState('')
+  const [archiveFeedback, setArchiveFeedback] = useState('')
   
   const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -111,6 +187,20 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId])
+
+  useEffect(() => {
+    const check = async () => {
+      if (!post?.id) return
+      try {
+        const res = await fetch(`/api/library/cases/${post.id}/exists`)
+        const json = await res.json().catch(() => null)
+        setCaseExists(!!json?.exists)
+      } catch {
+        setCaseExists(false)
+      }
+    }
+    void check()
+  }, [post?.id])
 
   const checkFollowingStatus = React.useCallback(async () => {
     if (!post?.author?.id || !currentUserProfile || currentUserProfile.id === post.author.id) {
@@ -324,6 +414,51 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     }
   }
 
+  const canArchive = !!post && !!currentUserProfile && (post.user_id === currentUserProfile.id || currentUserProfile.role === 'admin')
+
+  const handleArchive = async () => {
+    if (!post) return
+    if (!archiveFeedback.trim()) {
+      toast({ title: '请填写实际结果', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setArchiveSubmitting(true)
+      const session = await getSession()
+      if (!session?.access_token) {
+        toast({ title: '请先登录', variant: 'destructive' })
+        return
+      }
+
+      const res = await fetch('/api/library/archive', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          post_id: post.id,
+          feedback: archiveFeedback.trim(),
+          accuracy: archiveAccuracy,
+          occurred_at: archiveOccurredAt ? new Date(archiveOccurredAt).toISOString() : null,
+        }),
+      })
+
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error || '结案失败')
+
+      setArchiveOpen(false)
+      setCaseExists(true)
+      setPost((prev) => (prev ? { ...prev, status: 'archived' } : prev))
+      toast({ title: '结案成功', description: '已收录进案例库' })
+    } catch (e) {
+      toast({ title: '结案失败', description: e instanceof Error ? e.message : '未知错误', variant: 'destructive' })
+    } finally {
+      setArchiveSubmitting(false)
+    }
+  }
+
   // Helpers
   const formatTimeStr = (dateString: string) => {
     const date = new Date(dateString)
@@ -335,19 +470,54 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
 
-  const extractBackgroundText = (html: string) => {
-    if (!html) return ''
-    const text = typeof window !== 'undefined' 
-      ? new DOMParser().parseFromString(html, 'text/html').body.textContent || ''
-      : html.replace(/<[^>]*>/g, '')
+  // 过滤掉关联排盘和卦项信息
+  const filterBackgroundContent = (html: string): string => {
+    if (!html) return html
     
-    return text
-      .replace(/(\*\*关联排盘[^*]*\*\*|\*\*问题[^*]*\*\*|\*\*卦名[^*]*\*\*|关联排盘[:：][^\*\n]*|问题[:：][^\*\n]*)/g, '')
-      .split('\n')
-      .filter(line => line.trim() && !/关联排盘|问题[:：]|卦名|卦象/.test(line))
-      .join('\n')
+    let filtered = html
+
+    // 1. 移除包含关键词的 strong/b/em 标签 (e.g. <strong>关联排盘：xxx</strong>)
+    // 使用 [\s\S] 匹配所有字符包括换行
+    filtered = filtered.replace(/<(strong|b|em)[^>]*>[\s\S]*?(关联排盘|问题|卦名|卦象)[:：][\s\S]*?<\/\1>/gi, '')
+
+    // 2. 移除 Markdown 风格的加粗 (e.g. **关联排盘：xxx**)
+    filtered = filtered.replace(/\*\*(关联排盘|问题|卦名|卦象)[:：][\s\S]*?\*\*/gi, '')
+
+    // 3. 清理空标签和多余空白
+    filtered = filtered
+      // 移除空段落 (包含空白字符或&nbsp;)
+      .replace(/<p[^>]*>(\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '')
+      .replace(/<div[^>]*>(\s|&nbsp;|<br\s*\/?>)*<\/div>/gi, '')
+      // 移除连续的换行
+      .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>')
       .trim()
+    
+    return filtered
   }
+
+  // 分割富文本内容为背景说明和卦理推演两部分
+  const splitHtmlContent = (html: string) => {
+    const marker = '<h2>卦理推演</h2>'
+    const idx = html.indexOf(marker)
+    if (idx < 0) {
+      const backgroundHtml = html.trim()
+      return { backgroundHtml, analysisHtml: '' }
+    }
+    const backgroundHtml = html.slice(0, idx).trim()
+    const analysisHtml = html.slice(idx + marker.length).trim()
+    return { backgroundHtml, analysisHtml }
+  }
+
+  // 处理富文本内容，分割并清理
+  const safeHtml = useMemo(() => {
+    const raw = post?.content_html || post?.content || ''
+    if (!raw) return { backgroundHtml: '', analysisHtml: '' }
+    const sanitized = DOMPurify.sanitize(raw)
+    const split = splitHtmlContent(sanitized)
+    // 过滤背景说明中的关联排盘和卦项信息
+    const filteredBackground = filterBackgroundContent(split.backgroundHtml)
+    return { backgroundHtml: filteredBackground, analysisHtml: split.analysisHtml }
+  }, [post?.content_html, post?.content])
 
   const isHelpPost = post?.type === 'help' && post?.divination_record
   const fullGuaData = useMemo(() => {
@@ -483,13 +653,27 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     </div>
 
                     <div>
-                      <h2 className="text-sm sm:text-base font-bold text-stone-800 mb-3 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-stone-400"/> 背景说明
-                      </h2>
-                      <div className="text-stone-700 leading-relaxed font-serif-sc whitespace-pre-wrap text-sm sm:text-[15px]">
-                        {extractBackgroundText(post.content_html || post.content) || "暂无详细背景描述..."}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-[3px] h-4 bg-[#C82E31] rounded-full"></div>
+                        <h2 className="text-sm sm:text-base font-bold text-[#C82E31] uppercase tracking-[0.1em] font-sans">BACKGROUND / 背景说明</h2>
                       </div>
+                      {safeHtml.backgroundHtml ? (
+                        <div className="prose prose-stone max-w-none text-stone-700 text-sm sm:text-[15px] leading-relaxed font-serif-sc" dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml }} />
+                      ) : (
+                        <div className="text-stone-500 text-sm sm:text-[15px] italic">暂无详细背景描述...</div>
+                      )}
                     </div>
+
+                    {/* 卦理推演部分 */}
+                    {safeHtml.analysisHtml && (
+                      <div className="mt-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-[3px] h-4 bg-[#C82E31] rounded-full"></div>
+                          <h2 className="text-sm sm:text-base font-bold text-[#C82E31] uppercase tracking-[0.1em] font-sans">ANALYSIS / 卦理推演</h2>
+                        </div>
+                        <div className="prose prose-stone max-w-none text-stone-800 text-sm sm:text-[15px] leading-relaxed font-serif-sc" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="mb-6">
@@ -542,6 +726,25 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     >
                       <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> 回复
                     </Button>
+                    {canArchive && (
+                      caseExists ? (
+                        <Button variant="ghost" size="sm" className="gap-1.5 h-8 sm:h-9 text-xs sm:text-sm text-stone-500 hover:text-stone-900" asChild>
+                          <Link href={`/cases/${post.id}`}>
+                            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> 查看案例
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 h-8 sm:h-9 text-xs sm:text-sm text-stone-500 hover:text-stone-900"
+                          onClick={() => setArchiveOpen(true)}
+                          disabled={archiveSubmitting}
+                        >
+                          <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> 反馈/结案
+                        </Button>
+                      )
+                    )}
                   </div>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -799,6 +1002,23 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
               <Share2 className="h-5 w-5" />
               <span className="text-[10px] font-medium">分享</span>
             </button>
+            {canArchive && (
+              caseExists ? (
+                <Link href={`/cases/${post.id}`} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+                  <FileText className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">案例</span>
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setArchiveOpen(true)}
+                  className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
+                  disabled={archiveSubmitting}
+                >
+                  <FileText className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">结案</span>
+                </button>
+              )
+            )}
           </div>
           <Button 
             className="rounded-full bg-[#C82E31] hover:bg-[#a61b1f] text-white px-8 shadow-sm shadow-red-100 active:scale-95 transition-transform h-9"
@@ -814,6 +1034,66 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
           </Button>
         </div>
       </div>
+
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent className="sm:max-w-lg bg-white">
+          <DialogHeader>
+            <DialogTitle>反馈/结案</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-semibold text-stone-700">实际结果</div>
+              <Textarea
+                value={archiveFeedback}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setArchiveFeedback(e.target.value)}
+                placeholder="发生了什么？结果如何？尽量写清关键节点与时间"
+                className="min-h-28"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-semibold text-stone-700">准确度</div>
+              <div className="flex gap-3 flex-wrap">
+                {(
+                  [
+                    { id: 'accurate', label: '准' },
+                    { id: 'partial', label: '半准' },
+                    { id: 'inaccurate', label: '不准' },
+                  ] as const
+                ).map((o) => (
+                  <label key={o.id} className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="archive-accuracy-modal"
+                      value={o.id}
+                      checked={archiveAccuracy === o.id}
+                      onChange={() => setArchiveAccuracy(o.id)}
+                      className="accent-[#C82E31]"
+                    />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-semibold text-stone-700">关键应期（选填）</div>
+              <input
+                type="datetime-local"
+                value={archiveOccurredAt}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setArchiveOccurredAt(e.target.value)}
+                className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiveSubmitting}>
+                取消
+              </Button>
+              <Button onClick={handleArchive} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white" disabled={archiveSubmitting}>
+                {archiveSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '提交结案'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialogs (Delete/Adopt) - 保持不变，省略以节省空间，直接复用原逻辑 */}
       {/* ... Confirm Dialogs ... */}

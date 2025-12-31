@@ -5,6 +5,7 @@ import { Checkbox } from '@/lib/components/ui/checkbox'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
 import { getCurrentUser } from '@/lib/services/auth'
+import { syncProfileFromAuthUser } from '@/lib/services/profile'
 import { createClient } from '@/lib/supabase/client'
 import { Github } from 'lucide-react'
 import Link from 'next/link'
@@ -136,22 +137,11 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
       }
 
       if (data?.user) {
-        // 确保 profiles 记录存在（双重保险）
         try {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: data.user.id,
-              nickname: data.user.email?.split('@')[0] || '用户',
-              role: 'user',
-            }, {
-              onConflict: 'id',
-            })
-
-          if (profileError) {
-            console.warn('Failed to ensure profile exists:', profileError)
-            // 不阻止登录流程
-          }
+          await syncProfileFromAuthUser(
+            { user: data.user, defaultNickname: data.user.email?.split('@')[0] || '用户', role: 'user' },
+            supabase
+          )
         } catch (err) {
           console.warn('Error ensuring profile:', err)
           // 不阻止登录流程
@@ -401,4 +391,3 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     </>
   )
 }
-

@@ -58,7 +58,7 @@ export interface FullGuaData {
 // -----------------------------------------------------------------------------
 const PillarBlock = ({ label, value }: { label: string, value: string }) => (
   <div className="flex flex-col items-center">
-    <div className="w-9 h-9 rounded-lg bg-linear-to-br from-white to-amber-50 border border-gray-200/80 flex items-center justify-center font-serif font-bold text-stone-900 text-sm shadow-[0_2px_6px_rgba(200,46,49,0.08)] mb-1.5">
+    <div className="w-9 h-9 rounded-lg  border border-gray-200/80 flex items-center justify-center font-serif font-bold text-stone-900 text-sm shadow-[0_2px_6px_rgba(200,46,49,0.08)] mb-1.5">
       {value}
     </div>
     <span className="text-[10px] text-stone-500 scale-90 font-medium">{label}</span>
@@ -101,12 +101,12 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
       <div className={containerClass}>
         {isBarConnected ? (
           // 阳爻: 一条长实线
-          <div className={`w-full h-[5px] rounded-[1px] ${colorClass} transition-colors`} />
+          <div className={`w-full h-[7px] rounded-[1px] ${colorClass} transition-colors`} />
         ) : (
           // 阴爻: 两条短实线
           <div className="w-full flex justify-between">
-            <div className={`w-[42%] h-[5px] rounded-[1px] ${colorClass} transition-colors`} />
-            <div className={`w-[42%] h-[5px] rounded-[1px] ${colorClass} transition-colors`} />
+            <div className={`w-[42%] h-[7px] rounded-[1px] ${colorClass} transition-colors`} />
+            <div className={`w-[42%] h-[7px] rounded-[1px] ${colorClass} transition-colors`} />
           </div>
         )}
         
@@ -145,20 +145,20 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
         className={`grid ${gridCols} gap-1 items-center py-2.5 border-b border-stone-50 last:border-0 hover:bg-stone-50/80 transition-colors h-[52px]`}
       >
         {/* 1. 六兽 (居中, 弱化) */}
-        <div className="text-[11px] text-stone-400 text-center font-serif tracking-tighter">
+        <div className="text-[12px] text-stone-500 text-center font-serif tracking-tighter">
           {org.liuShou}
         </div>
         
         {/* 2. 本卦六亲 (右对齐，加粗重点) */}
-        <div className={`text-[11px] font-bold text-right pr-1 truncate ${isMoving ? 'text-[#C82E31]' : 'text-stone-600'}`}>
+        <div className={`text-[13px] font-bold text-right pr-1 truncate ${isMoving ? 'text-[#C82E31]' : 'text-stone-600'}`}>
           {org.liuQin}
         </div>
         
         {/* 3. 本卦纳甲 (左对齐) */}
         <div className="flex flex-col justify-center leading-none pl-1">
           <div className="flex items-center gap-1">
-            <span className="text-[11px] font-bold text-stone-700 mb-[3px] font-serif">{org.ganZhi}</span>
-            <span className="text-[9px] text-stone-400 scale-95 origin-left mb-0.5">{org.wuXing}</span>
+            <span className="text-[13px] font-bold text-stone-700 mb-[3px] font-serif">{org.ganZhi}</span>
+            <span className="text-[11px] text-stone-400 scale-95 origin-left mb-0.5">{org.wuXing}</span>
           </div>
           {/* 伏神显示 */}
           {org.fuShen && (
@@ -180,12 +180,12 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
           
           {/* 世应标记: 绝对定位在爻线右侧，使用红/灰底色区分 */}
           {org.isShi && (
-            <span className="absolute -right-1.5 top-1/2 -translate-y-1/2 text-[9px] bg-[#C82E31] text-white px-[3px] py-px rounded-[2px] leading-none z-10 shadow-sm font-serif">
+            <span className="absolute -right-3 top-1/2 -translate-y-1/2 text-[10px] bg-[#C82E31] text-white px-[3px] py-px rounded-[2px] leading-none z-10 shadow-sm font-serif">
               世
             </span>
           )}
           {org.isYing && (
-            <span className="absolute -right-1.5 top-1/2 -translate-y-1/2 text-[9px] bg-stone-200 text-stone-500 px-[3px] py-px rounded-[2px] leading-none z-10 font-serif">
+            <span className="absolute -right-3 top-1/2 -translate-y-1/2 text-[10px] bg-stone-200 text-stone-500 px-[3px] py-px rounded-[2px] leading-none z-10 font-serif">
               应
             </span>
           )}
@@ -204,7 +204,7 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
         {/* ---------------- 变卦区域 (完整显示所有爻的变卦信息) ---------------- */}
         
         {/* 6. 变卦六亲 */}
-        <div className={`text-[11px] text-right pr-1 truncate ${
+        <div className={`text-[13px] text-right pr-1 truncate ${
           !isQuietGua && chg 
             ? (isMoving ? 'text-stone-600 font-medium' : 'text-stone-500') 
             : 'opacity-0'
@@ -217,7 +217,7 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
           {isQuietGua ? (
             // 静卦模式：显示极浅的占位符 (Ghost Line)
             <div className="w-full h-full flex items-center opacity-30">
-               <div className="w-full h-[4px] bg-stone-100 rounded-full border border-stone-200 border-dashed"></div>
+               <div className="w-full h-[5px] bg-stone-100 rounded-full border border-stone-200 border-dashed"></div>
             </div>
           ) : (
             // 动卦模式：完整显示所有爻的变卦爻线
@@ -240,12 +240,12 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
         }`}>
           {!isQuietGua && chg && (
             <>
-              <span className={`text-[11px] font-medium mb-[3px] font-serif ${
+              <span className={`text-[12px] font-medium mb-[3px] font-serif ${
                 isMoving ? 'text-stone-700' : 'text-stone-500'
               }`}>
                 {chg.ganZhi}
               </span>
-              <span className={`text-[9px] scale-95 origin-left ${
+              <span className={`text-[11px] scale-95 origin-left ${
                 isMoving ? 'text-stone-500' : 'text-stone-500'
               }`}>
                 {chg.wuXing}
@@ -260,7 +260,7 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
   return (
     <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden w-full relative">
       {/* 顶部：时间与四柱 (信息增强版) */}
-      <div className="bg-linear-to-br from-amber-50 via-white to-amber-50/30 p-4 border-b border-stone-100 relative">
+      <div className="bg-linear-to-br p-4 border-b border-stone-100 relative">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-[#C82E31]/60 via-[#C82E31]/40 to-transparent"></div>
         
         {/* 第一行：公历与空亡 */}
@@ -277,7 +277,7 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
         
         {/* 第二行：农历与节气 */}
         <div className="flex items-center flex-wrap gap-y-1 gap-x-2 mb-5 text-xs font-serif">
-          <span className="bg-amber-100/80 text-amber-900 px-1.5 rounded font-medium">{data.lunarYear}</span>
+          <span className=" text-amber-900 px-1.5 rounded font-medium">{data.lunarYear}</span>
           <span className="font-bold text-stone-800">{data.lunarDateStr}</span>
           {/* <span className="text-stone-600">{data.lunarHour}</span> */}
           <span className="text-stone-300">|</span>
@@ -297,21 +297,21 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
       <div className="p-3 relative min-h-[340px]">
         {/* 表头 - 使用相同的 Grid 定义 */}
         <div className="grid grid-cols-[28px_32px_54px_36px_20px_112px] gap-1 pb-2 border-b border-stone-100 mb-1 items-end">
-          <div className="text-center text-[10px] text-stone-400 font-serif">六神</div>
+          <div className="text-center text-[12px] text-stone-400 font-serif">六神</div>
           {/* 合并本卦区域 */}
           <div className="col-span-3 text-center">
-            <div className="text-sm font-bold text-stone-800 font-serif tracking-wide">{data.originalName}</div>
-            <div className="text-[10px] text-stone-400 scale-90">{data.originalGong}</div>
+            <span className="text-sm font-bold text-stone-800 font-serif tracking-wide">{data.originalName}</span>
+            <span className="text-[12px] text-stone-400 scale-90 ml-1">{data.originalGong}</span>
           </div>
           <div></div>
           {/* 合并变卦区域 */}
           <div className={`col-span-1 text-center transition-opacity ${isQuietGua ? 'opacity-30' : 'opacity-100'}`}>
-            <div className="text-sm font-bold text-stone-600 font-serif tracking-wide">
+            <span className="text-sm font-bold text-stone-600 font-serif tracking-wide">
               {isQuietGua ? '六爻安静' : data.changedName}
-            </div>
-            <div className="text-[10px] text-stone-400 scale-90">
+            </span>
+            <span className="text-[10px] text-stone-400 scale-90 ml-1">
               {isQuietGua ? '无变卦' : data.changedGong}
-            </div>
+            </span>
           </div>
         </div>
         

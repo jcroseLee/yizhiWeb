@@ -69,7 +69,7 @@ const CHANNELS = [
   { id: 'help', label: '悬卦', icon: HelpCircle },
   { id: 'debate', label: '争鸣', icon: TrendingUp },
   { id: 'chat', label: '茶寮', icon: Coffee },
-]
+] as const
 
 // 格式化时间
 function formatTime(dateString: string): string {
@@ -92,32 +92,11 @@ const extractGuaInfo = getGuaInfo
 
 type SectionType = 'help' | 'theory' | 'debate' | 'chat'
 
-// 映射板块类型
-function mapSectionToType(
-  section?: string | null, 
-  type?: string | null,
-  bounty?: number | null,
-  divinationRecordId?: string | null
-): SectionType {
-  if ((bounty && bounty > 0) || divinationRecordId) return 'help'
-  if (type && ['theory', 'help', 'debate', 'chat'].includes(type)) return type as SectionType
-  
-  if (section) {
-    const sectionMap: Record<string, SectionType> = {
-      'study': 'theory',
-      'help': 'help',
-      'casual': 'chat',
-      'announcement': 'theory',
-    }
-    return sectionMap[section] || 'theory'
-  }
-  return 'theory'
-}
-
 // 转换数据格式
 function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] {
   const guaInfo = extractGuaInfo(post.divination_record)
-  const postType = mapSectionToType(post.section, post.type, post.bounty, post.divination_record_id)
+  // 直接使用帖子类型，如果没有则默认为 'theory'
+  const postType = (post.type as SectionType) || 'theory'
 
   return {
     id: post.id,
@@ -157,8 +136,8 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
 
 export default function CommunityPage() {
   const router = useRouter()
-  const [activeChannel, setActiveChannel] = useState('recommend')
   const [sortBy, setSortBy] = useState<'newest' | 'hottest' | 'viewed'>('newest')
+  const [activeChannel, setActiveChannel] = useState<string>('recommend')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -187,10 +166,6 @@ export default function CommunityPage() {
         setLoading(true)
       }
 
-      const type = ['recommend', 'follow'].includes(activeChannel) 
-        ? undefined 
-        : activeChannel as 'theory' | 'help' | 'debate' | 'chat'
-      
       let orderBy: 'created_at' | 'like_count' | 'view_count' = 'created_at'
       if (sortBy === 'hottest') orderBy = 'like_count'
       if (sortBy === 'viewed') orderBy = 'view_count'
@@ -198,13 +173,23 @@ export default function CommunityPage() {
       const limit = 20
       const offset = isLoadMore ? posts.length : 0
 
+      // 处理频道筛选
+      let type: 'theory' | 'help' | 'debate' | 'chat' | undefined
+      let followed: boolean | undefined
+
+      if (activeChannel === 'follow') {
+        followed = true
+      } else if (['theory', 'help', 'debate', 'chat'].includes(activeChannel)) {
+        type = activeChannel as 'theory' | 'help' | 'debate' | 'chat'
+      }
+
       const data = await getPosts({
         limit,
         offset,
-        type,
         orderBy,
         orderDirection: 'desc',
-        followed: activeChannel === 'follow',
+        type,
+        followed,
       })
 
       if (isLoadMore) {
@@ -231,7 +216,7 @@ export default function CommunityPage() {
   useEffect(() => {
     loadPosts(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChannel, sortBy])
+  }, [sortBy, activeChannel])
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
@@ -302,7 +287,7 @@ export default function CommunityPage() {
                   <div className="relative shrink-0 ml-2">
                     {/* 移动端左侧渐变遮罩 */}
                     <div className="absolute right-full top-0 bottom-0 w-8 bg-linear-to-l from-white to-transparent pointer-events-none lg:hidden z-10" />
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -346,7 +331,7 @@ export default function CommunityPage() {
                     <div className="flex justify-center mb-2">
                       <HelpCircle className="w-8 h-8 text-stone-200" />
                     </div>
-                    {activeChannel === 'follow' ? '暂无关注用户的帖子，快去发现感兴趣的道友吧' : '暂无帖子，快来发布第一条吧'}
+                    暂无帖子，快来发布第一条吧
                   </div>
                 ) : (
                   <>

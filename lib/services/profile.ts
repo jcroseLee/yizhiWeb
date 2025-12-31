@@ -1,5 +1,41 @@
-import { getCurrentUser } from './auth'
-import { getSupabaseClient } from './supabaseClient'
+import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { getCurrentUser } from './auth';
+import { getSupabaseClient } from './supabaseClient';
+
+export async function syncProfileFromAuthUser(
+  params: { user: User; defaultNickname?: string; role?: string },
+  client?: SupabaseClient
+): Promise<void> {
+  const supabase = client || getSupabaseClient()
+  if (!supabase) return
+
+  const now = new Date().toISOString()
+  const role = params.role || 'user'
+  const userId = params.user.id
+
+  const insertPayload: Record<string, unknown> = {
+    id: userId,
+    role,
+  }
+
+  if (params.defaultNickname) insertPayload.nickname = params.defaultNickname
+  if (params.user.email) insertPayload.email = params.user.email
+  insertPayload.last_login_at = now
+
+  await supabase
+    .from('profiles')
+    .upsert(insertPayload, { onConflict: 'id', ignoreDuplicates: true })
+
+  const updatePayload: Record<string, unknown> = {
+    last_login_at: now,
+  }
+  if (params.user.email) updatePayload.email = params.user.email
+
+  await supabase
+    .from('profiles')
+    .update(updatePayload)
+    .eq('id', userId)
+}
 
 export interface UserProfile {
   id: string

@@ -1,7 +1,15 @@
 'use client'
 
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/lib/components/ui/dialog'
 import { getCurrentUser } from '@/lib/services/auth'
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
+import { useAlert } from '@/lib/utils/alert'
 import Code from '@tiptap/extension-code'
 import Dropcursor from '@tiptap/extension-dropcursor'
 import Gapcursor from '@tiptap/extension-gapcursor'
@@ -52,11 +60,18 @@ export default function RichTextEditor({
   placeholder = '分享你的易学见解...',
   className = ''
 }: RichTextEditorProps) {
+  const { alert } = useAlert()
   const [showHeadingMenu, setShowHeadingMenu] = useState(false)
   const [showUploadArea, setShowUploadArea] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // 输入对话框状态
+  const [showInputDialog, setShowInputDialog] = useState(false)
+  const [inputDialogTitle, setInputDialogTitle] = useState('')
+  const [inputDialogValue, setInputDialogValue] = useState('')
+  const [inputDialogCallback, setInputDialogCallback] = useState<((value: string | null) => void) | null>(null)
   
   const editor = useEditor({
     extensions: [
@@ -108,23 +123,51 @@ export default function RichTextEditor({
     immediatelyRender: false,
   })
 
+  // 显示输入对话框的辅助函数
+  const showPrompt = useCallback((title: string, defaultValue: string = '', callback: (value: string | null) => void) => {
+    setInputDialogTitle(title)
+    setInputDialogValue(defaultValue)
+    setInputDialogCallback(() => callback)
+    setShowInputDialog(true)
+  }, [])
+
+  // 处理输入对话框确认
+  const handleInputDialogConfirm = useCallback(() => {
+    if (inputDialogCallback) {
+      inputDialogCallback(inputDialogValue)
+    }
+    setShowInputDialog(false)
+    setInputDialogCallback(null)
+    setInputDialogValue('')
+  }, [inputDialogValue, inputDialogCallback])
+
+  // 处理输入对话框取消
+  const handleInputDialogCancel = useCallback(() => {
+    if (inputDialogCallback) {
+      inputDialogCallback(null)
+    }
+    setShowInputDialog(false)
+    setInputDialogCallback(null)
+    setInputDialogValue('')
+  }, [inputDialogCallback])
+
   const setLink = useCallback(() => {
     if (!editor) return
 
     const previousUrl = editor.getAttributes('link').href
-    const url = window.prompt('输入链接地址', previousUrl || '')
+    showPrompt('输入链接地址', previousUrl || '', (url) => {
+      if (url === null) {
+        return
+      }
 
-    if (url === null) {
-      return
-    }
+      if (url === '') {
+        editor.chain().focus().extendMarkRange('link').unsetLink().run()
+        return
+      }
 
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
-    }
-
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-  }, [editor])
+      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+    })
+  }, [editor, showPrompt])
 
   const insertImage = useCallback((url?: string) => {
     if (!editor) return
@@ -133,12 +176,13 @@ export default function RichTextEditor({
       editor.chain().focus().setImage({ src: url }).run()
     } else {
       // 如果没有提供 URL，提示用户输入
-      const inputUrl = window.prompt('输入图片地址')
-      if (inputUrl) {
-        editor.chain().focus().setImage({ src: inputUrl }).run()
-      }
+      showPrompt('输入图片地址', '', (inputUrl) => {
+        if (inputUrl) {
+          editor.chain().focus().setImage({ src: inputUrl }).run()
+        }
+      })
     }
-  }, [editor])
+  }, [editor, showPrompt])
 
   // 上传图片到 Supabase Storage
   const uploadImage = useCallback(async (file: File): Promise<string> => {
@@ -235,7 +279,7 @@ export default function RichTextEditor({
 
     // 验证文件数量
     if (fileArray.length > maxFiles) {
-      alert(`最多只能上传 ${maxFiles} 个文件`)
+      alert(`最多只能上传 ${maxFiles} 个文件`, 'destructive')
       return
     }
 
@@ -243,11 +287,11 @@ export default function RichTextEditor({
     const validFiles: File[] = []
     for (const file of fileArray) {
       if (file.size > maxSize) {
-        alert(`文件 ${file.name} 超过 5MB 限制`)
+        alert(`文件 ${file.name} 超过 5MB 限制`, 'destructive')
         continue
       }
       if (!file.type.startsWith('image/')) {
-        alert(`文件 ${file.name} 不是图片格式`)
+        alert(`文件 ${file.name} 不是图片格式`, 'destructive')
         continue
       }
       validFiles.push(file)
@@ -267,11 +311,11 @@ export default function RichTextEditor({
       setUploadingFiles([])
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '上传失败'
-      alert(`上传失败: ${errorMessage}`)
+      alert(`上传失败: ${errorMessage}`, 'destructive')
     } finally {
       setUploading(false)
     }
-  }, [uploadImage, insertImage])
+  }, [uploadImage, insertImage, alert])
 
   // 处理文件输入变化
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -705,6 +749,50 @@ export default function RichTextEditor({
           text-align: right;
         }
       `}</style>
+
+      {/* 输入对话框 */}
+      <Dialog open={showInputDialog} onOpenChange={(open) => {
+        if (!open) {
+          handleInputDialogCancel()
+        }
+      }}>
+        <DialogContent className='bg-white rounded-lg p-3 lg:p-4'>
+          <DialogHeader>
+            <DialogTitle>{inputDialogTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <input
+              type="text"
+              value={inputDialogValue}
+              onChange={(e) => setInputDialogValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleInputDialogConfirm()
+                } else if (e.key === 'Escape') {
+                  handleInputDialogCancel()
+                }
+              }}
+              className="w-full px-3 py-2 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#C82E31] focus:border-transparent"
+              autoFocus
+              placeholder={inputDialogTitle}
+            />
+          </div>
+          <DialogFooter>
+            <button
+              onClick={handleInputDialogCancel}
+              className="px-4 py-2 text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-md hover:bg-stone-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleInputDialogConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#C82E31] rounded-md hover:bg-[#a61b1f] transition-colors"
+            >
+              确定
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

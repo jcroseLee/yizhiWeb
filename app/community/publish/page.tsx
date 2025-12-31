@@ -1,41 +1,41 @@
 'use client'
 
 import RichTextEditor from '@/lib/components/RichTextEditor'
+import TagPanel from '@/lib/components/TagPanel'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/lib/components/ui/card'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/lib/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
-import { getCurrentUser, getSession } from '@/lib/services/auth'
-import { createCustomTag, createPost, getPost, getPostTags, getTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, uploadPostCover, type DivinationMethodType, type Tag } from '@/lib/services/community'
+import { getCurrentUser } from '@/lib/services/auth'
+import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, uploadPostCover, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord as ProfileDivinationRecord } from '@/lib/services/profile'
 import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    CircleDashed,
-    Coins,
-    FileText,
-    History,
-    Image as ImageIcon,
-    LayoutGrid,
-    Loader2,
-    PenTool,
-    Save,
-    ScrollText,
-    Send,
-    Sparkles,
-    X
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  CircleDashed,
+  Coins,
+  FileText,
+  History,
+  Image as ImageIcon,
+  LayoutGrid,
+  Loader2,
+  PenTool,
+  Save,
+  ScrollText,
+  Send,
+  Sparkles,
+  X
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -159,14 +159,6 @@ const convertRecordToDisplay = (record: DivinationRecordLite): RecordDisplay => 
   }
 }
 
-const METHOD_OPTIONS: Array<{ value: DivinationMethodType; label: string }> = [
-  { value: 'liuyao', label: '六爻' },
-  { value: 'bazi', label: '八字' },
-  { value: 'qimen', label: '奇门' },
-  { value: 'meihua', label: '梅花' },
-  { value: 'ziwei', label: '紫微' },
-  { value: 'general', label: '通用/易理' },
-]
 
 // -----------------------------------------------------------------------------
 // 子组件：排盘卡片
@@ -219,14 +211,7 @@ function PublishPageContent() {
   const [title, setTitle] = useState('')
   const [bounty, setBounty] = useState(0)
   const [method, setMethod] = useState<DivinationMethodType>('liuyao')
-  const [availableSubjects, setAvailableSubjects] = useState<Tag[]>([])
-  const [availableTechniques, setAvailableTechniques] = useState<Tag[]>([])
-  const [availableCustom, setAvailableCustom] = useState<Tag[]>([])
   const [selectedTags, setSelectedTags] = useState<Tag[]>([])
-  const [loadingTags, setLoadingTags] = useState(false)
-  const [isSuggestingTags, setIsSuggestingTags] = useState(false)
-  const [customTagName, setCustomTagName] = useState('')
-  const [creatingCustomTag, setCreatingCustomTag] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<RecordDisplay | null>(null)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [backgroundDesc, setBackgroundDesc] = useState('')
@@ -240,246 +225,6 @@ function PublishPageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectedSubjectTags = selectedTags.filter((t) => t.category === 'subject')
-  const selectedTechniqueTags = selectedTags.filter((t) => t.category === 'technique')
-  const selectedCustomTags = selectedTags.filter((t) => t.category === 'custom')
-
-  const toggleTag = (tag: Tag) => {
-    setSelectedTags((prev) => {
-      const exists = prev.some((t) => t.id === tag.id)
-      if (exists) return prev.filter((t) => t.id !== tag.id)
-      return [...prev, tag]
-    })
-  }
-
-  const handleSuggestTags = async () => {
-    try {
-      setIsSuggestingTags(true)
-      const session = await getSession()
-      const res = await fetch('/api/ai/tag-suggest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          content: backgroundDesc.trim(),
-          method,
-        }),
-      })
-
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        throw new Error(data?.error || 'AI 推荐失败')
-      }
-
-      const names: string[] = Array.isArray(data?.tags) ? data.tags : []
-      const pool = [...availableSubjects, ...availableTechniques]
-      const matched: Tag[] = []
-      for (const name of names) {
-        const found = pool.find((t) => t.name === name)
-        if (found) matched.push(found)
-      }
-      const unique = Array.from(new Map(matched.map((t) => [t.id, t])).values())
-      setSelectedTags(unique)
-    } catch (error) {
-      toast({ title: 'AI 推荐失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
-    } finally {
-      setIsSuggestingTags(false)
-    }
-  }
-
-  const handleCreateCustomTag = async () => {
-    const name = customTagName.trim()
-    if (!name) return
-    try {
-      setCreatingCustomTag(true)
-      const scope = method === 'general' ? null : method
-      const created = await createCustomTag({ name, scope })
-      setCustomTagName('')
-      setAvailableCustom((prev) => {
-        if (prev.some((t) => t.id === created.id)) return prev
-        return [created, ...prev]
-      })
-      setSelectedTags((prev) => {
-        if (prev.some((t) => t.id === created.id)) return prev
-        return [...prev, created]
-      })
-    } catch (error) {
-      toast({ title: '创建失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
-    } finally {
-      setCreatingCustomTag(false)
-    }
-  }
-
-  const renderTagPanel = (props: { methodLocked?: boolean }) => {
-    const methodLocked = !!props.methodLocked
-    const methodLabel = METHOD_OPTIONS.find((x) => x.value === method)?.label || method
-
-    return (
-      <div className="space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-bold text-stone-700">门派</Label>
-            <Select value={method} onValueChange={(v: string) => setMethod(v as DivinationMethodType)} disabled={methodLocked}>
-              <SelectTrigger className="w-[160px] bg-white">
-                <SelectValue placeholder="选择门派" />
-              </SelectTrigger>
-              <SelectContent>
-                {METHOD_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={loadingTags || isSuggestingTags || !title.trim() || !backgroundDesc.trim()}
-            onClick={handleSuggestTags}
-            className="h-9"
-          >
-            {isSuggestingTags ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            AI 推荐标签
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-bold text-stone-700">求测事类</Label>
-            {selectedSubjectTags.length === 0 ? (
-              <span className="text-xs text-red-400 bg-red-50 px-2 py-0.5 rounded-full">必选</span>
-            ) : (
-              <span className="text-xs text-stone-400">{selectedSubjectTags.length} 个</span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {availableSubjects.map((t) => {
-              const active = selectedTags.some((x) => x.id === t.id)
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => toggleTag(t)}
-                  className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
-                    active
-                      ? 'bg-[#C82E31]/10 border-[#C82E31]/30 text-[#C82E31]'
-                      : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 hover:border-stone-300'
-                  }`}
-                >
-                  {t.name}
-                </button>
-              )
-            })}
-            {loadingTags && <span className="text-xs text-stone-400">加载中…</span>}
-            {!loadingTags && availableSubjects.length === 0 && (
-               <span className="text-xs text-stone-400">暂无可选标签</span>
-            )}
-          </div>
-        </div>
-
-        {method !== 'general' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-bold text-stone-700">{methodLabel}技法断语</Label>
-              <span className="text-xs text-stone-400">{selectedTechniqueTags.length} 个</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {availableTechniques.map((t) => {
-                const active = selectedTags.some((x) => x.id === t.id)
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleTag(t)}
-                    className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
-                      active
-                        ? 'bg-[#C82E31]/10 border-[#C82E31]/30 text-[#C82E31]'
-                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-white hover:border-[#C82E31]/40 hover:text-[#C82E31]'
-                    }`}
-                  >
-                    {t.name}
-                  </button>
-                )
-              })}
-              {availableTechniques.length === 0 && !loadingTags && (
-                <span className="text-xs text-stone-400">暂无可选技法标签</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-bold text-stone-700">自定义标签</Label>
-            <span className="text-xs text-stone-400">{selectedCustomTags.length} 个</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Input
-              value={customTagName}
-              onChange={(e) => setCustomTagName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleCreateCustomTag()
-                }
-              }}
-              placeholder="输入后回车添加"
-              className="h-9"
-            />
-            <Button type="button" variant="outline" size="sm" disabled={creatingCustomTag || !customTagName.trim()} onClick={handleCreateCustomTag}>
-              {creatingCustomTag ? <Loader2 className="h-4 w-4 animate-spin" /> : '添加'}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {availableCustom.map((t) => {
-              const active = selectedTags.some((x) => x.id === t.id)
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => toggleTag(t)}
-                  className={`text-xs px-2.5 py-1 rounded-md border transition-all ${
-                    active
-                      ? 'bg-[#C82E31]/10 border-[#C82E31]/30 text-[#C82E31]'
-                      : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 hover:border-stone-300'
-                  }`}
-                >
-                  {t.name}
-                </button>
-              )
-            })}
-            {availableCustom.length === 0 && (
-              <span className="text-xs text-stone-400">暂无</span>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-sm font-bold text-stone-700">已选标签</Label>
-          <div className="flex flex-wrap gap-2">
-            {selectedTags.length === 0 ? (
-              <span className="text-xs text-stone-400">未选择</span>
-            ) : (
-              selectedTags.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => toggleTag(t)}
-                  className="text-xs px-2.5 py-1 rounded-md border bg-white border-stone-200 text-stone-700 hover:border-red-200 hover:text-red-600 transition-all"
-                >
-                  {t.name}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
   
   // URL sync
   useEffect(() => {
@@ -505,33 +250,6 @@ function PublishPageContent() {
     })
   }, [method])
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        setLoadingTags(true)
-        const [subjects, techniques, customCommon, customScoped] = await Promise.all([
-          getTags({ category: 'subject', scope: null, limit: 200 }),
-          method === 'general' ? Promise.resolve([] as Tag[]) : getTags({ category: 'technique', scope: method, limit: 200 }),
-          getTags({ category: 'custom', scope: null, limit: 200 }),
-          method === 'general' ? Promise.resolve([] as Tag[]) : getTags({ category: 'custom', scope: method, limit: 200 }),
-        ])
-        if (cancelled) return
-        setAvailableSubjects(subjects)
-        setAvailableTechniques(techniques)
-        setAvailableCustom(Array.from(new Map([...customScoped, ...customCommon].map((t) => [t.id, t])).values()))
-      } catch (error) {
-        if (cancelled) return
-        toast({ title: '加载标签失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
-      } finally {
-        if (!cancelled) setLoadingTags(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [method, toast])
 
   // Data Loading
   const loadHistoryRecords = useCallback(async () => {
@@ -614,9 +332,10 @@ function PublishPageContent() {
               const tags = await getPostTags(postIdParam)
               setSelectedTags(tags)
             } catch {}
-            const newSearchParams = new URLSearchParams(searchParams.toString())
-            newSearchParams.delete('id')
-            window.history.replaceState({}, '', `${window.location.pathname}?${newSearchParams.toString()}`)
+            // 保持URL中的ID，以便刷新页面后仍处于编辑模式
+            // const newSearchParams = new URLSearchParams(searchParams.toString())
+            // newSearchParams.delete('id')
+            // window.history.replaceState({}, '', `${window.location.pathname}?${newSearchParams.toString()}`)
           } else {
             toast({ title: '加载失败', description: '帖子不存在', variant: 'destructive' })
             router.push('/community')
@@ -671,6 +390,7 @@ function PublishPageContent() {
     if (!title.trim()) return toast({ title: '请输入标题', variant: 'destructive' })
     if (activeTab === 'divination' && !selectedRecord) return toast({ title: '请选择排盘记录', variant: 'destructive' })
     if (!backgroundDesc.trim()) return toast({ title: '请输入内容', variant: 'destructive' })
+    if (selectedTags.length === 0) return toast({ title: '请至少选择一个标签', variant: 'destructive' })
     if (selectedSubjectTags.length === 0) return toast({ title: '请选择求测事类标签', variant: 'destructive' })
     
     try {
@@ -806,7 +526,7 @@ function PublishPageContent() {
               <Button
                 className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-4 lg:px-6 h-8 lg:h-10 text-xs lg:text-sm shadow-md shadow-red-100 transition-all"
                 onClick={handlePublish}
-                disabled={isSubmitting || !title.trim() || (activeTab === "divination" && !selectedRecord)}
+                disabled={isSubmitting || !title.trim() || (activeTab === "divination" && !selectedRecord) || selectedTags.length === 0 || selectedSubjectTags.length === 0}
               >
                 {isSubmitting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin lg:mr-2" />
@@ -868,10 +588,6 @@ function PublishPageContent() {
                           className="input-clean text-xl lg:text-3xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight border-0 shadow-none px-0"
                         />
                         <div className="h-px w-full bg-stone-100"></div>
-                      </div>
-
-                      <div className="rounded-xl border border-stone-200 bg-white p-4 lg:p-5">
-                        {renderTagPanel({ methodLocked: true })}
                       </div>
                       
                       <div className="space-y-3">
@@ -970,6 +686,24 @@ function PublishPageContent() {
                           </div>
                         </div>
                       </div>
+
+                      {/* 标签面板 */}
+                      <div className="pt-4 border-t border-stone-100 shrink-0">
+                        <div className="bg-gradient-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
+                          <div className="bg-white/60 rounded-lg p-3 lg:p-4 backdrop-blur-sm">
+                            <TagPanel
+                              method={method}
+                              onMethodChange={setMethod}
+                              selectedTags={selectedTags}
+                              onTagsChange={setSelectedTags}
+                              methodLocked={true}
+                              title={title}
+                              backgroundDesc={backgroundDesc}
+                              required={true}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </TabsContent>
 
                     {/* Tab 2: 撰写文章 */}
@@ -1048,10 +782,6 @@ function PublishPageContent() {
                           placeholder="请输入文章标题"
                           className="input-clean text-2xl lg:text-4xl font-serif font-bold placeholder:text-stone-300 text-stone-900 leading-tight px-0 py-2 shrink-0"
                         />
-
-                        <div className="rounded-xl border border-stone-200 bg-white p-4 lg:p-5">
-                          {renderTagPanel({ methodLocked: false })}
-                        </div>
                       </div>
 
                       {/* 编辑器区域 */}
@@ -1062,6 +792,24 @@ function PublishPageContent() {
                           placeholder="开始撰写您的正文... 支持 Markdown 语法"
                           className="w-full h-auto border-none focus-within:ring-0 text-base lg:text-lg leading-relaxed text-stone-800 rich-text-content"
                         />
+                      </div>
+
+                      {/* 标签面板 */}
+                      <div className="px-4 lg:px-10 pt-4 pb-6 border-t border-stone-100 shrink-0">
+                        <div className="bg-gradient-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
+                          <div className="bg-white/60 rounded-lg p-3 lg:p-4 backdrop-blur-sm">
+                            <TagPanel
+                              method={method}
+                              onMethodChange={setMethod}
+                              selectedTags={selectedTags}
+                              onTagsChange={setSelectedTags}
+                              methodLocked={false}
+                              title={title}
+                              backgroundDesc={backgroundDesc}
+                              required={true}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </TabsContent>
                   </div>

@@ -428,11 +428,21 @@ function ProfilePageContent() {
                 </div>
                 {/* ... Post List (保持不变) ... */}
                 {(() => {
-                  const currentPosts = postTab === 'mine' ? userPosts : postTab === 'fav' ? favoritePosts : postTab === 'liked' ? likedPosts : draftPosts
+                  // 过滤逻辑：
+                  // 1. "我的发布" (mine)：显示 userPosts，但排除 draft 状态（draft 在草稿箱显示）
+                  // 2. "我的草稿" (draft)：显示 draftPosts
+                  const currentPosts = postTab === 'mine' 
+                    ? userPosts.filter(p => p.status !== 'draft') 
+                    : postTab === 'fav' 
+                      ? favoritePosts 
+                      : postTab === 'liked' 
+                        ? likedPosts 
+                        : draftPosts
+
                   const isEmpty = currentPosts.length === 0
                   if (loadingPosts && isEmpty) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#C82E31]" /></div>
                   if (isEmpty) return <div className="text-center py-16 bg-stone-50/50 rounded-xl border border-dashed border-stone-200"><p className="text-stone-400 text-sm">暂无内容</p></div>
-                  return <div className="space-y-4">{currentPosts.map(post => <div key={post.id} className="relative group"><PostCard post={{ id: post.id, type: (post.type || post.section || 'chat') as any, author: { name: post.author?.nickname || profile.nickname || '未知', avatar: post.author?.avatar_url || '', level: 1 }, title: post.title, excerpt: extractTextFromHTML(post.content, 80), tags: [], stats: { likes: post.like_count, comments: post.comment_count, views: post.view_count }, time: new Date(post.created_at).toLocaleDateString(), hasGua: !!post.divination_record, isLiked: post.is_liked }} />{(postTab === 'mine' || postTab === 'draft') && <div className="absolute top-4 right-4 flex gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity z-20"><Button variant="secondary" size="icon" className="h-8 w-8 bg-white shadow-sm hover:text-blue-600" onClick={() => handleEditPost(post.id)}><Edit2 className="w-3.5 h-3.5" /></Button><Button variant="secondary" size="icon" className="h-8 w-8 bg-white shadow-sm hover:text-red-600" onClick={() => handleDeletePostClick(post.id)}><Trash2 className="w-3.5 h-3.5" /></Button></div>}</div>)}</div>
+                  return <div className="space-y-4">{currentPosts.map(post => <div key={post.id} className="relative group"><PostCard showStatus={true} post={{ id: post.id, type: (post.type || post.section || 'chat') as any, author: { name: post.author?.nickname || profile.nickname || '未知', avatar: post.author?.avatar_url || '', level: 1 }, title: post.title, excerpt: extractTextFromHTML(post.content, 80), tags: [], stats: { likes: post.like_count, comments: post.comment_count, views: post.view_count }, time: new Date(post.created_at).toLocaleDateString(), hasGua: !!post.divination_record, isLiked: post.is_liked, status: post.status }} />{(postTab === 'mine' || postTab === 'draft') && <div className="absolute top-4 right-4 flex gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity z-20"><Button variant="secondary" size="icon" className="h-8 w-8 bg-white shadow-sm hover:text-blue-600" onClick={() => handleEditPost(post.id)}><Edit2 className="w-3.5 h-3.5" /></Button><Button variant="secondary" size="icon" className="h-8 w-8 bg-white shadow-sm hover:text-red-600" onClick={() => handleDeletePostClick(post.id)}><Trash2 className="w-3.5 h-3.5" /></Button></div>}</div>)}</div>
                 })()}
               </TabsContent>
 

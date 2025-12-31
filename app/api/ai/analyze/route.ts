@@ -74,14 +74,13 @@ export async function POST(req: Request) {
   let requestId: string | null = null;
   let isReplay = false;
 
-  // In development, we skip payment to allow easier testing
-  if (process.env.NODE_ENV === 'development') {
-      console.log('Dev mode detected: Skipping payment deduction logic.');
-  } else if (user && !skipPayment && supabase) {
+  const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
+
+  if (!skipAiPayment && user && !skipPayment && supabase) {
     const COST = 50;
     // 使用 RPC 进行幂等扣费
     const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`; // Fallback key
-    
+
     const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
          p_user_id: user.id,
          p_amount: COST,
@@ -103,6 +102,31 @@ export async function POST(req: Request) {
 
     requestId = transactionResult.request_id;
     isReplay = transactionResult.is_replay;
+    
+    if (isReplay) {
+        // 如果是重放请求，尝试获取已有的结果
+        if (requestId && supabase) {
+            const { data: existingRequest } = await supabase
+                .from('ai_analysis_requests')
+                .select('result_payload, status')
+                .eq('id', requestId)
+                .single();
+            
+            // 如果已经有结果，直接返回缓存的结果
+            if (existingRequest?.result_payload?.content) {
+                return new Response(existingRequest.result_payload.content, {
+                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                });
+            }
+            
+            // 如果还在处理中，或者没有结果，阻止重复调用 AI
+            if (existingRequest?.status === 'processing') {
+                 return new Response(JSON.stringify({ error: 'AI 正在分析中，请稍候...' }), { status: 429 });
+            } else {
+                 return new Response(JSON.stringify({ error: '请求已提交，请查看历史记录或稍后重试' }), { status: 409 });
+            }
+        }
+    }
   }
 
   // 4. 执行 AI 分析
@@ -126,11 +150,16 @@ export async function POST(req: Request) {
         { role: 'user', content: promptContext }
       ],
       temperature: 0.3,
-      onFinish: async () => {
-        if (requestId && supabase) {
-            await supabase.rpc('complete_ai_analysis', { p_request_id: requestId });
-        }
-      }
+       onFinish: async ({ text }) => {
+         if (requestId && supabase) {
+             // 保存结果并标记完成
+             await supabase.from('ai_analysis_requests').update({
+                 status: 'completed',
+                 result_payload: { content: text },
+                 updated_at: new Date().toISOString()
+             }).eq('id', requestId);
+         }
+       }
     });
 
     console.log('StreamText Result Keys:', Object.keys(result));

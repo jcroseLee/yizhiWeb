@@ -4,6 +4,7 @@ import { Button } from '@/lib/components/ui/button'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
 import { getCurrentUser } from '@/lib/services/auth'
+import { syncProfileFromAuthUser } from '@/lib/services/profile'
 import { createClient } from '@/lib/supabase/client'
 import { Github } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -97,20 +98,10 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         if (data.session) {
           // 如果有 session，说明邮箱验证已禁用，直接创建 profile
           try {
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .upsert({
-                id: data.user.id,
-                nickname: email.split('@')[0],
-                role: 'user',
-              }, {
-                onConflict: 'id',
-              })
-
-            if (profileError) {
-              console.warn('Failed to create profile:', profileError)
-              // 不阻止注册流程，因为触发器应该已经创建了
-            }
+            await syncProfileFromAuthUser(
+              { user: data.user, defaultNickname: email.split('@')[0], role: 'user' },
+              supabase
+            )
           } catch (err) {
             console.warn('Error creating profile:', err)
             // 不阻止注册流程
@@ -380,4 +371,3 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     </>
   )
 }
-

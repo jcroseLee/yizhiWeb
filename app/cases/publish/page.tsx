@@ -1,29 +1,30 @@
 'use client'
 
 import RichTextEditor from '@/lib/components/RichTextEditor'
+import TagPanel from '@/lib/components/TagPanel'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Input } from '@/lib/components/ui/input'
 import {
-    Sheet,
-    SheetContent,
-    SheetTitle
+  Sheet,
+  SheetContent,
+  SheetTitle
 } from "@/lib/components/ui/sheet"
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
-import { createPost, getPost, publishDraft, saveDraft, updateDraft, updatePost } from '@/lib/services/community'
+import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord } from '@/lib/services/profile'
 import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    Loader2,
-    Plus,
-    Save,
-    ScrollText,
-    Send,
-    X
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Save,
+  ScrollText,
+  Send,
+  X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -245,12 +246,16 @@ function PublishCasePageContent() {
   const [selectedRecord, setSelectedRecord] = useState<RecordDisplay | null>(null)
   const [backgroundDesc, setBackgroundDesc] = useState('')
   const [reasoning, setReasoning] = useState('')
+  const [method, setMethod] = useState<DivinationMethodType>('liuyao')
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isDraft, setIsDraft] = useState(false)
   const [historyRecords, setHistoryRecords] = useState<RecordDisplay[]>([])
   const [loadingRecords, setLoadingRecords] = useState(false)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+
+  const selectedSubjectTags = selectedTags.filter((t) => t.category === 'subject')
   
   // Data Loading
   const loadHistoryRecords = useCallback(async () => {
@@ -268,6 +273,19 @@ function PublishCasePageContent() {
   }, [toast])
   
   useEffect(() => {
+    setSelectedTags((prev) => {
+      if (method === 'general') {
+        return prev.filter((t) => t.category !== 'technique' && (t.category !== 'custom' || t.scope === null))
+      }
+      return prev.filter((t) => {
+        if (t.category === 'technique') return t.scope === method
+        if (t.category === 'custom') return t.scope === null || t.scope === method
+        return true
+      })
+    })
+  }, [method])
+
+  useEffect(() => {
     const loadData = async () => {
       const user = await getCurrentUser()
       if (!user) {
@@ -282,6 +300,7 @@ function PublishCasePageContent() {
           if (record) {
             const displayRecord = convertRecordToDisplay(record)
             setSelectedRecord(displayRecord)
+            setMethod('liuyao')
             if (record.question) setTitle(record.question)
             const newSearchParams = new URLSearchParams(searchParams.toString())
             newSearchParams.delete('recordId')
@@ -304,6 +323,12 @@ function PublishCasePageContent() {
             }
             setTitle(post.title)
             setIsDraft(post.status === 'draft')
+            setMethod((post.method as DivinationMethodType) || 'liuyao')
+            
+            try {
+              const tags = await getPostTags(postIdParam)
+              setSelectedTags(tags)
+            } catch {}
             
             if (post.divination_record) {
               // @ts-expect-error - 忽略类型差异
@@ -351,6 +376,8 @@ function PublishCasePageContent() {
     if (!title.trim()) return toast({ title: '请输入标题', variant: 'destructive' })
     if (!selectedRecord) return toast({ title: '请选择排盘记录', variant: 'destructive' })
     if (!backgroundDesc.trim()) return toast({ title: '请输入案例描述', variant: 'destructive' })
+    if (selectedTags.length === 0) return toast({ title: '请至少选择一个标签', variant: 'destructive' })
+    if (selectedSubjectTags.length === 0) return toast({ title: '请选择求测事类标签', variant: 'destructive' })
     
     try {
       setIsSubmitting(true)
@@ -372,23 +399,32 @@ function PublishCasePageContent() {
         content: content.trim(),
         type: 'help' as const, // 使用 'help' 类型，因为它支持关联排盘
         divination_record_id: selectedRecord.record.id,
+        method,
       }
       
+      let targetPostId: string | null = null
       if (isEditMode && editingPostId) {
+        targetPostId = editingPostId
         if (isDraft) {
           await publishDraft(editingPostId)
           await updatePost(editingPostId, postData)
+          await setPostTags(editingPostId, selectedTags.map((t) => t.id))
           toast({ title: '发布成功' })
         } else {
           await updatePost(editingPostId, postData)
+          await setPostTags(editingPostId, selectedTags.map((t) => t.id))
           toast({ title: '更新成功' })
         }
       } else {
-        await createPost(postData)
+        const created = await createPost(postData)
+        targetPostId = created?.id || null
+        if (targetPostId) {
+          await setPostTags(targetPostId, selectedTags.map((t) => t.id))
+        }
         toast({ title: '发布成功' })
       }
-      // TODO: 跳转到案例详情页，目前先跳转到案例列表
-      router.push(`/cases`)
+      if (targetPostId) router.push(`/community/${targetPostId}`)
+      else router.push('/community')
     } catch (error) {
       toast({ title: isEditMode ? '更新失败' : '发布失败', description: error instanceof Error ? error.message : '未知错误', variant: 'destructive' })
     } finally {
@@ -421,14 +457,19 @@ function PublishCasePageContent() {
         content: content.trim() || '',
         type: 'help' as const,
         divination_record_id: selectedRecord ? selectedRecord.record.id : null,
+        method,
       }
       
       let draft
       if (isEditMode && editingPostId && isDraft) {
         draft = await updateDraft(editingPostId, draftData)
+        await setPostTags(editingPostId, selectedTags.map((t) => t.id))
         toast({ title: '草稿已更新' })
       } else {
         draft = await saveDraft(draftData)
+        if (draft.id) {
+          await setPostTags(draft.id, selectedTags.map((t) => t.id))
+        }
         toast({ title: '草稿已保存' })
         setIsEditMode(true)
         setEditingPostId(draft.id)
@@ -484,7 +525,7 @@ function PublishCasePageContent() {
               <Button
                 className="bg-[#C82E31] hover:bg-[#b02225] text-white rounded-full px-4 lg:px-6 h-8 lg:h-10 text-xs lg:text-sm shadow-md shadow-red-100 transition-all"
                 onClick={handlePublish}
-                disabled={isSubmitting || !title.trim() || !selectedRecord}
+                disabled={isSubmitting || !title.trim() || !selectedRecord || selectedTags.length === 0 || selectedSubjectTags.length === 0}
               >
                 {isSubmitting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin lg:mr-2" />
@@ -586,6 +627,28 @@ function PublishCasePageContent() {
                       onChange={setReasoning}
                       placeholder="请详细描述断语分析、反馈结果..."
                     />
+                  </div>
+
+                  {/* 标签面板 */}
+                  <div className="px-4 lg:px-8 pt-8 pb-6 border-t border-stone-100 shrink-0">
+                    <h3 className="text-sm font-bold text-stone-500 mb-2 uppercase tracking-wider flex items-center gap-2">
+                      <div className="w-1 h-3 bg-stone-300 rounded-full"></div>
+                      标签
+                    </h3>
+                    <div className="bg-linear-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
+                      <div className="bg-white/60 rounded-lg p-3 lg:p-4 backdrop-blur-sm">
+                        <TagPanel
+                          method={method}
+                          onMethodChange={setMethod}
+                          selectedTags={selectedTags}
+                          onTagsChange={setSelectedTags}
+                          methodLocked={false}
+                          title={title}
+                          backgroundDesc={backgroundDesc}
+                          required={true}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                 </CardContent>

@@ -4,10 +4,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from '@/lib/components/ui/dropdown-menu'
 import { Input } from '@/lib/components/ui/input'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
@@ -16,39 +16,39 @@ import { Textarea } from '@/lib/components/ui/textarea'
 import { getCurrentUser } from '@/lib/services/auth'
 import { getPost, type Comment as CommentType, type Post } from '@/lib/services/community'
 import {
-  getConversations,
-  getMessages,
-  markMessagesAsRead,
-  sendMessage,
-  setConversationSetting,
-  subscribeToConversations,
-  subscribeToMessages,
-  type Conversation as ConversationType,
-  type Message as MessageType
+    getConversations,
+    getMessages,
+    markMessagesAsRead,
+    sendMessage,
+    setConversationSetting,
+    subscribeToConversations,
+    subscribeToMessages,
+    type Conversation as ConversationType,
+    type Message as MessageType
 } from '@/lib/services/messages'
 import {
-  getNotifications,
-  markNotificationAsRead,
-  subscribeToNotifications,
-  type Notification as NotificationType
+    getNotifications,
+    markNotificationAsRead,
+    subscribeToNotifications,
+    type Notification as NotificationType
 } from '@/lib/services/notifications'
 import { getUserProfileById } from '@/lib/services/profile'
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
 import {
-  Bell,
-  CheckCheck,
-  Heart,
-  Image as ImageIcon,
-  MoreHorizontal,
-  Paperclip,
-  Pin,
-  PinOff,
-  Search,
-  Smile,
-  ThumbsUp,
-  User,
-  Volume2,
-  VolumeX,
+    Bell,
+    CheckCheck,
+    Heart,
+    Image as ImageIcon,
+    MoreHorizontal,
+    Paperclip,
+    Pin,
+    PinOff,
+    Search,
+    Smile,
+    ThumbsUp,
+    User,
+    Volume2,
+    VolumeX,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -212,6 +212,8 @@ function MessagesPageContent() {
   const [unreadSocialCount, setUnreadSocialCount] = useState(0)
   const [unreadSystemCount, setUnreadSystemCount] = useState(0)
   const [targetUserProfile, setTargetUserProfile] = useState<{ id: string; nickname: string | null; avatar_url: string | null } | null>(null)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [notificationsLoaded, setNotificationsLoaded] = useState(false)
   
   const [postInfoMap, setPostInfoMap] = useState<Map<string, Post>>(new Map())
   const [commentInfoMap, setCommentInfoMap] = useState<Map<string, CommentType>>(new Map())
@@ -224,6 +226,12 @@ function MessagesPageContent() {
 
   // --- 初始化与数据加载 ---
   useEffect(() => { getCurrentUser().then(setUser) }, [])
+
+  // 同步 ref 和状态
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId
+    activeChatTypeRef.current = activeChatType
+  }, [activeChatId, activeChatType])
 
   const loadConversations = useCallback(async () => {
     try {
@@ -243,16 +251,26 @@ function MessagesPageContent() {
   }, [loadConversations])
 
   const loadNotifications = useCallback(async () => {
+    if (!user) return
+    
+    // 避免重复加载
+    if (notificationsLoading) return
+    
+    setNotificationsLoading(true)
     try {
-      const allNotifs = await getNotifications(100, 0, false)
-      const social = allNotifs.filter(n => ['like', 'comment', 'reply', 'follow'].includes(n.type))
-      // 系统通知包括: system, report_resolved, report_rejected
-      const system = allNotifs.filter(n => ['system', 'report_resolved', 'report_rejected'].includes(n.type))
+      const socialTypes = ['like', 'comment', 'reply', 'follow']
+      const systemTypes = ['system', 'report_resolved', 'report_rejected']
+
+      const [social, system] = await Promise.all([
+        getNotifications(100, 0, false, socialTypes),
+        getNotifications(100, 0, false, systemTypes)
+      ])
       
       setSocialNotifications(social)
       setSystemNotifications(system)
       setUnreadSocialCount(social.filter(n => !n.is_read).length)
       setUnreadSystemCount(system.filter(n => !n.is_read).length)
+      setNotificationsLoaded(true)
       
       // 批量加载关联数据
       const postIds = new Set<string>()
@@ -305,34 +323,63 @@ function MessagesPageContent() {
               return next
             })
             // 补充加载评论关联的帖子
-            const newPostIds = comments.map(c => c.post_id).filter(id => !postInfoMap.has(id))
-            if (newPostIds.length > 0) {
-              const newPosts = await Promise.all(
+            setPostInfoMap(prev => {
+              const newPostIds = comments.map(c => c.post_id).filter(id => !prev.has(id))
+              if (newPostIds.length === 0) return prev
+              
+              // 异步加载新帖子，但不阻塞当前函数
+              Promise.all(
                 newPostIds.map(async (id) => {
                   try {
                     return await getPost(id)
                   } catch {
-                    // 静默处理错误，可能是帖子不存在或已被删除
                     console.debug(`Failed to load post ${id}`)
                     return null
                   }
                 })
-              )
-              setPostInfoMap(prev => {
-                const next = new Map(prev)
-                newPosts.forEach(p => {
-                  if (p) {
-                    next.set(p.id, p)
-                  }
+              ).then(newPosts => {
+                setPostInfoMap(current => {
+                  const updated = new Map(current)
+                  newPosts.forEach(p => {
+                    if (p) {
+                      updated.set(p.id, p)
+                    }
+                  })
+                  return updated
                 })
-                return next
+              }).catch(err => {
+                console.error('Failed to load comment-related posts:', err)
               })
-            }
+              
+              return prev
+            })
           }
         }
       }
-    } catch (error) { console.error(error) }
-  }, [postInfoMap])
+    } catch (error: any) { 
+      console.error('Failed to load notifications:', error)
+      
+      // 只有在认证错误或明确的数据不存在时才清空数据
+      // 对于网络错误或其他临时错误，保留之前的数据
+      const errorMessage = error?.message || ''
+      const isAuthError = errorMessage.includes('登录') || 
+                         errorMessage.includes('未登录') || 
+                         errorMessage.includes('unauthorized') ||
+                         errorMessage.includes('permission denied')
+      
+      // 如果是认证错误，清空数据（因为用户可能已登出）
+      if (isAuthError) {
+        setSocialNotifications([])
+        setSystemNotifications([])
+        setUnreadSocialCount(0)
+        setUnreadSystemCount(0)
+      }
+      // 对于其他错误（网络错误、超时等），保留之前的数据，不进行清空
+      // 这样即使加载失败，用户仍能看到之前加载的数据
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }, [user, notificationsLoading])
 
   // --- 副作用 ---
   useEffect(() => {
@@ -344,13 +391,37 @@ function MessagesPageContent() {
     if (!user) return
     const subConvs = subscribeToConversations(loadConversations)
     const subNotifs = subscribeToNotifications((n) => {
-      if (!n) { loadNotifications(); return }
+      if (!n) { 
+        // 通知被更新（如标记为已读），重新加载以同步状态
+        loadNotifications()
+        return 
+      }
       // 举报处理通知也归类为系统通知
       if (n.type === 'system' || n.type === 'report_resolved' || n.type === 'report_rejected') {
-        setSystemNotifications(prev => [n, ...prev])
+        setSystemNotifications(prev => {
+          // 检查是否已存在，避免重复添加
+          if (prev.some(notif => notif.id === n.id)) {
+            // 如果已存在，更新它
+            return prev.map(notif => notif.id === n.id ? n : notif)
+          }
+          // 按时间排序插入
+          return [n, ...prev].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        })
         if (!n.is_read) setUnreadSystemCount(c => c + 1)
       } else {
-        setSocialNotifications(prev => [n, ...prev])
+        setSocialNotifications(prev => {
+          // 检查是否已存在，避免重复添加
+          if (prev.some(notif => notif.id === n.id)) {
+            // 如果已存在，更新它
+            return prev.map(notif => notif.id === n.id ? n : notif)
+          }
+          // 按时间排序插入
+          return [n, ...prev].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        })
         if (!n.is_read) setUnreadSocialCount(c => c + 1)
       }
     })
@@ -406,8 +477,15 @@ function MessagesPageContent() {
     setActiveChatId(conversation.other_user_id)
     setActiveChatType(type)
     setTargetUserProfile(null)
-    if (type === 'private' && conversation.other_user_id) loadMessages(conversation.other_user_id)
-    else if (type === 'social') loadNotifications()
+    if (type === 'private' && conversation.other_user_id) {
+      loadMessages(conversation.other_user_id)
+    } else if (type === 'social' || type === 'system') {
+      // 切换到互动通知或系统通知时，如果数据未加载或为空，重新加载通知数据
+      const targetNotifications = type === 'social' ? socialNotifications : systemNotifications
+      if (!notificationsLoaded || targetNotifications.length === 0) {
+        loadNotifications()
+      }
+    }
   }
 
   const handleSendMessage = async () => {
@@ -660,14 +738,28 @@ function MessagesPageContent() {
             <ScrollArea className="flex-1">
               <div className="flex flex-col">
                 {/* 静态入口 */}
-                <div onClick={() => { setActiveChatId('social'); setActiveChatType('social'); loadNotifications() }} className={`flex items-center gap-3 p-3.5 mx-2 my-1 rounded-lg cursor-pointer transition-colors ${activeChatId === 'social' ? 'bg-[#C6C6C6]' : 'hover:bg-[#EAEAEA]'}`}>
+                <div onClick={() => { 
+                  setActiveChatId('social'); 
+                  setActiveChatType('social'); 
+                  // 如果数据未加载或为空，重新加载
+                  if (!notificationsLoaded || socialNotifications.length === 0) {
+                    loadNotifications()
+                  }
+                }} className={`flex items-center gap-3 p-3.5 mx-2 my-1 rounded-lg cursor-pointer transition-colors ${activeChatId === 'social' ? 'bg-[#C6C6C6]' : 'hover:bg-[#EAEAEA]'}`}>
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white relative bg-linear-to-br from-amber-400 to-orange-500 shadow-sm">
                     <Heart size={20} fill="currentColor" />
                     {unreadSocialCount > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#FA5151] rounded-full text-[10px] flex items-center justify-center border border-[#F7F7F7]">{unreadSocialCount > 99 ? '99+' : unreadSocialCount}</span>}
                   </div>
                   <div className="flex-1"><span className="text-sm font-bold">互动通知</span><p className="text-xs text-stone-500 truncate">{unreadSocialCount > 0 ? `${unreadSocialCount}条未读` : '暂无新通知'}</p></div>
                 </div>
-                <div onClick={() => { setActiveChatId('system'); setActiveChatType('system'); loadNotifications() }} className={`flex items-center gap-3 p-3.5 mx-2 my-1 rounded-lg cursor-pointer transition-colors ${activeChatId === 'system' ? 'bg-[#C6C6C6]' : 'hover:bg-[#EAEAEA]'}`}>
+                <div onClick={() => { 
+                  setActiveChatId('system'); 
+                  setActiveChatType('system'); 
+                  // 如果数据未加载或为空，重新加载
+                  if (!notificationsLoaded || systemNotifications.length === 0) {
+                    loadNotifications()
+                  }
+                }} className={`flex items-center gap-3 p-3.5 mx-2 my-1 rounded-lg cursor-pointer transition-colors ${activeChatId === 'system' ? 'bg-[#C6C6C6]' : 'hover:bg-[#EAEAEA]'}`}>
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white relative bg-linear-to-br from-blue-400 to-indigo-500 shadow-sm">
                     <Bell size={20} />
                     {unreadSystemCount > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#FA5151] rounded-full text-[10px] flex items-center justify-center border border-[#F7F7F7]">{unreadSystemCount > 99 ? '99+' : unreadSystemCount}</span>}

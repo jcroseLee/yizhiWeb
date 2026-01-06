@@ -1142,7 +1142,7 @@ export async function togglePostLike(postId: string): Promise<boolean> {
       .eq('user_id', currentUser.id)
 
     if (error) {
-      console.error('Error unliking post:', error)
+      console.error('Error unliking post:', JSON.stringify(error, null, 2))
       throw error
     }
     return false
@@ -1156,7 +1156,11 @@ export async function togglePostLike(postId: string): Promise<boolean> {
       })
 
     if (error) {
-      console.error('Error liking post:', error)
+      // Handle race condition: if already liked (unique violation), consider it a success
+      if (error.code === '23505') {
+        return true
+      }
+      console.error('Error liking post:', JSON.stringify(error, null, 2))
       throw error
     }
 
@@ -1218,7 +1222,11 @@ export async function togglePostFavorite(postId: string): Promise<boolean> {
       })
 
     if (error) {
-      console.error('Error favoriting post:', error)
+      // Handle race condition: if already favorited (unique violation), consider it a success
+      if (error.code === '23505') {
+        return true
+      }
+      console.error('Error favoriting post:', JSON.stringify(error, null, 2))
       throw error
     }
 
@@ -1558,7 +1566,11 @@ export async function toggleCommentLike(commentId: string): Promise<boolean> {
       })
 
     if (error) {
-      console.error('Error liking comment:', error)
+      // Handle race condition: if already liked (unique violation), consider it a success
+      if (error.code === '23505') {
+        return true
+      }
+      console.error('Error liking comment:', JSON.stringify(error, null, 2))
       throw error
     }
 

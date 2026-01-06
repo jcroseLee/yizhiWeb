@@ -11,7 +11,7 @@ import {
     SortAsc
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
@@ -25,141 +25,28 @@ import {
     SelectValue,
 } from '@/lib/components/ui/select'
 import { Separator } from '@/lib/components/ui/separator'
+import { createClient } from '@/lib/supabase/client'
 
-// 模拟书籍数据
-const BOOKS = [
-  {
-    id: 1,
-    title: '增删卜易',
-    author: '野鹤老人',
-    dynasty: '清',
-    category: '六爻',
-    status: '精校版',
-    progress: 85,
-    color: 'bg-[#F0F0ED]',
-  },
-  {
-    id: 2,
-    title: '卜筮正宗',
-    author: '王洪绪',
-    dynasty: '清',
-    category: '六爻',
-    status: '全本',
-    progress: 12,
-    color: 'bg-[#EDEFEF]',
-  },
-  {
-    id: 3,
-    title: '三命通会',
-    author: '万民英',
-    dynasty: '明',
-    category: '四柱',
-    status: '精校版',
-    progress: 0,
-    color: 'bg-[#F2EFE9]',
-  },
-  {
-    id: 4,
-    title: '滴天髓',
-    author: '京图',
-    dynasty: '宋',
-    category: '四柱',
-    status: '全本',
-    progress: 0,
-    color: 'bg-[#F0F0ED]',
-  },
-  {
-    id: 5,
-    title: '穷通宝鉴',
-    author: '余春台',
-    dynasty: '清',
-    category: '四柱',
-    status: '残卷',
-    progress: 0,
-    color: 'bg-[#EBEBEB]',
-  },
-  {
-    id: 6,
-    title: '葬书',
-    author: '郭璞',
-    dynasty: '晋',
-    category: '风水',
-    status: '拓本',
-    progress: 45,
-    color: 'bg-[#EFEDEA]',
-  },
-  {
-    id: 7,
-    title: '撼龙经',
-    author: '杨筠松',
-    dynasty: '唐',
-    category: '风水',
-    status: '全本',
-    progress: 0,
-    color: 'bg-[#F0F0ED]',
-  },
-  {
-    id: 8,
-    title: '麻衣神相',
-    author: '麻衣道者',
-    dynasty: '宋',
-    category: '相术',
-    status: '图解',
-    progress: 0,
-    color: 'bg-[#EFEFEF]',
-  },
-  {
-    id: 9,
-    title: '渊海子平',
-    author: '徐子平',
-    dynasty: '宋',
-    category: '四柱',
-    status: '精校版',
-    progress: 5,
-    color: 'bg-[#F2EFE9]',
-  },
-  {
-    id: 10,
-    title: '千里命稿',
-    author: '韦千里',
-    dynasty: '民国',
-    category: '四柱',
-    status: '现代',
-    progress: 0,
-    color: 'bg-[#FFFFFF]',
-  },
-  {
-    id: 11,
-    title: '梅花易数',
-    author: '邵康节',
-    dynasty: '宋',
-    category: '推演',
-    status: '全本',
-    progress: 0,
-    color: 'bg-[#F0F0ED]',
-  },
-  {
-    id: 12,
-    title: '皇极经世',
-    author: '邵康节',
-    dynasty: '宋',
-    category: '理气',
-    status: '精校版',
-    progress: 0,
-    color: 'bg-[#EBEBEB]',
-  },
-]
+type LibraryBookRow = {
+  id: string
+  title: string
+  author: string | null
+  dynasty: string | null
+  category: string | null
+  status: string | null
+  cover_url: string | null
+}
 
-const CATEGORIES = [
-  { name: '全部藏书', count: 128 },
-  { name: '六爻预测', count: 24 },
-  { name: '四柱命理', count: 45 },
-  { name: '风水堪舆', count: 18 },
-  { name: '奇门遁甲', count: 12 },
-  { name: '梅花易数', count: 9 },
-  { name: '紫微斗数', count: 15 },
-  { name: '相术/面相', count: 5 },
-]
+type DisplayBook = {
+  id: string
+  title: string
+  author: string
+  dynasty: string
+  categoryLabel: string
+  statusLabel: string
+  progress: number
+  color: string
+}
 
 const DYNASTIES = ['先秦', '汉唐', '宋元', '明清', '民国', '现代']
 
@@ -167,10 +54,115 @@ export default function AllBooksPage() {
   const router = useRouter()
   const [activeCategory, setActiveCategory] = useState('全部藏书')
   const [searchQuery, setSearchQuery] = useState('')
+  const [books, setBooks] = useState<DisplayBook[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  const handleBookClick = (bookTitle: string) => {
-    router.push(`/library/reader/${encodeURIComponent(bookTitle)}`)
+  const normalizeCategory = (raw: string | null | undefined) => {
+    const v = (raw || '').trim()
+    if (!v) return '其他'
+    if (v.includes('六爻')) return '六爻预测'
+    if (v.includes('四柱') || v.includes('八字') || v.includes('命理')) return '四柱命理'
+    if (v.includes('风水') || v.includes('堪舆')) return '风水堪舆'
+    if (v.includes('奇门')) return '奇门遁甲'
+    if (v.includes('梅花')) return '梅花易数'
+    if (v.includes('紫微')) return '紫微斗数'
+    if (v.includes('相术') || v.includes('面相') || v.includes('相')) return '相术/面相'
+    if (v.includes('古籍')) return '其他'
+    return v
   }
+
+  const normalizeStatus = (raw: string | null | undefined) => {
+    const v = (raw || '').trim()
+    if (!v) return '未知'
+    if (v.includes('精校')) return '精校版'
+    if (v.includes('全')) return '全本'
+    if (v.includes('残')) return '残卷'
+    if (v.includes('拓')) return '拓本'
+    if (v.includes('图')) return '图解'
+    if (v.includes('采集')) return '采集导入'
+    return v
+  }
+
+  const categoryColor = (categoryLabel: string) => {
+    if (categoryLabel === '六爻预测') return 'bg-[#F0F0ED]'
+    if (categoryLabel === '四柱命理') return 'bg-[#F2EFE9]'
+    if (categoryLabel === '风水堪舆') return 'bg-[#EFEDEA]'
+    if (categoryLabel === '奇门遁甲') return 'bg-[#EDEFEF]'
+    if (categoryLabel === '梅花易数') return 'bg-[#F0F0ED]'
+    if (categoryLabel === '紫微斗数') return 'bg-[#EBEBEB]'
+    if (categoryLabel === '相术/面相') return 'bg-[#EFEFEF]'
+    return 'bg-[#FFFFFF]'
+  }
+
+  const categories = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of books) {
+      map.set(b.categoryLabel, (map.get(b.categoryLabel) || 0) + 1)
+    }
+    const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+    return [{ name: '全部藏书', count: books.length }, ...entries.map(([name, count]) => ({ name, count }))]
+  }, [books])
+
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient()
+      if (!supabase) {
+        setLoadError('Supabase 未配置')
+        return
+      }
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const { data, error } = await supabase
+          .from('library_books')
+          .select('id, title, author, dynasty, category, status, cover_url')
+          .order('created_at', { ascending: false })
+          .limit(500)
+
+        if (error) throw error
+
+        const rows = (data || []) as LibraryBookRow[]
+        setBooks(
+          rows.map((x) => {
+            const categoryLabel = normalizeCategory(x.category)
+            return {
+              id: x.id,
+              title: x.title,
+              author: (x.author || '佚名').trim(),
+              dynasty: (x.dynasty || '佚').trim(),
+              categoryLabel,
+              statusLabel: normalizeStatus(x.status),
+              progress: 0,
+              color: categoryColor(categoryLabel),
+            }
+          })
+        )
+      } catch (e: any) {
+        setLoadError(e?.message || '加载失败')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const handleBookClick = (bookId: string) => {
+    router.push(`/library/reader/${encodeURIComponent(bookId)}`)
+  }
+
+  const filteredBooks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return books.filter((b) => {
+      if (activeCategory !== '全部藏书' && b.categoryLabel !== activeCategory) return false
+      if (!q) return true
+      return (
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        b.dynasty.toLowerCase().includes(q)
+      )
+    })
+  }, [books, searchQuery, activeCategory])
 
   return (
     <div className="flex flex-col h-full bg-[#FAFAFA]">
@@ -189,7 +181,7 @@ export default function AllBooksPage() {
             <h1 className="text-2xl font-bold font-serif text-slate-900 flex items-center gap-2">
               馆藏目录
               <span className="text-sm font-sans font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                128 部
+                {books.length} 部
               </span>
             </h1>
           </div>
@@ -231,7 +223,7 @@ export default function AllBooksPage() {
                   学科分类
                 </h3>
                 <div className="space-y-1">
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <Button
                       key={cat.name}
                       variant={activeCategory === cat.name ? 'secondary' : 'ghost'}
@@ -292,7 +284,7 @@ export default function AllBooksPage() {
             <div className="p-8 pb-20">
               {/* 顶部标签栏 (Mobile Filter Placeholder) */}
               <div className="flex items-center gap-2 mb-6 lg:hidden overflow-x-auto pb-2">
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <Badge
                     key={cat.name}
                     variant={activeCategory === cat.name ? 'default' : 'secondary'}
@@ -305,12 +297,12 @@ export default function AllBooksPage() {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-8 gap-y-10">
-                {BOOKS.map((book) => (
+                {filteredBooks.map((book) => (
                   <div key={book.id} className="group relative flex flex-col items-center">
                     {/* 书籍拟物化主体 */}
                     <div
                       className="relative w-full aspect-[2/3] cursor-pointer transition-all duration-300 group-hover:-translate-y-2"
-                      onClick={() => handleBookClick(book.title)}
+                      onClick={() => handleBookClick(book.id)}
                     >
                       {/* 阴影层 - Hover时加深 */}
                       <div className="absolute top-2 left-2 w-full h-full bg-slate-200 rounded-sm -z-10 transition-all duration-300 group-hover:top-3 group-hover:left-3 group-hover:bg-slate-300" />
@@ -332,7 +324,7 @@ export default function AllBooksPage() {
                             variant="secondary"
                             className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none"
                           >
-                            {book.status}
+                            {book.statusLabel}
                           </Badge>
                         </div>
 
@@ -362,7 +354,7 @@ export default function AllBooksPage() {
                           className="bg-[#C82E31] text-white hover:bg-[#a61b1f] shadow-lg scale-90 group-hover:scale-100 transition-transform"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleBookClick(book.title)
+                            handleBookClick(book.id)
                           }}
                         >
                           立即阅读
@@ -424,6 +416,12 @@ export default function AllBooksPage() {
                   <span className="text-xs text-slate-400 mt-1">上传 PDF / 图片</span>
                 </div>
               </div>
+              {loading && (
+                <div className="mt-10 text-center text-sm text-slate-400">加载中...</div>
+              )}
+              {!loading && loadError && (
+                <div className="mt-10 text-center text-sm text-red-600">{loadError}</div>
+              )}
             </div>
           </ScrollArea>
         </div>

@@ -12,6 +12,7 @@ import {
   Sparkles,
   Tag,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 
@@ -246,8 +247,9 @@ export default function LibraryPage() {
                       variant="ghost"
                       size="sm"
                       className="text-xs text-stone-400 hover:text-[#C82E31]"
+                      asChild
                     >
-                      查看全部 →
+                      <Link href="/library/books">查看全部 →</Link>
                     </Button>
                   </div>
 

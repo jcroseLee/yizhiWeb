@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
 import { corsHeaders } from '@/lib/api/cors'
+import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
@@ -33,11 +33,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabaseAdmin
+    let profile: any = null
+    const { data: profileWithLevel, error: profileWithLevelError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, admin_level')
       .eq('id', user.id)
       .single()
+    if (profileWithLevelError && (profileWithLevelError.message?.includes('admin_level') || profileWithLevelError.message?.includes('does not exist'))) {
+      const { data: profileOnlyRole } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
+      profile = profileOnlyRole
+    } else {
+      profile = profileWithLevel
+    }
 
     if (!profile || profile.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, {
@@ -51,28 +58,42 @@ export async function GET(request: NextRequest) {
     let profiles: any[] = []
     let profilesError: any = null
 
-    const { data: profilesWithOpenid, error: errorWithOpenid } = await supabaseAdmin
+    const { data: profilesWithDetails, error: errorWithDetails } = await supabaseAdmin
       .from('profiles')
-      .select('id, nickname, avatar_url, role, wechat_openid, created_at')
+      .select('id, nickname, avatar_url, role, admin_level, is_verified, is_banned, banned_until, ban_reason, wechat_openid, created_at')
       .order('created_at', { ascending: false })
 
-    if (errorWithOpenid && (errorWithOpenid.message?.includes('wechat_openid') || errorWithOpenid.message?.includes('does not exist'))) {
-      // Column doesn't exist, select without it
-      console.log('wechat_openid column not found, selecting without it:', errorWithOpenid.message)
-      const { data: profilesWithoutOpenid, error: errorWithoutOpenid } = await supabaseAdmin
+    if (
+      errorWithDetails &&
+      (errorWithDetails.message?.includes('does not exist') ||
+        errorWithDetails.message?.includes('wechat_openid') ||
+        errorWithDetails.message?.includes('admin_level') ||
+        errorWithDetails.message?.includes('is_verified') ||
+        errorWithDetails.message?.includes('banned_until') ||
+        errorWithDetails.message?.includes('ban_reason'))
+    ) {
+      const { data: profilesFallback, error: errorFallback } = await supabaseAdmin
         .from('profiles')
         .select('id, nickname, avatar_url, role, created_at')
         .order('created_at', { ascending: false })
 
-      if (errorWithoutOpenid) {
-        profilesError = errorWithoutOpenid
+      if (errorFallback) {
+        profilesError = errorFallback
       } else {
-        profiles = (profilesWithoutOpenid || []).map((p: any) => ({ ...p, wechat_openid: null }))
+        profiles = (profilesFallback || []).map((p: any) => ({
+          ...p,
+          wechat_openid: null,
+          admin_level: null,
+          is_verified: false,
+          is_banned: false,
+          banned_until: null,
+          ban_reason: null,
+        }))
       }
-    } else if (errorWithOpenid) {
-      profilesError = errorWithOpenid
+    } else if (errorWithDetails) {
+      profilesError = errorWithDetails
     } else {
-      profiles = profilesWithOpenid || []
+      profiles = profilesWithDetails || []
     }
 
     if (profilesError) {
@@ -113,6 +134,11 @@ export async function GET(request: NextRequest) {
             nickname: profile.nickname,
             avatar_url: profile.avatar_url,
             role: profile.role || 'user',
+            admin_level: profile.admin_level || null,
+            is_verified: Boolean(profile.is_verified),
+            is_banned: Boolean(profile.is_banned),
+            banned_until: profile.banned_until || null,
+            ban_reason: profile.ban_reason || null,
             wechat_openid: profile.wechat_openid,
             login_type: loginType,
             created_at: profile.created_at,
@@ -126,6 +152,11 @@ export async function GET(request: NextRequest) {
             nickname: profile.nickname,
             avatar_url: profile.avatar_url,
             role: profile.role || 'user',
+            admin_level: profile.admin_level || null,
+            is_verified: Boolean(profile.is_verified),
+            is_banned: Boolean(profile.is_banned),
+            banned_until: profile.banned_until || null,
+            ban_reason: profile.ban_reason || null,
             wechat_openid: profile.wechat_openid,
             login_type: 'unknown',
             created_at: profile.created_at,
@@ -146,4 +177,3 @@ export async function GET(request: NextRequest) {
     })
   }
 }
-

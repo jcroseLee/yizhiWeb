@@ -10,6 +10,7 @@ import {
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import { Separator } from '@/lib/components/ui/separator'
 import { Slider } from '@/lib/components/ui/slider'
+import { createClient } from '@/lib/supabase/client'
 import {
   ArrowUpRight,
   Bookmark,
@@ -17,12 +18,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Highlighter,
+  Loader2,
   Menu,
   Search,
   Settings,
   Share2
 } from 'lucide-react'
-import { useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 
 // -----------------------------------------------------------------------------
 // 样式补丁：复用全局风格
@@ -46,18 +49,6 @@ const styles = `
     color: #1c1917;
   }
 `
-
-// -----------------------------------------------------------------------------
-// 模拟数据：书籍内容与关联案例
-// -----------------------------------------------------------------------------
-const BOOK_META = {
-  title: "增删卜易",
-  author: "野鹤老人",
-  currentChapter: "卷二 · 动变生克冲合",
-  chapters: [
-    "卷一 · 八卦章", "卷一 · 黄金策", "卷二 · 动变生克冲合", "卷二 · 旬空", "卷二 · 月破"
-  ]
-}
 
 const RELATED_CASES = [
   {
@@ -97,12 +88,438 @@ const CaseCard = ({ data }: { data: typeof RELATED_CASES[0] }) => (
   </div>
 )
 
+type LibraryBookRow = {
+  id: string
+  title: string
+  author: string | null
+  dynasty: string | null
+  category: string | null
+  status: string | null
+  cover_url: string | null
+  description: string | null
+  pdf_url?: string | null
+  source_type?: string | null
+  source_url?: string | null
+  source_payload?: unknown | null
+}
+
+type BookContentRow = {
+  id: string
+  volume_no: number | null
+  volume_title: string | null
+  chapter_no: number | null
+  chapter_title: string | null
+  content: string | null
+  sort_order: number | null
+}
+
+type SlicePage = {
+  no: number
+  url: string
+  path?: string | null
+  width?: number | null
+  height?: number | null
+}
+
+type SliceManifest = {
+  bucket?: string | null
+  prefix?: string | null
+  page_count?: number | null
+  pages?: SlicePage[] | null
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+const getErrorMessage = (e: unknown, fallback: string) => {
+  if (e instanceof Error) return e.message || fallback
+  if (isRecord(e) && typeof e.message === 'string' && e.message.trim()) return e.message
+  return fallback
+}
+
+const getSlicesManifestUrl = (payload: unknown) => {
+  if (!payload || !isRecord(payload)) return null
+  const slices = payload.slices
+  if (!slices || !isRecord(slices)) return null
+  const url = slices.manifest_url
+  return typeof url === 'string' && url.trim() ? url.trim() : null
+}
+
 // -----------------------------------------------------------------------------
 // 主页面
 // -----------------------------------------------------------------------------
 export default function BookReaderPage() {
+  const router = useRouter()
+  const params = useParams()
+  const rawBookId = params.bookId as string | undefined
+
   const [fontSize, setFontSize] = useState([18])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [book, setBook] = useState<LibraryBookRow | null>(null)
+  const [chapters, setChapters] = useState<BookContentRow[]>([])
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrError, setOcrError] = useState<string | null>(null)
+  const [slicesLoading, setSlicesLoading] = useState(false)
+  const [slicesError, setSlicesError] = useState<string | null>(null)
+  const [slicesManifest, setSlicesManifest] = useState<SliceManifest | null>(null)
+  const [viewMode, setViewMode] = useState<'slices' | 'text'>('text')
+  const bookDescription = book?.description ?? null
+  const bookPdfUrl = book?.pdf_url ? String(book.pdf_url) : null
+  const bookSourceUrl = book?.source_url ? String(book.source_url) : null
+  const bookSourcePayload = book?.source_payload ?? null
+  const ocrSourcePdfUrl = useMemo(() => {
+    const pdf = bookPdfUrl && String(bookPdfUrl).trim() ? String(bookPdfUrl).trim() : null
+    if (pdf) return pdf
+    const downloadUrl = (() => {
+      if (!bookSourcePayload || !isRecord(bookSourcePayload)) return null
+      const v = bookSourcePayload.download_url
+      return typeof v === 'string' ? v.trim() : null
+    })()
+    if (downloadUrl && /\.pdf(\?|#|$)/i.test(downloadUrl)) return downloadUrl
+    const src = bookSourceUrl && String(bookSourceUrl).trim() ? String(bookSourceUrl).trim() : null
+    if (src && /\.pdf(\?|#|$)/i.test(src)) return src
+    return null
+  }, [bookPdfUrl, bookSourcePayload, bookSourceUrl])
+
+  const slicesManifestUrl = useMemo(() => getSlicesManifestUrl(bookSourcePayload), [bookSourcePayload])
+
+  const normalizeCategory = (raw: string | null | undefined) => {
+    const v = (raw || '').trim()
+    if (!v) return '其他'
+    if (v.includes('六爻')) return '六爻预测'
+    if (v.includes('四柱') || v.includes('八字') || v.includes('命理')) return '四柱命理'
+    if (v.includes('风水') || v.includes('堪舆')) return '风水堪舆'
+    if (v.includes('奇门')) return '奇门遁甲'
+    if (v.includes('梅花')) return '梅花易数'
+    if (v.includes('紫微')) return '紫微斗数'
+    if (v.includes('相术') || v.includes('面相') || v.includes('相')) return '相术/面相'
+    if (v.includes('古籍')) return '其他'
+    return v
+  }
+
+  const normalizeStatus = (raw: string | null | undefined) => {
+    const v = (raw || '').trim()
+    if (!v) return '未知'
+    if (v.includes('精校')) return '精校版'
+    if (v.includes('全')) return '全本'
+    if (v.includes('残')) return '残卷'
+    if (v.includes('拓')) return '拓本'
+    if (v.includes('图')) return '图解'
+    if (v.includes('采集')) return '采集导入'
+    return v
+  }
+
+  const chapterLabel = (c: BookContentRow) => {
+    const vt = (c.volume_title || '').trim()
+    const ct = (c.chapter_title || '').trim()
+    const vol =
+      vt ||
+      (typeof c.volume_no === 'number' && Number.isFinite(c.volume_no) ? `卷${c.volume_no}` : '')
+    if (vol && ct) return `${vol} · ${ct}`
+    return ct || vol || '正文'
+  }
+
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient()
+      if (!supabase) {
+        setError('Supabase 未配置')
+        setLoading(false)
+        return
+      }
+
+      const bookIdOrTitle = decodeURIComponent(rawBookId || '').trim()
+      if (!bookIdOrTitle) {
+        setError('缺少书籍参数')
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          bookIdOrTitle
+        )
+
+        const bookQuery = supabase
+          .from('library_books')
+          .select('id, title, author, dynasty, category, status, cover_url, description, pdf_url, source_type, source_url, source_payload')
+
+        let bookRow: unknown = null
+        let bookError: unknown = null
+        const res1 = uuidLike ? await bookQuery.eq('id', bookIdOrTitle).maybeSingle() : await bookQuery.eq('title', bookIdOrTitle).maybeSingle()
+        bookRow = res1.data
+        bookError = res1.error
+        if (bookError) {
+          const code = isRecord(bookError) && typeof bookError.code === 'string' ? bookError.code : ''
+          const msg = isRecord(bookError) && typeof bookError.message === 'string' ? bookError.message : ''
+          if (code === 'PGRST204' || /column.+(pdf_url|source_type|source_url|source_payload)/i.test(msg)) {
+            const fallbackQuery = supabase
+              .from('library_books')
+              .select('id, title, author, dynasty, category, status, cover_url, description')
+            const res2 = uuidLike ? await fallbackQuery.eq('id', bookIdOrTitle).maybeSingle() : await fallbackQuery.eq('title', bookIdOrTitle).maybeSingle()
+            bookRow = res2.data
+            bookError = res2.error
+          }
+        }
+
+        if (bookError) throw bookError
+        if (!bookRow) {
+          setError('未找到该书')
+          setLoading(false)
+          return
+        }
+
+        if (!isRecord(bookRow) || typeof bookRow.id !== 'string' || typeof bookRow.title !== 'string') {
+          setError('未找到该书')
+          setLoading(false)
+          return
+        }
+
+        const bookTyped = bookRow as unknown as LibraryBookRow
+        setBook(bookTyped)
+
+        const { data: contents, error: contentsError } = await supabase
+          .from('library_book_contents')
+          .select('id, volume_no, volume_title, chapter_no, chapter_title, content, sort_order')
+          .eq('book_id', bookTyped.id)
+          .order('sort_order', { ascending: true })
+
+        const isMissingContentsTable = (err: unknown) => {
+          const status = isRecord(err) && typeof err.status === 'number' ? err.status : null
+          const code = isRecord(err) && typeof err.code === 'string' ? err.code : ''
+          const msg = isRecord(err) && typeof err.message === 'string' ? err.message : ''
+          if (status === 404) return true
+          if (code === '42P01') return true
+          if (/PGRST(10\d|20\d)/i.test(code)) return true
+          return /library_book_contents/i.test(msg) && /does not exist|not found/i.test(msg)
+        }
+
+        if (contentsError) {
+          if (isMissingContentsTable(contentsError)) {
+            setChapters([])
+            setActiveIndex(0)
+            return
+          }
+          throw contentsError
+        }
+
+        const list = (contents || []) as BookContentRow[]
+        setChapters(list)
+        setActiveIndex(0)
+      } catch (e: unknown) {
+        setError(getErrorMessage(e, '加载失败'))
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [rawBookId])
+
+  useEffect(() => {
+    setOcrError(null)
+    setOcrLoading(false)
+  }, [book?.id])
+
+  useEffect(() => {
+    setSlicesError(null)
+    setSlicesLoading(false)
+    setSlicesManifest(null)
+  }, [book?.id])
+
+  useEffect(() => {
+    if (slicesManifestUrl) setViewMode('slices')
+  }, [slicesManifestUrl])
+
+  useEffect(() => {
+    const loadManifest = async () => {
+      if (!slicesManifestUrl) return
+      setSlicesLoading(true)
+      setSlicesError(null)
+      try {
+        const res = await fetch(slicesManifestUrl, { method: 'GET' })
+        const json = (await res.json().catch(() => null)) as unknown
+        if (!res.ok) throw new Error(`切片清单加载失败 (${res.status})`)
+        if (!isRecord(json)) throw new Error('切片清单格式错误')
+        const rawPages = Array.isArray((json as any).pages) ? ((json as any).pages as unknown[]) : []
+        const pages: SlicePage[] = rawPages
+          .map((p) => {
+            if (!isRecord(p)) return null
+            const no = typeof p.no === 'number' ? p.no : null
+            const url = typeof p.url === 'string' ? p.url.trim() : ''
+            if (!no || !url) return null
+            return {
+              no,
+              url,
+              path: typeof p.path === 'string' ? p.path : null,
+              width: typeof p.width === 'number' ? p.width : null,
+              height: typeof p.height === 'number' ? p.height : null,
+            } as SlicePage
+          })
+          .filter((x): x is SlicePage => !!x)
+        if (!pages.length) throw new Error('切片清单为空')
+        setSlicesManifest({
+          bucket: typeof (json as any).bucket === 'string' ? (json as any).bucket : null,
+          prefix: typeof (json as any).prefix === 'string' ? (json as any).prefix : null,
+          page_count: typeof (json as any).page_count === 'number' ? (json as any).page_count : pages.length,
+          pages,
+        })
+      } catch (e: unknown) {
+        setSlicesError(getErrorMessage(e, '切片清单加载失败'))
+        setSlicesManifest(null)
+      } finally {
+        setSlicesLoading(false)
+      }
+    }
+    loadManifest()
+  }, [slicesManifestUrl])
+
+  useEffect(() => {
+    const runOcr = async () => {
+      if (!book?.id) return
+      if (chapters.length > 0) return
+      if (!ocrSourcePdfUrl && !slicesManifestUrl) return
+      if (ocrError) return
+
+      setOcrLoading(true)
+      setOcrError(null)
+      try {
+        const res = await fetch(`/api/library/books/${encodeURIComponent(book.id)}/ocr`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+        const json = (await res.json().catch(() => null)) as unknown
+        if (!res.ok) {
+          const msg = isRecord(json) && typeof json.error === 'string' ? json.error : `OCR 失败 (${res.status})`
+          throw new Error(msg)
+        }
+        const nextChapters =
+          isRecord(json) && Array.isArray(json.chapters) ? (json.chapters as BookContentRow[]) : []
+        if (!nextChapters.length) throw new Error('OCR 结果为空')
+        setChapters(nextChapters)
+        setActiveIndex(0)
+      } catch (e: unknown) {
+        setOcrError(getErrorMessage(e, 'OCR 失败'))
+      } finally {
+        setOcrLoading(false)
+      }
+    }
+    runOcr()
+  }, [book?.id, bookDescription, chapters.length, ocrSourcePdfUrl, ocrError, slicesManifestUrl])
+
+  const chapterList = useMemo(() => {
+    if (chapters.length) return chapters
+    const fallbackContent = ocrSourcePdfUrl && !ocrError ? null : bookDescription
+    return [
+      {
+        id: 'fallback',
+        volume_no: 1,
+        volume_title: null,
+        chapter_no: 1,
+        chapter_title: '正文',
+        content: fallbackContent,
+        sort_order: 1,
+      } as BookContentRow,
+    ]
+  }, [chapters, bookDescription, ocrError, ocrSourcePdfUrl])
+
+  const safeActiveIndex = Math.max(0, Math.min(activeIndex, chapterList.length - 1))
+  const activeChapter = chapterList[safeActiveIndex] || null
+  const activeChapterTitle = activeChapter ? chapterLabel(activeChapter) : ''
+  const slicePages = slicesManifest?.pages || []
+  const safeActivePageIndex = Math.max(0, Math.min(activeIndex, slicePages.length - 1))
+  const activeSlicePage = slicePages[safeActivePageIndex] || null
+  const activeSliceTitle = activeSlicePage ? `第${activeSlicePage.no}页` : ''
+  const activeTitle = viewMode === 'slices' ? activeSliceTitle : activeChapterTitle
+  const contentParagraphs = useMemo(() => {
+    const raw = (activeChapter?.content || '').replace(/\r\n/g, '\n').trim()
+    if (!raw) return []
+    return raw
+      .split(/\n{2,}/g)
+      .map((x) => x.trim())
+      .filter(Boolean)
+  }, [activeChapter?.content])
+
+  const hasPrev = viewMode === 'slices' ? safeActivePageIndex > 0 : safeActiveIndex > 0
+  const hasNext =
+    viewMode === 'slices' ? safeActivePageIndex < slicePages.length - 1 : safeActiveIndex < chapterList.length - 1
+
+  const canSlice = !!book?.id && !!ocrSourcePdfUrl && !slicesManifestUrl
+
+  const handleSlice = async () => {
+    if (!book?.id) return
+    if (!canSlice) return
+    setSlicesLoading(true)
+    setSlicesError(null)
+    try {
+      const res = await fetch(`/api/library/books/${encodeURIComponent(book.id)}/slices`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = (await res.json().catch(() => null)) as unknown
+      if (!res.ok) {
+        const msg = isRecord(json) && typeof json.error === 'string' ? json.error : `切片失败 (${res.status})`
+        throw new Error(msg)
+      }
+      const manifestUrl =
+        isRecord(json) && isRecord((json as any).slices) && typeof (json as any).slices.manifest_url === 'string'
+          ? String((json as any).slices.manifest_url).trim()
+          : ''
+      if (!manifestUrl) throw new Error('切片服务未返回 manifest_url')
+      setBook((prev) => {
+        if (!prev) return prev
+        const prevPayload = isRecord(prev.source_payload) ? (prev.source_payload as Record<string, unknown>) : {}
+        return {
+          ...prev,
+          source_payload: {
+            ...prevPayload,
+            slices: {
+              ...(isRecord(prevPayload.slices) ? (prevPayload.slices as Record<string, unknown>) : {}),
+              ...(isRecord((json as any).slices) ? ((json as any).slices as Record<string, unknown>) : {}),
+              manifest_url: manifestUrl,
+            },
+          },
+        }
+      })
+      setViewMode('slices')
+    } catch (e: unknown) {
+      setSlicesError(getErrorMessage(e, '切片失败'))
+    } finally {
+      setSlicesLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <style jsx global>{styles}</style>
+        <div className="min-h-screen paper-texture flex items-center justify-center text-stone-600">
+          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+          载入中...
+        </div>
+      </>
+    )
+  }
+
+  if (error || !book) {
+    return (
+      <>
+        <style jsx global>{styles}</style>
+        <div className="min-h-screen paper-texture flex items-center justify-center text-stone-600">
+          <div className="text-center">
+            <div className="text-sm text-red-700">{error || '加载失败'}</div>
+            <Button className="mt-4" variant="outline" onClick={() => router.push('/library/books')}>
+              返回馆藏目录
+            </Button>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -113,17 +530,45 @@ export default function BookReaderPage() {
         {/* 1. 顶部导航栏 (沉浸式) */}
         <header className="flex-none h-14 border-b border-stone-200/60 bg-[#fdfbf7]/90 backdrop-blur-md px-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600">
+            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600" onClick={() => router.push('/library/books')}>
               <ChevronLeft className="w-5 h-5" />
             </Button>
             
             <div className="flex flex-col">
-              <h1 className="text-sm font-bold font-serif text-stone-800">{BOOK_META.title}</h1>
-              <span className="text-[10px] text-stone-500">{BOOK_META.currentChapter}</span>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold font-serif text-stone-800">{book.title}</h1>
+                <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                  {normalizeCategory(book.category)}
+                </Badge>
+                <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                  {normalizeStatus(book.status)}
+                </Badge>
+              </div>
+              <span className="text-[10px] text-stone-500">{activeTitle}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-stone-500 hover:text-stone-800"
+              disabled={viewMode === 'slices' ? !slicePages.length : !chapterList.length}
+              onClick={() => setViewMode((m) => (m === 'slices' ? 'text' : 'slices'))}
+            >
+              {viewMode === 'slices' ? '文字' : '切片'}
+            </Button>
+            {canSlice && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]"
+                disabled={slicesLoading}
+                onClick={handleSlice}
+              >
+                {slicesLoading ? '切片中...' : '生成切片'}
+              </Button>
+            )}
             {/* 字体设置 Popover */}
             <Popover>
               <PopoverTrigger asChild>
@@ -176,24 +621,43 @@ export default function BookReaderPage() {
                 <ChevronLeft className="w-3 h-3" />
               </Button>
             </div>
-            <ScrollArea className="flex-1 p-3">
+                <ScrollArea className="flex-1 p-3">
               <div className="space-y-1">
-                {BOOK_META.chapters.map((chapter, i) => (
-                  <div 
-                    key={i}
-                    className={`
+                {viewMode === 'slices'
+                  ? slicePages.map((p, i) => (
+                      <div
+                        key={p.path || p.no || i}
+                        className={`
                       group px-3 py-2.5 rounded-md text-sm cursor-pointer font-serif flex items-center gap-2 transition-colors
-                      ${chapter === BOOK_META.currentChapter 
-                        ? 'bg-white text-[#C82E31] font-bold shadow-sm border border-stone-100' 
-                        : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
-                      }
+                      ${i === safeActivePageIndex
+                          ? 'bg-white text-[#C82E31] font-bold shadow-sm border border-stone-100'
+                          : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                        }
                     `}
-                  >
-                    {/* 选中时的红色指示标 */}
-                    <div className={`w-1 h-1 rounded-full ${chapter === BOOK_META.currentChapter ? 'bg-[#C82E31]' : 'bg-transparent group-hover:bg-stone-300'}`} />
-                    {chapter}
-                  </div>
-                ))}
+                        onClick={() => setActiveIndex(i)}
+                      >
+                        <div
+                          className={`w-1 h-1 rounded-full ${i === safeActivePageIndex ? 'bg-[#C82E31]' : 'bg-transparent group-hover:bg-stone-300'}`}
+                        />
+                        第{p.no}页
+                      </div>
+                    ))
+                  : chapterList.map((chapter, i) => (
+                      <div
+                        key={chapter.id || i}
+                        className={`
+                      group px-3 py-2.5 rounded-md text-sm cursor-pointer font-serif flex items-center gap-2 transition-colors
+                      ${i === safeActiveIndex
+                          ? 'bg-white text-[#C82E31] font-bold shadow-sm border border-stone-100'
+                          : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900'
+                        }
+                    `}
+                        onClick={() => setActiveIndex(i)}
+                      >
+                        <div className={`w-1 h-1 rounded-full ${i === safeActiveIndex ? 'bg-[#C82E31]' : 'bg-transparent group-hover:bg-stone-300'}`} />
+                        {chapterLabel(chapter)}
+                      </div>
+                    ))}
               </div>
             </ScrollArea>
           </aside>
@@ -218,64 +682,81 @@ export default function BookReaderPage() {
                 
                 {/* 章节标题 */}
                 <div className="text-center mb-12 pb-8 border-b border-dashed border-stone-300">
-                  <span className="text-xs text-stone-400 font-serif tracking-widest uppercase mb-2 block">Chapter 02</span>
-                  <h2 className="text-3xl font-bold font-serif text-stone-900 mb-4">{BOOK_META.currentChapter.split('·')[1]}</h2>
+                  <span className="text-xs text-stone-400 font-serif tracking-widest uppercase mb-2 block">Chapter</span>
+                  <h2 className="text-3xl font-bold font-serif text-stone-900 mb-4">{activeTitle || '正文'}</h2>
                   <div className="flex items-center justify-center gap-4 text-xs text-stone-500">
                     <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> 原文</span>
                     <span>•</span>
-                    <span>野鹤老人 著</span>
+                    <span>{(book.author || '佚名').trim()} 著</span>
                   </div>
                 </div>
 
-                {/* 正文内容 */}
-                <article 
-                  className="prose prose-stone max-w-none font-serif text-stone-800 leading-loose"
-                  style={{ fontSize: `${fontSize}px` }}
-                >
-                  <p>
-                    <span className="text-[#C82E31] font-bold text-xl float-left mr-2 mt-[-4px]">动</span>
-                    变者，卦之动爻变出之爻也。动爻为始，变爻为终。动爻为因，变爻为果。
-                  </p>
-                  
-                  {/* 原文引用块 */}
-                  <div className="my-8 pl-6 border-l-4 border-stone-300 italic text-stone-600 bg-stone-50/50 py-2 pr-4 rounded-r">
-                    <p className="m-0 text-sm">
-                      “如卦中子水动而变出午火，即是子水回头克，如化申金，即是回头生。”
-                    </p>
+                {viewMode === 'slices' ? (
+                  <div className="space-y-4">
+                    {slicesError && <div className="text-sm text-red-700">{slicesError}</div>}
+                    {slicesLoading && (
+                      <div className="flex items-center gap-2 text-stone-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">正在加载切片...</span>
+                      </div>
+                    )}
+                    {!slicesLoading && activeSlicePage?.url ? (
+                      <div className="bg-white border border-stone-200 rounded-lg overflow-hidden shadow-sm">
+                        <img src={activeSlicePage.url} alt={activeSliceTitle || 'page'} className="w-full h-auto block" />
+                      </div>
+                    ) : !slicesLoading ? (
+                      <div className="text-stone-500">
+                        <div className="text-sm">暂无切片</div>
+                      </div>
+                    ) : null}
                   </div>
-
-                  <p>
-                    动爻既能生克他爻，他爻亦能生克动爻。惟变爻只可生克本位之动爻，不能生克他爻，而他爻亦不能生克变爻。
-                  </p>
-                  <p>
-                    <span className="bg-[#C82E31]/10 border-b border-[#C82E31]/30 px-1 cursor-pointer hover:bg-[#C82E31]/20 transition-colors" title="点击查看释义">
-                      进神
-                    </span>
-                    者，卦中之动爻，化出之变爻，比动爻五行相同，而长生十二宫地支次序在前也。如亥水动变子水，丑土动变辰土，皆为化进神。
-                  </p>
-                  <p>
-                    退神者，卦中之动爻，化出之变爻，比动爻五行相同，而长生十二宫地支次序在后也。如子水动变亥水，辰土动变丑土，皆为化退神。
-                  </p>
-                  
-                  {/* 注疏/批注 */}
-                  <div className="mt-8 p-6 bg-white border border-stone-200 rounded-lg shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-sm font-bold text-[#C82E31] mb-2 flex items-center gap-2">
-                      <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span>
-                      野鹤老人注
-                    </h4>
-                    <p className="text-sm text-stone-600 m-0">
-                      进神者，如春木之向荣；退神者，如秋叶之凋零。吉神化进神，吉之又吉；凶神化进神，凶之又凶。
-                    </p>
-                  </div>
-                </article>
+                ) : (
+                  <article
+                    className="prose prose-stone max-w-none font-serif text-stone-800 leading-loose"
+                    style={{ fontSize: `${fontSize}px` }}
+                  >
+                    {contentParagraphs.length > 0 ? (
+                      contentParagraphs.map((p, idx) => <p key={idx}>{p.replace(/\n/g, ' ')}</p>)
+                    ) : (
+                      <div className="text-stone-500 space-y-3">
+                        {ocrLoading ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">正在将 PDF OCR 转换为文字...</span>
+                          </div>
+                        ) : ocrError ? (
+                          <div className="text-sm text-red-700">{ocrError}</div>
+                        ) : ocrSourcePdfUrl ? (
+                          <div className="text-sm">正在准备 OCR 文本...</div>
+                        ) : (
+                          <p>暂无正文内容</p>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                )}
 
                 {/* 底部翻页 */}
                 <div className="flex justify-between items-center mt-16 pt-8 border-t border-stone-200">
-                  <Button variant="ghost" className="text-stone-500 hover:text-stone-800">
-                    上一章
+                  <Button
+                    variant="ghost"
+                    className="text-stone-500 hover:text-stone-800"
+                    disabled={!hasPrev}
+                    onClick={() => setActiveIndex((x) => Math.max(0, x - 1))}
+                  >
+                    {viewMode === 'slices' ? '上一页' : '上一章'}
                   </Button>
-                  <Button variant="outline" className="border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]">
-                    下一章：旬空
+                  <Button
+                    variant="outline"
+                    className="border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]"
+                    disabled={!hasNext}
+                    onClick={() =>
+                      setActiveIndex((x) =>
+                        Math.min((viewMode === 'slices' ? slicePages.length : chapterList.length) - 1, x + 1)
+                      )
+                    }
+                  >
+                    {viewMode === 'slices' ? '下一页' : '下一章'}
                   </Button>
                 </div>
 

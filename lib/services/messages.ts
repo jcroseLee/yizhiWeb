@@ -332,20 +332,36 @@ export async function markMessagesAsRead(otherUserId: string): Promise<boolean> 
   }
 
   try {
-    // 使用 RPC 函数标记已读
+    // 尝试使用 RPC 函数标记已读
     const { error } = await supabase.rpc('mark_dm_read', {
       other_id: otherUserId,
     })
 
     if (error) {
-      logError('Error marking messages as read:', error)
-      throw error
+      // 如果 RPC 失败（例如函数不存在），尝试直接更新
+      // 这可以作为回退机制，确保即使数据库迁移未完全应用也能工作
+      console.warn('RPC mark_dm_read failed, trying direct update fallback...', error)
+      
+      const { error: updateError } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('receiver_id', user.id)
+        .eq('sender_id', otherUserId)
+        .eq('is_read', false)
+        .is('group_id', null)
+
+      if (updateError) {
+        logError('Error marking messages as read (fallback failed):', updateError)
+        // 不抛出错误，以免中断 UI 流程，但记录日志
+        return false
+      }
     }
 
     return true
   } catch (error) {
     logError('Error in markMessagesAsRead:', error)
-    throw error
+    // 不抛出错误，以免中断 UI 流程
+    return false
   }
 }
 

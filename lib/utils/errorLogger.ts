@@ -59,6 +59,17 @@ export function logError(message: string, error: any): void {
     if (Object.keys(errorInfo).length > 0) {
       console.error(message, errorInfo)
     } else {
+      // 如果是完全空的对象，尝试记录原始对象的 stringify 结果
+      try {
+        const stringified = JSON.stringify(error, null, 2)
+        if (stringified && stringified !== '{}') {
+           console.error(message + ' (JSON):', stringified)
+           return
+        }
+      } catch (e) {
+        // ignore circular reference etc
+      }
+
       // 如果是完全空的对象，至少记录一个警告
       console.warn(message + ' (空错误对象，可能是数据库连接或字段问题)', {
         errorType: typeof error,

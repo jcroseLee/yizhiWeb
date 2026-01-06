@@ -55,7 +55,7 @@ import { HexagramLine } from '../components/HexagramLine'
 import { ShenShaList } from '../components/ShenShaList'
 
 const GLOBAL_STYLES = `
-  .font-serif-sc { font-family: "Noto Serif SC", "Songti SC", serif; }
+  .font-serif-sc { font-family: "Source Han Serif CN", "Source Han Serif SC", "Source Han Serif", "Noto Serif SC", "Songti SC", serif; }
   .writing-vertical { writing-mode: vertical-rl; }
 `
 

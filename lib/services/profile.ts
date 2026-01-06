@@ -148,7 +148,12 @@ export async function getUserProfile(): Promise<UserProfile | null> {
                               errorDetails.hint !== null
         
         if (hasActualError) {
-          console.error('Error fetching profile:', errorDetails)
+          console.error('Error fetching profile (raw):', error)
+          try {
+            console.error('Error fetching profile (details):', JSON.stringify(errorDetails, null, 2))
+          } catch (e) {
+            console.error('Error fetching profile (fallback):', errorDetails)
+          }
         }
         
         return null

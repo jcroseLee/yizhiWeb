@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* 内容扫描路径 - 相对于项目根目录 */
 @source "./app/**/*.{ts,tsx}";
@@ -190,13 +191,16 @@
     background-repeat: repeat;
     background-size: auto 200px;
   }
-  /* 宣纸纹理背景 - 使用极低透明度的云纹/回形纹，更"隐" */
+  /* 宣纸纹理背景 - 使用细腻的噪点模拟纸张质感 */
   .paper-texture {
-    /* background-color: #f7f7f9; */
     background-color: #fdfbf7;
-    /* background-color: #f0f0f4; */
-    background-image: url("data:image/svg+xml,%3Csvg width='600' height='600' viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpath id='taiji' fill='%23000000' fill-opacity='0.01' fill-rule='evenodd' d='M50 0 A50 50 0 1 1 50 100 A25 25 0 0 1 50 50 A25 25 0 0 0 50 0 Z M50 25 m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 M50 75 m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0'/%3E%3C/defs%3E%3C!-- 随机散落分布，旋转不同角度，拉大间距 --%3E%3Cuse href='%23taiji' x='50' y='50' transform='rotate(150 100 100)' /%3E%3Cuse href='%23taiji' x='350' y='120' transform='scale(0.8) rotate(-15 400 170)' /%3E%3Cuse href='%23taiji' x='100' y='400' transform='scale(1.2) rotate(180 150 450)' /%3E%3Cuse href='%23taiji' x='450' y='380' transform='scale(0.9) rotate(145 500 430)' /%3E%3C/svg%3E");
-    background-size: 400px 400px; /* 控制整体疏密程度 */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  /* 宣纸上的墨迹效果 */
+  .ink-text {
+    color: #2c3e50;
+    text-shadow: 0 0 1px rgba(44, 62, 80, 0.1);
   }
   
   /* 印章样式 - 方印/椭圆印，双边框效果，金石气 */

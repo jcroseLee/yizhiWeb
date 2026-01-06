@@ -1,6 +1,6 @@
-import { getSupabaseClient } from './supabaseClient'
-import { getCurrentUser } from './auth'
 import { logError } from '../utils/errorLogger'
+import { getCurrentUser } from './auth'
+import { getSupabaseClient } from './supabaseClient'
 
 // -----------------------------------------------------------------------------
 // 类型定义
@@ -34,7 +34,8 @@ export interface Notification {
 export async function getNotifications(
   limit: number = 50,
   offset: number = 0,
-  unreadOnly: boolean = false
+  unreadOnly: boolean = false,
+  types?: string[]
 ): Promise<Notification[]> {
   const user = await getCurrentUser()
   if (!user) {
@@ -51,12 +52,19 @@ export async function getNotifications(
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
 
     if (unreadOnly) {
       query = query.eq('is_read', false)
     }
+
+    if (types && types.length > 0) {
+      query = query.in('type', types)
+    }
+
+    // Modifiers like order and range must be applied last
+    query = query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     const { data, error } = await query
 

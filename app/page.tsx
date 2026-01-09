@@ -278,8 +278,8 @@ const IconScroll = () => (
   </svg>
 )
 
-const IconCompass = () => (
-  <svg viewBox="0 0 64 64" fill="none" className="w-10 h-10 text-orange-600">
+const IconCompass = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 64 64" fill="none" className={className || "w-10 h-10 text-orange-600"}>
     <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="1.5" opacity="0.3" strokeDasharray="4 4" className="spin-slow" style={{animationDuration: '30s'}}/>
     <circle cx="32" cy="32" r="20" stroke="currentColor" strokeWidth="1.5" opacity="0.6"/>
     <path d="M32 12L32 52M12 32L52 32" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
@@ -287,8 +287,8 @@ const IconCompass = () => (
   </svg>
 )
 
-const IconCommunity = () => (
-  <svg viewBox="0 0 64 64" fill="none" className="w-10 h-10 text-emerald-600">
+const IconCommunity = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 64 64" fill="none" className={className || "w-10 h-10 text-emerald-600"}>
     <circle cx="32" cy="20" r="8" stroke="currentColor" strokeWidth="2"/>
     <path d="M16 52C16 42 24 42 32 42C40 42 48 42 48 52" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     <path d="M8 32C8 32 12 28 16 28M56 32C56 32 52 28 48 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>

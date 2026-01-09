@@ -154,7 +154,7 @@ export default function WikiIndexPage() {
           {/* Recursive Children */}
           {isExpanded && hasChildren && (
             <div className="">
-               {renderTree(node.children, level + 1)}
+               {renderTree(node.children ?? [], level + 1)}
             </div>
           )}
         </div>

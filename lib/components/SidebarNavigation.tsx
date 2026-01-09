@@ -39,6 +39,7 @@ export interface NavItem {
 
 interface SidebarNavigationProps {
   items: NavItem[]
+  bottomItems?: NavItem[]
 }
 
 // 判断激活逻辑
@@ -259,7 +260,7 @@ const SidebarItem = ({ item, level = 0, pathname, expandedItems, onToggle }: any
   )
 }
 
-export default function SidebarNavigation({ items }: SidebarNavigationProps) {
+export default function SidebarNavigation({ items, bottomItems }: SidebarNavigationProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
@@ -277,8 +278,11 @@ export default function SidebarNavigation({ items }: SidebarNavigationProps) {
       })
     }
     findAndExpand(items)
+    if (bottomItems) {
+      findAndExpand(bottomItems)
+    }
     if (hasChange) setExpandedItems(newExpanded)
-  }, [pathname, items]) 
+  }, [pathname, items, bottomItems]) 
 
   const handleToggle = useCallback((href: string) => {
     setExpandedItems(prev => {

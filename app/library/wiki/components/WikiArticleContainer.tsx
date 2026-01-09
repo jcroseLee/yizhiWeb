@@ -1,6 +1,14 @@
 'use client'
 
 import { Button } from '@/lib/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/lib/components/ui/dialog'
 import { Input } from '@/lib/components/ui/input'
 import { Textarea } from '@/lib/components/ui/textarea'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -28,6 +36,10 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
   const [authorName, setAuthorName] = useState('')
   const [changeDescription, setChangeDescription] = useState('')
 
+  // Dialog States
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showRevisionWarning, setShowRevisionWarning] = useState(false)
+
   const { toast } = useToast()
 
   // Reset form when entering edit mode
@@ -41,9 +53,12 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
   }
 
   const handleCancel = () => {
-    if (confirm('确定要取消编辑吗？未保存的内容将丢失。')) {
-        setIsEditing(false)
-    }
+    setShowCancelConfirm(true)
+  }
+
+  const handleConfirmCancel = () => {
+    setIsEditing(false)
+    setShowCancelConfirm(false)
   }
 
   const handleSubmit = async (ignoreWarning = false) => {
@@ -58,11 +73,15 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
 
     // Check for revision marker if content has changed and warning is not ignored
     if (!ignoreWarning && content !== (article.content || '') && !content.includes('{{REV}}')) {
-        if (!confirm('检测到您修改了正文，但未插入“修订标记”。\n\n建议在修改处点击“插入修订标记”按钮，以便在正文中显示引用序号。\n\n点击“确定”继续提交（不标记），点击“取消”返回编辑。')) {
-            return;
-        }
+        setShowRevisionWarning(true)
+        return
     }
 
+    await performSubmit()
+  }
+
+  const performSubmit = async () => {
+    setShowRevisionWarning(false)
     setLoading(true)
     try {
       const res = await fetch('/api/wiki/revisions', {
@@ -99,6 +118,10 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleConfirmSubmitWithoutRevision = () => {
+    performSubmit()
   }
 
   // Markdown Components Configuration
@@ -332,6 +355,54 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
                 </div>
             </div>
         )}
+
+        {/* Cancel Confirmation Dialog */}
+        <Dialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+          <DialogContent className="bg-white">
+            <DialogHeader>
+              <DialogTitle>确定要取消编辑吗？</DialogTitle>
+              <DialogDescription>未保存的内容将丢失。</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
+                取消
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmCancel}
+                className="bg-[#C82E31] text-white hover:bg-[#B02629]"
+              >
+                确定
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Revision Warning Dialog */}
+        <Dialog open={showRevisionWarning} onOpenChange={setShowRevisionWarning}>
+          <DialogContent className="bg-white">
+            <DialogHeader>
+              <DialogTitle>检测到您修改了正文，但未插入"修订标记"</DialogTitle>
+              <DialogDescription className="whitespace-pre-line">
+                建议在修改处点击"插入修订标记"按钮，以便在正文中显示引用序号。
+
+                点击"确定"继续提交（不标记），点击"取消"返回编辑。
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRevisionWarning(false)}>
+                取消
+              </Button>
+              <Button 
+                onClick={handleConfirmSubmitWithoutRevision}
+                className="bg-[#C82E31] text-white hover:bg-[#B02629]"
+                disabled={loading}
+              >
+                确定
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   )
 }

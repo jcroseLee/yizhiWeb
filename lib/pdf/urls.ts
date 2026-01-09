@@ -20,14 +20,28 @@ export function parseSupabaseStorageObjectUrl(inputUrl: string, supabaseUrl: str
 
   const rest = u.pathname.slice(prefix.length)
   const parts = rest.split('/').filter(Boolean)
-  if (parts.length < 3) return null
+  if (parts.length < 2) return null
 
-  const kind = parts[0]
-  if (kind !== 'public' && kind !== 'sign') return null
+  // Handle two URL formats:
+  // 1. /storage/v1/object/public/{bucket}/{path} or /storage/v1/object/sign/{bucket}/{path}
+  // 2. /storage/v1/object/{bucket}/{path} (direct bucket access, e.g., from getPublicUrl)
+  let bucket: string
+  let pathSegments: string[]
+  
+  if (parts[0] === 'public' || parts[0] === 'sign') {
+    // Format 1: has 'public' or 'sign' prefix
+    if (parts.length < 3) return null
+    bucket = parts[1]
+    pathSegments = parts.slice(2)
+  } else {
+    // Format 2: direct bucket access (e.g., user_resources bucket)
+    bucket = parts[0]
+    pathSegments = parts.slice(1)
+  }
 
-  const bucket = parts[1]
-  const rawSegments = parts.slice(2)
-  const decodedSegments = rawSegments.map((seg) => {
+  if (!bucket || pathSegments.length === 0) return null
+
+  const decodedSegments = pathSegments.map((seg) => {
     try {
       return decodeURIComponent(seg)
     } catch {
@@ -36,7 +50,6 @@ export function parseSupabaseStorageObjectUrl(inputUrl: string, supabaseUrl: str
   })
   const path = decodedSegments.join('/')
 
-  if (!bucket || !path) return null
   return { bucket, path }
 }
 

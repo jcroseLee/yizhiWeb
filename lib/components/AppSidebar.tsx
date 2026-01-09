@@ -1,7 +1,7 @@
 'use client'
 
 import SidebarNavigation, { NavItem } from '@/lib/components/SidebarNavigation'
-import { BookOpen, Compass, Home as HomeIcon, Library, Settings, Users } from 'lucide-react'
+import { BookOpen, Bot, Compass, Home as HomeIcon, Library, Settings, Users } from 'lucide-react'
 
 const navItems: NavItem[] = [
   { href: '/', label: '首页', icon: HomeIcon },
@@ -21,8 +21,8 @@ const bottomItems: NavItem[] = [
   },
   {
     href: '/chat',
-    label: '聊天室',
-    icon: Users,
+    label: '易知小童',
+    icon: Bot,
   },
 ]
 

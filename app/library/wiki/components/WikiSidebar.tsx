@@ -3,7 +3,14 @@
 import { Badge } from '@/lib/components/ui/badge'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import { WikiCategory, WikiService, WikiTag } from '@/lib/services/wiki'
-import { ChevronDown, FileText, Folder } from 'lucide-react'
+import {
+  ChevronRight,
+  Circle,
+  FileText,
+  GitBranch,
+  Hash,
+  Layout,
+} from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -115,7 +122,8 @@ export function WikiSidebar({
     }
   }, [pathname, treeData])
 
-  const toggleNode = (id: string) => {
+  const toggleNode = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     const newSet = new Set(expandedNodes)
     if (newSet.has(id)) {
       newSet.delete(id)
@@ -125,62 +133,81 @@ export function WikiSidebar({
     setExpandedNodes(newSet)
   }
 
+  // --- 递归渲染树 (与首页样式一致) ---
   const renderTree = (nodes: WikiCategory[], level = 0) => {
-    return nodes.map(node => {
+    return nodes.map((node, index) => {
       const hasChildren = (node.children && node.children.length > 0) || (node.articles && node.articles.length > 0)
+      const isExpanded = expandedNodes.has(node.id)
       const currentSlug = pathname ? pathname.split('/').pop() : ''
       const isActive = node.slug === currentSlug
-
+      
       return (
-      <div key={node.id} className="mb-1">
-        <div 
-          className={`flex items-center w-full text-sm font-semibold mb-1 px-2 py-1 rounded-md transition-colors cursor-pointer ${level > 0 ? 'ml-2' : ''} ${isActive ? 'bg-slate-200 text-slate-900' : 'text-slate-900 hover:bg-slate-100'}`}
-          onClick={() => router.push(`/library/wiki/${node.slug}`)}
-        >
-           <div
-             className={`mr-1 p-0.5 rounded transition-colors ${hasChildren ? 'hover:bg-slate-300' : ''}`}
-             onClick={(e) => {
-               if (hasChildren) {
-                 e.stopPropagation()
-                 toggleNode(node.id)
-               }
-             }}
-           >
-             {hasChildren ? (
-               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedNodes.has(node.id) ? '' : '-rotate-90'}`} />
-             ) : (
-               <Folder className="w-4 h-4 text-slate-400" />
-             )}
-           </div>
-           <span>{node.name}</span>
-        </div>
-        
-        {expandedNodes.has(node.id) && (
-          <div className="space-y-0.5 ml-2 border-l border-slate-200 pl-2">
-             {/* Subcategories */}
-             {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
-             
-             {/* Articles */}
-             {node.articles && node.articles.map(article => {
-                const isArticleActive = article.slug === currentSlug
-                return (
-                <div key={article.id} className="mb-1 ml-2">
-                    <button
-                        className={`flex items-center w-full text-sm px-2 py-1 rounded-md transition-colors ${isArticleActive ? 'bg-slate-200 text-slate-900 font-medium' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}
+        <div key={node.id} className={`relative ${level > 0 ? 'ml-6 tree-line' : 'mb-1'}`}>
+          {/* Node Item */}
+          <div 
+             className={`group flex items-center w-full text-sm py-1.5 px-2 rounded-md transition-all duration-200 cursor-pointer relative z-10 
+             ${level > 0 ? 'tree-branch' : ''}
+             ${isActive ? 'bg-stone-200/50 text-stone-900' : 'hover:bg-stone-200/50 text-stone-600 hover:text-stone-900'}`}
+             onClick={() => router.push(`/library/wiki/${node.slug}`)}
+          >
+             {/* Icon / Expander */}
+             <div 
+               className="mr-2 shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-stone-300/50 transition-colors"
+               onClick={(e) => hasChildren && toggleNode(node.id, e)}
+             >
+                {hasChildren ? (
+                  <ChevronRight 
+                    className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} 
+                  />
+                ) : (
+                  <Circle className="w-1.5 h-1.5 text-stone-300 fill-stone-300" />
+                )}
+             </div>
+
+             <span className={`font-medium ${level === 0 ? 'font-serif text-base' : 'text-sm'}`}>
+                {node.name}
+             </span>
+          </div>
+          
+          {/* Recursive Children */}
+          {isExpanded && hasChildren && (
+            <div className="">
+               {/* Subcategories */}
+               {node.children && node.children.length > 0 && renderTree(node.children, level + 1)}
+               
+               {/* Articles */}
+               {node.articles && node.articles.map((article, artIndex) => {
+                  const isArticleActive = article.slug === currentSlug
+                  const totalSiblings = (node.children?.length || 0) + (node.articles?.length || 0)
+                  const isLastItem = artIndex === (node.articles?.length || 0) - 1 && 
+                                    (!node.children || node.children.length === 0)
+                  
+                  return (
+                    <div 
+                      key={article.id} 
+                      className={`relative ml-6 tree-line ${isLastItem ? '' : ''}`}
+                    >
+                      <div 
+                        className={`group flex items-center w-full text-sm py-1.5 px-2 rounded-md transition-all duration-200 cursor-pointer relative z-10 tree-branch
+                        ${isArticleActive ? 'bg-stone-200/50 text-stone-900' : 'hover:bg-stone-200/50 text-stone-600 hover:text-stone-900'}`}
                         onClick={(e) => {
                             e.stopPropagation()
                             router.push(`/library/wiki/${article.slug}`)
                         }}
-                    >
-                        <FileText className={`w-3 h-3 mr-2 flex-shrink-0 ${isArticleActive ? 'text-slate-600' : 'text-slate-400'}`} />
-                        <span className="truncate text-left">{article.title}</span>
-                    </button>
-                </div>
-             )})}
-          </div>
-        )}
-      </div>
-    )})
+                      >
+                        <div className="mr-2 shrink-0 w-5 h-5 flex items-center justify-center">
+                          <Circle className="w-1.5 h-1.5 text-stone-300 fill-stone-300" />
+                        </div>
+                        <span className="text-sm truncate text-left">{article.title}</span>
+                      </div>
+                    </div>
+                  )
+               })}
+            </div>
+          )}
+        </div>
+      )
+    })
   }
 
   // Group Categories
@@ -189,50 +216,62 @@ export function WikiSidebar({
   const otherCats = treeData.filter(c => c.type !== 'foundation' && c.type !== 'school')
 
   return (
-    <aside className={`w-64 bg-[#FAFAFA] border-r border-slate-200 flex flex-col ${className}`}>
-        <ScrollArea className="flex-1 py-6 px-4">
-            <div className="space-y-6">
+    <aside className={`w-72 bg-transparent border-r border-stone-200/50 flex flex-col ${className}`}>
+        <ScrollArea className="flex-1 py-6 pl-6 pr-4">
+            <div className="space-y-8 pb-10">
                 
-                {/* Layer 1: Foundation */}
+                {/* Section 1 */}
                 {foundationCats.length > 0 && (
-                <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">易学通识 (公共底层)</h3>
-                    {renderTree(foundationCats)}
-                </div>
+                  <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                        <Layout className="w-3 h-3" /> 易学通识
+                    </h3>
+                    <div className="pl-1">
+                        {renderTree(foundationCats)}
+                    </div>
+                  </div>
                 )}
 
-                {/* Layer 2: Schools */}
+                {/* Section 2 */}
                 {schoolCats.length > 0 && (
-                <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">分门别类 (独立流派)</h3>
-                    {renderTree(schoolCats)}
-                </div>
+                  <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                        <GitBranch className="w-3 h-3" /> 分门别类
+                    </h3>
+                    <div className="pl-1">
+                        {renderTree(schoolCats)}
+                    </div>
+                  </div>
                 )}
 
-                {/* Layer 3: Scenarios (Tags) */}
+                {/* Section 3 (Tags) - Styled as Stamps */}
                 {tags.length > 0 && (
-                <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">分类占验 (实战案例)</h3>
-                    <div className="flex flex-wrap gap-2 px-2">
+                  <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-300">
+                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                        <Hash className="w-3 h-3" /> 分类占验
+                     </h3>
+                     <div className="flex flex-wrap gap-2 px-2">
                         {tags.map(tag => (
-                        <Badge 
+                          <Badge 
                             key={tag.id} 
                             variant="outline"
-                            className="cursor-pointer hover:bg-slate-100"
+                            className="cursor-pointer bg-white/50 border-stone-200 text-stone-500 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white transition-all font-serif font-normal px-2.5 py-0.5"
                             onClick={() => router.push(`/library/wiki/${tag.slug || tag.id}`)}
-                        >
+                          >
                             {tag.name}
-                        </Badge>
+                          </Badge>
                         ))}
-                    </div>
-                </div>
+                     </div>
+                  </div>
                 )}
                 
                 {otherCats.length > 0 && (
-                <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">其他</h3>
-                    {renderTree(otherCats)}
-                </div>
+                  <div>
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2">其他</h3>
+                    <div className="pl-1">
+                        {renderTree(otherCats)}
+                    </div>
+                  </div>
                 )}
 
             </div>

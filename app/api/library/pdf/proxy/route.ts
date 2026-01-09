@@ -31,6 +31,17 @@ const resolveUrl = async (rawUrl: string) => {
   return data.signedUrl
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, HEAD, OPTIONS',
+      'access-control-allow-headers': 'Content-Type',
+    },
+  })
+}
+
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url)
   const rawUrl = requestUrl.searchParams.get('url')
@@ -65,6 +76,9 @@ export async function GET(req: Request) {
   headers.set('content-type', contentType)
   headers.set('content-disposition', 'inline')
   headers.set('cache-control', 'private, max-age=600')
+  headers.set('access-control-allow-origin', '*')
+  headers.set('access-control-allow-methods', 'GET, HEAD, OPTIONS')
+  headers.set('access-control-allow-headers', 'Content-Type')
   if (contentLength) headers.set('content-length', contentLength)
 
   return new NextResponse(upstream.body, { headers })

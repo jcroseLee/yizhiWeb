@@ -255,65 +255,61 @@ export default function CommunityPage() {
             {/* --- 左侧内容区 --- */}
             <div className="flex-1 min-w-0 space-y-2 lg:space-y-6">
               
-              {/* 1. 发布器组件 */}
-              <div className="bg-white lg:rounded-xl p-4 lg:p-0 lg:bg-transparent shadow-sm lg:shadow-none border-b lg:border-none border-stone-100">
+              {/* 1. 发布器组件 - 增加阴影和圆角，像一张浮在桌面的纸 */}
+              <div className="bg-white lg:rounded-2xl p-1 shadow-sm border-b lg:border border-stone-100 hover:shadow-md transition-shadow duration-300">
                  <PostComposer />
               </div>
 
-              {/* 2. 频道 Tab */}
-              <div className="sticky top-0 lg:relative z-20 bg-paper-50 lg:bg-transparent pt-2 lg:pt-0">
-                <div className="flex items-center justify-between bg-white lg:bg-paper-50 px-4 py-3 border-b lg:border-b border-stone-200/60 lg:rounded-t-lg shadow-sm lg:shadow-none mx-0 lg:mx-0">
-                  <div className="flex-1 flex gap-6 lg:gap-8 pr-4 min-w-0 overflow-x-auto overflow-y-hidden scrollbar-hide">
-                    {CHANNELS.map(channel => {
-                      const Icon = channel.icon;
-                      const isActive = activeChannel === channel.id;
-                      return (
-                        <Button
-                          key={channel.id}
-                          variant="ghost"
-                          onClick={() => setActiveChannel(channel.id)}
-                          className={`flex items-center gap-1.5 text-sm transition-colors pb-2 relative whitespace-nowrap outline-none rounded-none hover:bg-transparent h-auto px-0 ${
-                            isActive ? 'tab-active text-stone-900' : 'text-stone-500 hover:text-stone-800'
-                          }`}
-                        >
-                          <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-[#C82E31]' : ''}`} />
-                          {channel.label}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                  
-                  {/* 筛选按钮 */}
-                  <div className="relative shrink-0 ml-2">
-                    {/* 移动端左侧渐变遮罩 */}
-                    <div className="absolute right-full top-0 bottom-0 w-8 bg-linear-to-l from-white to-transparent pointer-events-none lg:hidden z-10" />
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="flex text-xs text-stone-500 hover:text-stone-800 items-center gap-1 px-2 sm:px-3 py-1 bg-white border border-stone-200 rounded-full shadow-sm hover:border-[#C82E31]/30 transition-colors h-auto shrink-0"
-                        >
-                          <ListFilter className="h-3 w-3" /> 
-                          <span className="hidden sm:inline">
-                            {sortBy === 'newest' && '最新'}
-                            {sortBy === 'hottest' && '最热'}
-                            {sortBy === 'viewed' && '浏览'}
-                          </span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="z-20 bg-white">
-                        <DropdownMenuItem onClick={() => setSortBy('newest')} className={sortBy === 'newest' ? 'bg-stone-100 font-bold' : ''}>
-                          最新发布
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSortBy('hottest')} className={sortBy === 'hottest' ? 'bg-stone-100 font-bold' : ''}>
-                          最多点赞
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSortBy('viewed')} className={sortBy === 'viewed' ? 'bg-stone-100 font-bold' : ''}>
-                          最多浏览
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {/* 2. 频道 Tab - 玻璃拟态吸顶 */}
+              <div className="sticky top-0 z-20 -mx-4 lg:mx-0">
+                <div className="bg-white/90 backdrop-blur-md px-4 lg:px-0 border-b border-stone-200/50 lg:border-none lg:bg-transparent lg:backdrop-blur-none">
+                  <div className="flex items-center justify-between lg:bg-white lg:px-6 lg:py-1 lg:rounded-xl lg:border lg:border-stone-100 lg:shadow-sm">
+                    {/* Channel List */}
+                    <div className="flex-1 flex gap-2 lg:gap-6 min-w-0 overflow-x-auto scrollbar-hide py-3 lg:py-2">
+                      {CHANNELS.map(channel => {
+                        const Icon = channel.icon;
+                        const isActive = activeChannel === channel.id;
+                        return (
+                          <button
+                            key={channel.id}
+                            onClick={() => setActiveChannel(channel.id)}
+                            className={`
+                              relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-300
+                              ${isActive 
+                                ? 'text-stone-900 font-bold bg-stone-100' 
+                                : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50'}
+                            `}
+                          >
+                            <Icon className={`h-4 w-4 ${isActive ? 'text-[#C82E31]' : 'opacity-70'}`} />
+                            <span className="whitespace-nowrap">{channel.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    
+                    {/* Sort Filter */}
+                    <div className="relative shrink-0 ml-2 pl-2 border-l border-stone-100">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="flex items-center gap-1.5 h-8 px-2 text-xs text-stone-500 hover:text-stone-900 hover:bg-stone-50 rounded-md"
+                          >
+                            <ListFilter className="h-3.5 w-3.5" /> 
+                            <span className="hidden sm:inline">
+                              {sortBy === 'newest' && '最新'}
+                              {sortBy === 'hottest' && '最热'}
+                              {sortBy === 'viewed' && '浏览'}
+                            </span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="z-30 min-w-[100px] bg-white border border-stone-100 shadow-sm">
+                          <DropdownMenuItem onClick={() => setSortBy('newest')} className="text-xs cursor-pointer">最新发布</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSortBy('hottest')} className="text-xs cursor-pointer">最多点赞</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSortBy('viewed')} className="text-xs cursor-pointer">最多浏览</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </div>

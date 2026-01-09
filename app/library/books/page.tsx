@@ -1,31 +1,69 @@
 'use client'
 
 import {
-    Book,
-    CheckCircle2,
-    ChevronRight,
-    History,
-    Library,
-    MoreHorizontal,
-    Search,
-    SortAsc
+  CheckCircle2,
+  ChevronRight,
+  History,
+  LayoutGrid,
+  MoreHorizontal,
+  Search,
+  SortAsc,
+  Upload,
+  X
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
 import { Input } from '@/lib/components/ui/input'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/lib/components/ui/select'
 import { Separator } from '@/lib/components/ui/separator'
+import { Skeleton } from '@/lib/components/ui/skeleton'
+import { getCurrentUser } from '@/lib/services/auth'
 import { createClient } from '@/lib/supabase/client'
+import { BookCover } from '../components/BookCover'
+
+// --- 样式补丁 ---
+const styles = `
+  /* 全局宣纸纹理 */
+  .paper-texture {
+    background-color: #F9F7F2;
+    background-image: 
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E"),
+      linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, rgba(249,247,242,0) 100%);
+  }
+  
+  /* 隐藏滚动条 */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* 书架底部投影 */
+  .shelf-shadow {
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0) 70%);
+  }
+  
+  /* 书籍悬停上浮动画 */
+  .book-lift {
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .book-lift:hover {
+    transform: translateY(-6px) scale(1.02);
+    z-index: 10;
+  }
+`
 
 type LibraryBookRow = {
   id: string
@@ -35,6 +73,9 @@ type LibraryBookRow = {
   category: string | null
   status: string | null
   cover_url: string | null
+  volume_type: 'none' | 'upper' | 'lower' | null
+  is_manually_reviewed: boolean | null
+  source_payload?: any
 }
 
 type DisplayBook = {
@@ -46,6 +87,12 @@ type DisplayBook = {
   statusLabel: string
   progress: number
   color: string
+  volumeType: 'none' | 'upper' | 'lower' | null
+  isManuallyReviewed: boolean
+}
+
+type BookWithContentProgress = DisplayBook & {
+  contentProgress: number
 }
 
 const DYNASTIES = ['先秦', '汉唐', '宋元', '明清', '民国', '现代']
@@ -55,9 +102,14 @@ export default function AllBooksPage() {
   const [activeCategory, setActiveCategory] = useState('全部藏书')
   const [searchQuery, setSearchQuery] = useState('')
   const [books, setBooks] = useState<DisplayBook[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // --- 数据处理逻辑 (保持不变) ---
   const normalizeCategory = (raw: string | null | undefined) => {
     const v = (raw || '').trim()
     if (!v) return '其他'
@@ -116,15 +168,48 @@ export default function AllBooksPage() {
       try {
         const { data, error } = await supabase
           .from('library_books')
-          .select('id, title, author, dynasty, category, status, cover_url')
+          .select('id, title, author, dynasty, category, status, cover_url, volume_type, is_manually_reviewed, source_payload')
+          .in('status', ['reviewed', 'published'])
           .order('created_at', { ascending: false })
           .limit(500)
 
         if (error) throw error
 
-        const rows = (data || []) as LibraryBookRow[]
-        setBooks(
-          rows.map((x) => {
+        const rows = (data || []) as (LibraryBookRow & { source_payload?: any })[]
+        
+        const booksWithContentProgress: BookWithContentProgress[] = await Promise.all(
+          rows.map(async (x) => {
+            const slicesInfo = x.source_payload?.slices
+            const expectedPageCount = slicesInfo?.page_count
+              ? (typeof slicesInfo.page_count === 'number' && Number.isFinite(slicesInfo.page_count) && slicesInfo.page_count > 0
+                  ? Math.floor(slicesInfo.page_count)
+                  : null)
+              : null
+
+            let contentProgress = 0
+            if (expectedPageCount && slicesInfo?.prefix && slicesInfo?.bucket) {
+              let uploadedCount = 0
+              if (slicesInfo.manifest_url) {
+                try {
+                  const manifestRes = await fetch(slicesInfo.manifest_url)
+                  if (manifestRes.ok) {
+                    const manifest = await manifestRes.json()
+                    if (manifest && Array.isArray(manifest.pages)) uploadedCount = manifest.pages.length
+                  }
+                } catch (e) {}
+              }
+              if (uploadedCount === 0) {
+                try {
+                  const { count } = await supabase
+                    .from('library_book_contents')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('book_id', x.id)
+                  if (count !== null) uploadedCount = count
+                } catch (e) {}
+              }
+              contentProgress = uploadedCount > 0 ? Math.min(100, Math.round((uploadedCount / expectedPageCount) * 100)) : 0
+            }
+
             const categoryLabel = normalizeCategory(x.category)
             return {
               id: x.id,
@@ -134,10 +219,40 @@ export default function AllBooksPage() {
               categoryLabel,
               statusLabel: normalizeStatus(x.status),
               progress: 0,
+              contentProgress,
               color: categoryColor(categoryLabel),
+              volumeType: x.volume_type || 'none',
+              isManuallyReviewed: x.is_manually_reviewed === true,
             }
           })
         )
+
+        const completedBooks = booksWithContentProgress.filter((b) => b.contentProgress === 100)
+        
+        // Load user progress
+        const { data: authData } = await supabase.auth.getUser()
+        if (authData.user?.id && completedBooks.length > 0) {
+           const bookIds = completedBooks.map((b) => b.id)
+           const { data: progressRows } = await supabase
+            .from('library_reading_progress')
+            .select('book_id, progress')
+            .in('book_id', bookIds)
+            
+            const progressMap = new Map<string, number>()
+            progressRows?.forEach((row: any) => {
+                if (row.book_id && typeof row.progress === 'number') {
+                    progressMap.set(row.book_id, Math.max(0, Math.min(100, Math.round(row.progress))))
+                }
+            })
+            
+            setBooks(completedBooks.map(({ contentProgress, ...rest }) => ({
+                ...rest,
+                progress: progressMap.get(rest.id) ?? 0,
+            })))
+        } else {
+             setBooks(completedBooks.map(({ contentProgress, ...rest }) => rest))
+        }
+
       } catch (e: any) {
         setLoadError(e?.message || '加载失败')
       } finally {
@@ -149,6 +264,66 @@ export default function AllBooksPage() {
 
   const handleBookClick = (bookId: string) => {
     router.push(`/library/reader/${encodeURIComponent(bookId)}`)
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const isPdf = file.type === 'application/pdf'
+    const isImage = file.type.startsWith('image/')
+    if (!isPdf && !isImage) {
+      setUploadError('格式不支持')
+      return
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadError('文件过大 (>100MB)')
+      return
+    }
+    setUploadError(null)
+    setUploadSuccess(false)
+    setUploading(true)
+    try {
+      const user = await getCurrentUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      const supabase = createClient()
+      if (!supabase) throw new Error('Client Error')
+
+      const resourceId = crypto.randomUUID()
+      const fileExt = file.name.split('.').pop() || (isPdf ? 'pdf' : 'jpg')
+      const fileName = `${resourceId}.${fileExt}`
+      const storagePath = `${user.id}/${resourceId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('user_resources')
+        .upload(storagePath, file, { cacheControl: '3600', upsert: false })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('user_resources').getPublicUrl(storagePath)
+
+      const { error: dbError } = await supabase.from('user_resources').insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: isPdf ? 'pdf' : 'image',
+          file_size: file.size,
+          file_url: urlData.publicUrl,
+          storage_path: storagePath,
+          status: 'pending'
+      })
+      
+      if (dbError) throw dbError
+
+      setUploadSuccess(true)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setTimeout(() => setUploadSuccess(false), 3000)
+    } catch (error: any) {
+      setUploadError('上传失败')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const filteredBooks = useMemo(() => {
@@ -164,268 +339,349 @@ export default function AllBooksPage() {
     })
   }, [books, searchQuery, activeCategory])
 
+  const handleUploadClick = async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+        router.push('/login?redirect=/library/books')
+        return
+    }
+    fileInputRef.current?.click()
+  }
+
   return (
-    <div className="flex flex-col h-full bg-[#FAFAFA]">
-      {/* 1. Header: 简约的顶部栏 */}
-      <div className="flex-none px-8 py-6 bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-slate-500 hover:text-slate-900 -ml-2"
-              onClick={() => router.push('/library')}
-            >
-              <ChevronRight className="w-5 h-5 rotate-180" />
-            </Button>
-            <h1 className="text-2xl font-bold font-serif text-slate-900 flex items-center gap-2">
-              馆藏目录
-              <span className="text-sm font-sans font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {books.length} 部
-              </span>
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-[320px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="搜索书名、作者、朝代..."
-                className="pl-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+    <>
+      <style jsx global>{styles}</style>
+      
+      {/* 
+        主容器：h-screen 确保占满屏幕高度，不可滚动。
+        flex-col 布局将 Header 固定在顶部。
+      */}
+      <div className="flex flex-col h-screen overflow-hidden paper-texture text-stone-800">
+        
+        {/* --- Header: 固定高度，不随页面滚动 --- */}
+        <div className="flex-none px-6 lg:px-8 py-4 border-b border-stone-200/50 bg-[#F9F7F2]/90 backdrop-blur-md z-50">
+          <div className="max-w-[1920px] mx-auto w-full flex flex-col md:flex-row gap-4 items-center justify-between">
+            {/* Left: Title */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-stone-400 hover:text-stone-800 hover:bg-stone-200/50 rounded-full -ml-3"
+                onClick={() => router.push('/library')}
+              >
+                <ChevronRight className="w-5 h-5 rotate-180" />
+              </Button>
+              <h1 className="text-xl font-bold font-serif text-stone-900 tracking-tight flex items-center gap-2">
+                <span className="w-1 h-4 bg-[#C82E31] rounded-full inline-block"></span>
+                馆藏目录
+              </h1>
+              <Badge variant="secondary" className="bg-stone-100 text-stone-500 font-normal px-2 text-xs">
+                  {books.length} 部
+              </Badge>
             </div>
-            <Select defaultValue="popular">
-              <SelectTrigger className="w-[130px] bg-white">
-                <SortAsc className="w-4 h-4 mr-2 text-slate-500" />
-                <SelectValue placeholder="排序" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="popular">最受欢迎</SelectItem>
-                <SelectItem value="newest">最新收录</SelectItem>
-                <SelectItem value="oldest">年代最久</SelectItem>
-              </SelectContent>
-            </Select>
+
+            {/* Right: Search & Sort */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-[280px] group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400 group-focus-within:text-[#C82E31] transition-colors" />
+                <Input
+                  placeholder="检索书名、作者..."
+                  className="pl-9 h-9 bg-white/60 border-stone-200 focus-visible:ring-[#C82E31]/20 focus-visible:border-[#C82E31] rounded-full shadow-sm text-xs transition-all hover:bg-white"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select defaultValue="popular">
+                <SelectTrigger className="w-[120px] h-9 bg-white/60 border-stone-200 rounded-full shadow-sm text-xs">
+                  <SortAsc className="w-3.5 h-3.5 mr-2 text-stone-500" />
+                  <SelectValue placeholder="排序" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="popular">最受欢迎</SelectItem>
+                  <SelectItem value="newest">最新收录</SelectItem>
+                  <SelectItem value="oldest">年代最久</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 2. Main Content: 双栏布局 */}
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full h-full flex">
-          {/* Left Sidebar: 分类索引 */}
-          <div className="w-64 hidden lg:flex flex-col border-r border-slate-200 bg-white/50 h-full overflow-y-auto py-8 pr-6 pl-8">
-            <div className="space-y-6">
-              {/* 主要分类 */}
-              <div>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">
-                  学科分类
-                </h3>
-                <div className="space-y-1">
-                  {categories.map((cat) => (
-                    <Button
-                      key={cat.name}
-                      variant={activeCategory === cat.name ? 'secondary' : 'ghost'}
-                      className={`w-full justify-between font-normal ${
-                        activeCategory === cat.name
-                          ? 'bg-[#C82E31]/10 text-[#C82E31] font-medium'
-                          : 'text-slate-600'
-                      }`}
-                      onClick={() => setActiveCategory(cat.name)}
-                    >
-                      <span className="flex items-center">
-                        {activeCategory === cat.name && (
-                          <Library className="w-3.5 h-3.5 mr-2" />
-                        )}
-                        {cat.name}
-                      </span>
-                      <span className="text-xs text-slate-400">{cat.count}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* 朝代筛选 */}
-              <div>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">
-                  按年代检索
-                </h3>
-                <div className="flex flex-wrap gap-2 px-2">
-                  {DYNASTIES.map((dynasty) => (
-                    <Badge
-                      key={dynasty}
-                      variant="outline"
-                      className="cursor-pointer hover:border-slate-400 hover:bg-white text-slate-500 font-normal"
-                    >
-                      {dynasty}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* 我的书架 */}
-              <div className="pt-4">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-slate-600 border-dashed border-slate-300"
-                >
-                  <History className="w-4 h-4 mr-2" />
-                  最近阅读
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Content: 书籍网格 */}
-          <ScrollArea className="flex-1 h-full">
-            <div className="p-8 pb-20">
-              {/* 顶部标签栏 (Mobile Filter Placeholder) */}
-              <div className="flex items-center gap-2 mb-6 lg:hidden overflow-x-auto pb-2">
-                {categories.map((cat) => (
-                  <Badge
-                    key={cat.name}
-                    variant={activeCategory === cat.name ? 'default' : 'secondary'}
-                    className="whitespace-nowrap"
-                    onClick={() => setActiveCategory(cat.name)}
-                  >
-                    {cat.name}
-                  </Badge>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-8 gap-y-10">
-                {filteredBooks.map((book) => (
-                  <div key={book.id} className="group relative flex flex-col items-center">
-                    {/* 书籍拟物化主体 */}
-                    <div
-                      className="relative w-full aspect-[2/3] cursor-pointer transition-all duration-300 group-hover:-translate-y-2"
-                      onClick={() => handleBookClick(book.id)}
-                    >
-                      {/* 阴影层 - Hover时加深 */}
-                      <div className="absolute top-2 left-2 w-full h-full bg-slate-200 rounded-sm -z-10 transition-all duration-300 group-hover:top-3 group-hover:left-3 group-hover:bg-slate-300" />
-
-                      {/* 封面主体 */}
-                      <div
-                        className={`${book.color} w-full h-full rounded-sm border border-stone-200/60 shadow-sm overflow-hidden relative flex flex-col`}
-                      >
-                        {/* 左侧装订区 */}
-                        <div className="absolute left-0 top-0 bottom-0 w-[14px] bg-black/5 border-r border-black/5 z-10 flex flex-col justify-around py-4 items-center">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="w-full h-[1px] bg-stone-400/40" />
-                          ))}
-                        </div>
-
-                        {/* 状态徽章 */}
-                        <div className="absolute top-2 right-2">
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none"
-                          >
-                            {book.statusLabel}
-                          </Badge>
-                        </div>
-
-                        {/* 封面内容 */}
-                        <div className="flex-1 flex items-center justify-center pl-4">
-                          <div className="bg-white/50 border border-stone-800/20 px-3 py-6 min-h-[60%] flex items-center justify-center shadow-inner">
-                            <h3
-                              className="font-serif text-lg md:text-xl font-bold text-slate-900 tracking-[0.2em] leading-relaxed"
-                              style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}
-                            >
-                              {book.title}
-                            </h3>
-                          </div>
-                        </div>
-
-                        {/* 底部朝代/作者 (封面内) */}
-                        <div className="absolute bottom-3 right-3 text-[10px] text-stone-500 font-serif flex flex-col items-end gap-0.5 opacity-60">
-                          <span>{book.dynasty}</span>
-                          <span>{book.author}</span>
-                        </div>
-                      </div>
-
-                      {/* Hover Overlay: 快速操作 */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pl-4">
-                        <Button
-                          size="sm"
-                          className="bg-[#C82E31] text-white hover:bg-[#a61b1f] shadow-lg scale-90 group-hover:scale-100 transition-transform"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleBookClick(book.id)
-                          }}
+        {/* --- Content Body: 占据剩余空间 --- */}
+        <div className="flex-1 flex overflow-hidden max-w-[1920px] mx-auto w-full">
+            
+            {/* 
+              Left Sidebar: 
+              固定宽度，高度跟随父容器 (h-full)，
+              内部 overflow-y-auto 实现独立滚动。
+            */}
+            <div className="w-56 hidden lg:flex flex-col border-r border-stone-200/40 bg-[#F9F7F2]/50 h-full overflow-y-auto hide-scrollbar py-6 pr-4 pl-6">
+              <div className="space-y-6">
+                
+                {/* 学科分类 */}
+                <div>
+                  <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
+                    <LayoutGrid className="w-3 h-3" /> 学科分类
+                  </h3>
+                  <div className="space-y-0.5">
+                    {categories.map((cat) => {
+                      const isActive = activeCategory === cat.name
+                      return (
+                        <button
+                          key={cat.name}
+                          className={`w-full text-left py-1.5 px-3 rounded-md text-sm transition-all duration-200 flex justify-between items-center group relative ${
+                            isActive
+                              ? 'bg-white shadow-sm text-stone-900 font-bold'
+                              : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/30'
+                          }`}
+                          onClick={() => setActiveCategory(cat.name)}
                         >
-                          立即阅读
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 底部信息 (Metadata) */}
-                    <div className="mt-4 w-full px-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-bold text-slate-800 text-sm truncate">
-                            {book.title}
-                          </h4>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {book.author} · {book.dynasty}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-slate-300 hover:text-slate-600"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      {/* 阅读进度条 (如果有) */}
-                      {book.progress > 0 && (
-                        <div className="mt-2.5 flex items-center gap-2">
-                          <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#C82E31] rounded-full"
-                              style={{ width: `${book.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-[#C82E31] font-medium">
-                            {book.progress}%
+                          {isActive && <div className="absolute left-0 h-4 w-0.5 bg-[#C82E31] rounded-r-full" />}
+                          <span className="font-serif tracking-wide">{cat.name}</span>
+                          <span className={`text-[10px] ${isActive ? 'text-stone-600' : 'text-stone-500 group-hover:text-stone-400'}`}>
+                            {cat.count}
                           </span>
-                        </div>
-                      )}
-
-                      {/* 已读完标记 */}
-                      {book.progress === 100 && (
-                        <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> 已读完
-                        </div>
-                      )}
-                    </div>
+                        </button>
+                      )
+                    })}
                   </div>
-                ))}
+                </div>
 
-                {/* 模拟上传新书的空位 (Optional) */}
-                <div className="flex flex-col items-center justify-start pt-[30%] border-2 border-dashed border-slate-200 rounded-sm aspect-[2/3] hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all mb-3">
-                    <Book className="w-6 h-6" />
+                <Separator className="bg-stone-200/50" />
+
+                {/* 年代检索 */}
+                <div>
+                  <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
+                    <History className="w-3 h-3" /> 年代检索
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5 px-1">
+                    {DYNASTIES.map((dynasty) => (
+                      <Badge
+                        key={dynasty}
+                        variant="outline"
+                        className="cursor-pointer bg-white/40 border-stone-200/60 text-stone-500 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white transition-all font-serif text-[11px] px-2 py-0.5 font-normal"
+                      >
+                        {dynasty}
+                      </Badge>
+                    ))}
                   </div>
-                  <span className="text-sm font-medium text-slate-500">申请收录</span>
-                  <span className="text-xs text-slate-400 mt-1">上传 PDF / 图片</span>
                 </div>
               </div>
-              {loading && (
-                <div className="mt-10 text-center text-sm text-slate-400">加载中...</div>
-              )}
-              {!loading && loadError && (
-                <div className="mt-10 text-center text-sm text-red-600">{loadError}</div>
-              )}
             </div>
-          </ScrollArea>
+
+            {/* 
+              Right Content: 
+              flex-1 占据剩余宽度，h-full 占据剩余高度。
+              内部 ScrollArea 处理滚动。
+            */}
+            <div className="flex-1 h-full bg-transparent relative">
+              <ScrollArea className="h-full w-full">
+                <div className="p-6 lg:p-8 pb-32">
+                  
+                  {/* Mobile Filter */}
+                  <div className="flex items-center gap-2 mb-6 lg:hidden overflow-x-auto pb-1 hide-scrollbar">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.name}
+                        onClick={() => setActiveCategory(cat.name)}
+                        className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          activeCategory === cat.name
+                            ? 'bg-[#C82E31] text-white'
+                            : 'bg-white border border-stone-200 text-stone-600'
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 
+                    Books Grid:
+                    Increased grid columns (md:4, lg:5, xl:6) to make items smaller.
+                    Reduced gap (gap-x-6, gap-y-10).
+                  */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-x-8 gap-y-10">
+                    
+                    {loading ? (
+                      Array.from({ length: 12 }).map((_, i) => (
+                        <div key={i} className="flex flex-col items-center">
+                          <div className="w-full aspect-2/3 relative mb-3">
+                            <Skeleton className="w-full h-full rounded-sm bg-stone-200/50" />
+                          </div>
+                          <div className="w-full px-1 space-y-2">
+                            <Skeleton className="h-3 w-3/4 bg-stone-200/50" />
+                            <Skeleton className="h-2 w-1/2 bg-stone-200/50" />
+                          </div>
+                        </div>
+                      ))
+                    ) : filteredBooks.map((book) => (
+                      <div key={book.id} className="group relative flex flex-col items-center perspective-midrange">
+                        
+                        {/* Book Cover Container */}
+                        <div 
+                          className="relative w-full book-lift cursor-pointer"
+                          onClick={() => handleBookClick(book.id)}
+                        >
+                           {/* 
+                             Constraint: Do not modify BookCover functionality. 
+                             Assuming BookCover fits width:100% of parent. 
+                           */}
+                           <BookCover
+                            id={book.id}
+                            title={book.title}
+                            author={book.author}
+                            dynasty={book.dynasty}
+                            color={book.color}
+                            volumeType={book.volumeType}
+                            isManuallyReviewed={book.isManuallyReviewed}
+                            onClick={() => handleBookClick(book.id)}
+                          />
+                          {/* 底部柔和阴影 */}
+                          <div className="absolute -bottom-3 left-3 right-3 h-2 rounded-[100%] shelf-shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-[2px] pointer-events-none" />
+                        </div>
+
+                        {/* Metadata Info - Scaled down font sizes */}
+                        <div className="mt-3 w-full px-1 relative z-0">
+                          <div className="flex justify-between items-start gap-1">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold font-serif text-stone-800 text-sm truncate group-hover:text-[#C82E31] transition-colors">
+                                {book.title}
+                              </h4>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[10px] text-stone-500 font-medium bg-stone-100 px-1 py-px rounded-[2px] truncate max-w-[60px]">
+                                  {book.dynasty}
+                                </span>
+                                <span className="text-[10px] text-stone-400 truncate">
+                                  {book.author}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-stone-300 hover:text-stone-800 hover:bg-stone-100 rounded-full opacity-0 group-hover:opacity-100 transition-all -mr-1"
+                            >
+                              <MoreHorizontal className="w-3 h-3" />
+                            </Button>
+                          </div>
+
+                          {/* Progress Bar (Miniature) */}
+                          {book.progress > 0 && book.progress < 100 && (
+                            <div className="mt-2 group/progress">
+                               <div className="h-0.5 w-full bg-stone-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-[#C82E31] rounded-full"
+                                    style={{ width: `${book.progress}%` }}
+                                  />
+                               </div>
+                            </div>
+                          )}
+                          
+                          {/* Read Badge */}
+                          {book.progress === 100 && (
+                            <div className="mt-2 flex items-center gap-1 text-[10px] text-green-600 opacity-60">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> 已读
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Upload Card - Resized to match Grid */}
+                    {!loading && (
+                      <div className="relative flex flex-col items-center">
+                         <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          disabled={uploading}
+                        />
+                        <div
+                          onClick={handleUploadClick}
+                          className={`w-full aspect-[2/3] rounded-[4px] border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
+                            uploading
+                              ? 'border-stone-300 bg-stone-100'
+                              : uploadSuccess
+                              ? 'border-green-300 bg-green-50'
+                              : uploadError
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-[#C5A065]/30 hover:border-[#C5A065] hover:bg-[#C5A065]/5 bg-white/30'
+                          }`}
+                        >
+                           {/* Hover Ripple */}
+                           {!uploading && !uploadSuccess && !uploadError && (
+                               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none flex items-center justify-center">
+                                   <div className="w-16 h-16 rounded-full border border-[#C5A065]/10 animate-ping" />
+                               </div>
+                           )}
+
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-all duration-300 shadow-sm ${
+                              uploading
+                                ? 'bg-stone-200 text-stone-500'
+                                : uploadSuccess
+                                ? 'bg-green-100 text-green-600'
+                                : uploadError
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-white border border-[#C5A065]/20 text-[#C5A065] group-hover:scale-110 group-hover:shadow-md'
+                            }`}
+                          >
+                            {uploading ? (
+                              <Upload className="w-4 h-4 animate-pulse" />
+                            ) : uploadSuccess ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : uploadError ? (
+                              <X className="w-4 h-4" />
+                            ) : (
+                              <Upload className="w-4 h-4" />
+                            )}
+                          </div>
+                          
+                          <div className="text-center px-2 space-y-0.5 relative z-10">
+                              {uploading ? (
+                                <span className="block text-xs text-stone-400">处理中...</span>
+                              ) : uploadSuccess ? (
+                                <span className="block text-xs text-green-600">成功</span>
+                              ) : uploadError ? (
+                                <span className="block text-[10px] text-red-500 line-clamp-1">失败</span>
+                              ) : (
+                                <>
+                                  <span className="block text-xs font-bold font-serif text-stone-700 group-hover:text-[#C5A065] transition-colors">申请收录</span>
+                                  <span className="block text-[9px] text-stone-600 uppercase tracking-wider group-hover:text-[#C5A065]/60">上传 PDF / 图片</span>
+                                </>
+                              )}
+                          </div>
+                        </div>
+                        {uploadError && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-1 right-1 h-5 w-5 p-0 hover:bg-red-100 rounded-full"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setUploadError(null)
+                            }}
+                          >
+                            <X className="w-3 h-3 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {!loading && loadError && (
+                    <div className="mt-20 text-center">
+                        <p className="text-stone-400 text-sm">{loadError}</p>
+                    </div>
+                  )}
+                  
+                </div>
+              </ScrollArea>
+            </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

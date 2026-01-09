@@ -1,49 +1,119 @@
 'use client'
 
 import {
+  ArrowRight,
   BookOpen,
   Compass,
-  Filter,
   Flame,
-  Library,
   PenTool,
   ScrollText,
   Search,
   Sparkles,
-  Tag,
+  Tag
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+
+import { createClient } from '@/lib/supabase/client'
 
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Input } from '@/lib/components/ui/input'
 import { ScrollArea, ScrollBar } from '@/lib/components/ui/scroll-area'
-import { Tabs, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 
-// 样式补丁：宣纸纹理 & Tab 下划线
+// --- 极致视觉样式补丁 ---
 const styles = `
+  /* 1. 基础纹理：宣纸叠加噪点 */
   .paper-texture {
-    background-color: #fdfbf7;
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-color: #F9F7F2;
+    background-image: 
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E"),
+      linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, rgba(249,247,242,0) 100%);
   }
 
-  .tab-underline[data-state='active'] {
-    color: #1c1917;
-    font-weight: 600;
-    box-shadow: none;
-    border-bottom: 2px solid #C82E31;
-    border-radius: 0;
-    background: transparent;
+  /* 2. 暗黑卡片背景纹理 */
+  .card-background {
+    background-color: #1a1a1a;
+    background-image: 
+      radial-gradient(circle at 80% 20%, rgba(200, 46, 49, 0.18) 0%, transparent 40%),
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10 C 20 20, 40 20, 50 10 C 60 0, 80 0, 90 10 S 90 40, 50 50 S 10 40, 10 10 Z M50 50 C 60 60, 80 60, 90 50 C 100 40, 100 80, 90 90 S 60 100, 50 90 S 0 80, 10 90 S 40 100, 50 50 Z' stroke='%23FFFFFF' stroke-width='0.5' fill='none' opacity='0.03'/%3E%3C/svg%3E");
+    background-size: cover, 60px 60px;
+  }
+
+  /* 3. 书脊拟物效果：增加光泽感和圆弧感 */
+  .book-spine {
+    background: linear-gradient(90deg, 
+      #dcdad5 0%, 
+      #f0efeb 20%, 
+      #e6e4df 50%, 
+      #dcdad5 100%);
+    box-shadow: inset 2px 0 5px rgba(0,0,0,0.05), inset -2px 0 5px rgba(0,0,0,0.05);
+  }
+
+  /* 4. 文字发光效果 (用于Dark Mode) */
+  .text-glow {
+    text-shadow: 0 0 20px rgba(255,255,255,0.3);
+  }
+  
+  /* 5. 隐藏滚动条但保留功能 */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  /* 6. 链接下划线动画 */
+  .hover-underline {
+    display: inline-flex;
+    position: relative;
+  }
+  .hover-underline::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    transform: scaleX(0);
+    height: 1px;
+    bottom: 0;
+    left: 0;
+    background-color: currentColor;
+    transform-origin: bottom right;
+    transition: transform 0.25s ease-out;
+  }
+  .hover-underline:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
   }
 `
+
+type LibraryBook = {
+  id: string
+  title: string
+  author: string | null
+  volume_type: 'none' | 'upper' | 'lower' | null
+}
+
+type WikiArticle = {
+  id: string
+  title: string
+  slug: string
+  summary: string | null
+  view_count: number | null
+  category_name: string | null
+}
 
 export default function LibraryPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [books, setBooks] = useState<LibraryBook[]>([])
+  const [booksLoading, setBooksLoading] = useState(true)
+  const [latestArticle, setLatestArticle] = useState<WikiArticle | null>(null)
+  const [articleLoading, setArticleLoading] = useState(true)
 
+  // 处理搜索
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
@@ -51,344 +121,494 @@ export default function LibraryPage() {
     }
   }
 
-  const handleCategoryClick = (category: string) => {
-    router.push(`/library/wiki/${encodeURIComponent(category)}`)
-  }
-
-  const handleBookClick = (bookTitle: string) => {
-    router.push(`/library/reader/${encodeURIComponent(bookTitle)}`)
-  }
-
-  const handleTagClick = (tag: string) => {
-    router.push(`/cases?tag=${encodeURIComponent(tag)}`)
-  }
-
+  // 路由跳转辅助函数
+  const handleCategoryClick = (category: string) => router.push(`/library/wiki/${encodeURIComponent(category)}`)
+  const handleBookClick = (bookTitle: string) => router.push(`/library/reader/${encodeURIComponent(bookTitle)}`)
+  const handleTagClick = (tag: string) => router.push(`/cases?tag=${encodeURIComponent(tag)}`)
   const handleHotTopicClick = (topic: string) => {
     const keyword = topic.replace(/^#\s*/, '')
     router.push(`/cases?q=${encodeURIComponent(keyword)}`)
   }
 
+  // 计算书籍列表总宽度（书籍宽度 + 间距 + 留白）
+  const booksContainerWidth = useMemo(() => {
+    const bookWidth = 120 // 每本书宽度 120px
+    const bookGap = 40 // 书籍间距 space-x-10 = 40px
+    const padding = 32 // 左右 padding pl-4 pr-4 = 16px * 2 = 32px
+    const bookCount = booksLoading ? 5 : books.length // loading 时显示 5 个骨架屏
+    if (bookCount === 0) return 0
+    return bookCount * bookWidth + (bookCount - 1) * bookGap + padding
+  }, [books.length, booksLoading])
+
+  // 数据加载逻辑 (保持原样)
+  useEffect(() => {
+    const loadBooks = async () => {
+      const supabase = createClient()
+      if (!supabase) {
+        setBooksLoading(false)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('library_books')
+          .select('id, title, author, volume_type')
+          .in('status', ['reviewed', 'published'])
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (error) throw error
+        setBooks(data as LibraryBook[])
+      } catch (error) {
+        console.error('Failed to load books:', error)
+      } finally {
+        setBooksLoading(false)
+      }
+    }
+
+    const loadLatestArticle = async () => {
+      const supabase = createClient()
+      if (!supabase) {
+        setArticleLoading(false)
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('wiki_articles')
+          .select('id, title, slug, summary, view_count, wiki_categories(name)')
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') throw error
+
+        if (data) {
+          setLatestArticle({
+            id: data.id,
+            title: data.title,
+            slug: data.slug,
+            summary: data.summary,
+            view_count: data.view_count,
+            category_name: (data.wiki_categories as any)?.name || null,
+          })
+        } else {
+          setLatestArticle(null)
+        }
+      } catch (error) {
+        console.error('Failed to load latest article:', error)
+        setLatestArticle(null)
+      } finally {
+        setArticleLoading(false)
+      }
+    }
+
+    loadBooks()
+    loadLatestArticle()
+  }, [])
+
   return (
     <>
-      <style jsx global>{styles}</style>
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
 
-      <div className="flex flex-col min-h-screen paper-texture">
-        {/* Header（不置顶，随内容滚动） */}
-        <div className="flex-none px-6 lg:px-8 pt-10 pb-6 border-b border-stone-200/50 bg-[#fdfbf7]/80 backdrop-blur-sm">
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="flex flex-col gap-8">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-bold tracking-tight font-serif text-stone-800 flex items-center gap-2">
-                    <span className="w-1.5 h-6 bg-[#C82E31] rounded-full inline-block" />
-                    藏经阁 · 智慧沉淀
-                  </h1>
-                  <p className="text-stone-500 text-sm font-serif pl-3.5">
-                    “博学之，审问之，慎思之，明辨之，笃行之。”
-                  </p>
-                </div>
+      <div className="flex flex-col min-h-screen paper-texture selection:bg-[#C82E31] selection:text-white">
+        
+        {/* --- Header: 增加玻璃拟态和吸顶效果 --- */}
+        <div className="sticky top-0 z-50 px-6 lg:px-8 py-4 border-b border-stone-200/60 bg-[#F9F7F2]/80 backdrop-blur-md transition-all duration-300">
+          <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight font-serif text-stone-800 flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C82E31] text-white shadow-md shadow-red-900/10">
+                    <span className="font-serif font-bold text-lg">藏</span>
+                </span>
+                <span>藏经阁 · 智慧沉淀</span>
+              </h1>
+            </div>
 
-                <div className="flex items-center gap-3">
-                  <form onSubmit={handleSearch} className="relative w-full lg:w-[320px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
-                    <Input
-                      placeholder="搜索古籍、技法、知识点..."
-                      className="pl-9 h-10 bg-white/80 border-stone-200 focus-visible:ring-[#C82E31]/20 focus-visible:border-[#C82E31] shadow-sm rounded-lg text-sm"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </form>
-                  <Button className="bg-[#C82E31] hover:bg-[#a61b1f] text-white h-10 px-5 shadow-sm font-serif tracking-wide">
-                    <PenTool className="w-4 h-4 mr-2" />
-                    贡献词条
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Tabs defaultValue="recommend" className="w-full">
-                  <div className="flex items-center justify-between">
-                    <TabsList className="bg-transparent h-auto p-0 gap-6">
-                      <TabsTrigger
-                        value="recommend"
-                        className="tab-underline px-1 py-3 text-stone-500 text-base font-serif data-[state=active]:bg-transparent transition-all"
-                      >
-                        推荐
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="theory"
-                        className="tab-underline px-1 py-3 text-stone-500 text-base font-serif data-[state=active]:bg-transparent transition-all"
-                      >
-                        <BookOpen className="w-4 h-4 mr-1.5" />
-                        理论体系
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="books"
-                        className="tab-underline px-1 py-3 text-stone-500 text-base font-serif data-[state=active]:bg-transparent transition-all"
-                      >
-                        <Library className="w-4 h-4 mr-1.5" />
-                        珍藏古籍
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-full border-stone-200 text-stone-500 hover:text-stone-800 hover:border-stone-300 bg-white/50"
-                    >
-                      <Filter className="w-3.5 h-3.5 mr-1.5" />
-                      筛选
-                    </Button>
-                  </div>
-                </Tabs>
-              </div>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <form onSubmit={handleSearch} className="relative w-full md:w-[320px] group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#C82E31] transition-colors" />
+                <Input
+                  placeholder="搜索古籍、技法..."
+                  className="pl-10 h-10 bg-white/60 border-stone-200/80 focus-visible:ring-[#C82E31]/20 focus-visible:border-[#C82E31] shadow-sm rounded-full text-sm transition-all hover:bg-white"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </form>
+              <Button className="bg-[#1c1917] hover:bg-[#333] text-[#f5f5f0] h-10 px-6 rounded-full shadow-lg shadow-stone-900/10 font-serif tracking-wide transition-all hover:scale-105 active:scale-95">
+                <PenTool className="w-3.5 h-3.5 mr-2" />
+                贡献
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Main content */}
-        <ScrollArea className="flex-1 w-full">
-          <div className="max-w-7xl mx-auto w-full p-6 lg:p-8 pt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left column */}
-              <div className="lg:col-span-9 space-y-8">
-                {/* Daily Learn */}
-                <Card className="group relative overflow-hidden border-none shadow-lg bg-[#1c1917] text-stone-100 hover:shadow-xl transition-all duration-500">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                    <Compass className="w-64 h-64 text-white -rotate-12" />
-                  </div>
-
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className="border border-[#C82E31]/50 text-[#C82E31] bg-[#C82E31]/10 px-3 py-1 text-xs font-bold font-serif tracking-widest backdrop-blur-sm rounded-sm">
-                      每日一学
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row h-full">
-                    <div className="md:w-56 p-8 flex flex-col justify-center items-center text-center relative border-r border-white/10">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#C82E31] to-[#7f1d1d] flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(200,46,49,0.3)]">
-                        <Sparkles className="w-8 h-8 text-white" />
-                      </div>
-                      <h3 className="font-serif text-xl font-bold tracking-widest">进神退神</h3>
-                      <p className="text-[10px] text-stone-400 mt-2 uppercase tracking-widest">Advanced Tech</p>
-                    </div>
-
-                    <div className="p-8 flex-1 flex flex-col justify-center relative z-10">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-xs font-bold text-[#C82E31] bg-white/10 px-2 py-0.5 rounded border border-white/10">
-                          进阶技法
-                        </span>
-                        <span className="text-xs text-stone-400">阅读 2.1k</span>
-                      </div>
-                      <h2
-                        className="text-2xl font-serif font-bold text-white mb-4 leading-tight group-hover:text-[#C82E31] transition-colors cursor-pointer"
-                        onClick={() => handleCategoryClick('进阶技法')}
-                      >
-                        论“进神”与“退神”的实战吉凶判定
-                      </h2>
-                      <p className="text-stone-300 text-sm leading-relaxed line-clamp-2 font-serif mb-6 opacity-80">
-                        “进神者，如春木之向荣；退神者，如秋叶之凋零。” 在占断吉凶时，进退之机往往决定了事情的长远走向。本文将结合《增删卜易》古例深入剖析。
-                      </p>
-                      <Button
-                        size="sm"
-                        className="bg白色 text-stone-900 hover:bg-stone-100 border-none h-9 px-6 font-medium"
-                        onClick={() => handleCategoryClick('进阶技法')}
-                      >
-                        <BookOpen className="w-4 h-4 mr-2" /> 开始研读
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Knowledge graph */}
-                <div className="space-y-4">
-                  <h3 className="text-base font-bold font-serif text-stone-800 flex items-center gap-2 mb-4 border-l-4 border-[#C82E31] pl-3">
-                    知识图谱
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {[
-                      { title: '基础理论', desc: '五行 / 八卦 / 干支', char: '乾' },
-                      { title: '六亲通辩', desc: '取象 / 类神 / 飞伏', char: '亲' },
-                      { title: '五行生克', desc: '旺衰 / 刑冲 / 合害', char: '生' },
-                      { title: '应期法则', desc: '远近 / 快慢 / 定数', char: '应' },
-                      { title: '进阶技法', desc: '进退 / 反吟 / 暗动', char: '技' },
-                      { title: '分类占验', desc: '求财 / 功名 / 感情', char: '占' },
-                    ].map((item) => (
-                      <Card
-                        key={item.title}
-                        className="group cursor-pointer border border-stone-200/60 bg-white/60 hover:bg-white hover:border-[#C82E31]/30 hover:shadow-md transition-all duration-300"
-                        onClick={() => handleCategoryClick(item.title)}
-                      >
-                        <CardContent className="p-5 flex flex-row items-start gap-4">
-                          <div className="w-12 h-12 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0 group-hover:bg-[#C82E31] group-hover:text-white group-hover:border-[#C82E31] transition-colors duration-300 font-serif font-bold text-stone-600 text-xl shadow-sm">
-                            {item.char}
-                          </div>
-                          <div className="space-y-1">
-                            <h4 className="text-base font-bold text-stone-800 font-serif group-hover:text-[#C82E31] transition-colors">
-                              {item.title}
-                            </h4>
-                            <p className="text-xs text-stone-400 group-hover:text-stone-500 transition-colors">
-                              {item.desc}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+        {/* --- Main Content --- */}
+        <div className="flex-1 w-full max-w-7xl mx-auto p-6 lg:p-8 space-y-10">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
+            {/* Left Main Column */}
+            <div className="lg:col-span-9 space-y-10">
+              
+              {/* 1. Daily Learn Hero Card (优化版) */}
+              <Card className="group relative overflow-hidden border-none shadow-2xl shadow-stone-900/20 bg-[#1c1917] text-stone-100 card-background rounded-2xl ring-1 ring-white/10">
+                {/* 装饰：背景罗盘 */}
+                <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-700 pointer-events-none">
+                  <Compass className="w-80 h-80 text-white -rotate-12 transform origin-center" />
+                </div>
+                
+                {/* 装饰：顶部标签 */}
+                <div className="absolute top-6 right-6 z-20">
+                  <div className="flex items-center gap-2 border border-[#C82E31]/40 text-[#ff6b6b] bg-[#C82E31]/10 px-3 py-1 text-[10px] font-bold font-serif tracking-[0.2em] backdrop-blur-md rounded-full shadow-[0_0_10px_rgba(200,46,49,0.2)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b6b] animate-pulse"/>
+                    每日一学
                   </div>
                 </div>
 
-                {/* Books */}
-                <div className="space-y-4 pt-4">
-                  <div className="flex items-center justify-between border-b border-stone-200 pb-2 mb-4">
-                    <h3 className="text-base font-bold font-serif text-stone-800 flex items-center gap-2 border-l-4 border-[#C82E31] pl-3">
-                      经典古籍
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-stone-400 hover:text-[#C82E31]"
-                      asChild
-                    >
-                      <Link href="/library/books">查看全部 →</Link>
-                    </Button>
-                  </div>
-
-                  <div className="relative bg-[#f5f5f0] border border-stone-200 rounded-lg p-8 shadow-inner overflow-hidden">
-                    <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')]" />
-
-                    <ScrollArea className="w-full whitespace-nowrap pb-4">
-                      <div className="flex w-max space-x-8 px-4">
-                        {[
-                          { title: '增删卜易', author: '野鹤老人' },
-                          { title: '卜筮正宗', author: '王洪绪' },
-                          { title: '易隐', author: '曹九锡' },
-                          { title: '火珠林', author: '麻衣道者' },
-                          { title: '断易天机', author: '鬼谷子' },
-                        ].map((book) => (
-                          <div
-                            key={book.title}
-                            className="group relative shrink-0 w-[130px] cursor-pointer"
-                            onClick={() => handleBookClick(book.title)}
-                          >
-                            <div className="relative aspect-[2/3] bg-[#EBE9E4] shadow-[5px_5px_15px_rgba(0,0,0,0.15)] group-hover:-translate-y-2 group-hover:shadow-[8px_15px_25px_rgba(0,0,0,0.2)] transition-all duration-500 border-r border-stone-300 rounded-sm">
-                              <div className="absolute left-0 top-0 bottom-0 w-4 bg-[#Dcdad5] border-r border-stone-300 z-10 flex flex-col justify-around py-4 items-center shadow-inner">
-                                <div className="w-full h-[1px] bg-stone-400/50" />
-                                <div className="w-full h-[1px] bg-stone-400/50" />
-                                <div className="w-full h-[1px] bg-stone-400/50" />
-                                <div className="w-full h-[1px] bg-stone-400/50" />
-                              </div>
-
-                              <div className="absolute top-4 left-8 right-6 bg-[#FDFBF7] border border-stone-300 shadow-sm py-4 flex justify-center items-center">
-                                <span
-                                  className="font-serif text-lg font-bold text-stone-800 tracking-[0.2em]"
-                                  style={{ writingMode: 'vertical-rl' }}
-                                >
-                                  {book.title}
-                                </span>
-                              </div>
-
-                              <div className="absolute bottom-3 right-3 opacity-60">
-                                <div className="border border-[#C82E31] text-[#C82E31] text-[9px] px-1 py-0.5 rounded-[2px] font-serif">
-                                  {book.author}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="absolute -bottom-4 left-2 right-2 h-2 bg-black/10 blur-md rounded-[50%] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                          </div>
-                        ))}
-                      </div>
-                      <ScrollBar orientation="horizontal" className="bg-stone-200/50" />
-                    </ScrollArea>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right column */}
-              <div className="lg:col-span-3 space-y-8">
-                <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
-                  <h4 className="text-sm font-bold font-serif text-stone-800 mb-5 flex items-center">
-                    <Flame className="w-4 h-4 mr-2 text-[#C82E31]" /> 热门研读
-                  </h4>
-                  <div className="space-y-4">
-                    {[
-                      { title: '# 如何判断用神旺衰', views: 234 },
-                      { title: '# 暗动的吉凶法则', views: 189 },
-                      { title: '# 三合局应期判断', views: 156 },
-                      { title: '# 墓库论与入墓', views: 112 },
-                    ].map((item, index) => (
-                      <div
-                        key={item.title}
-                        className="flex items-start gap-3 group cursor-pointer"
-                        onClick={() => handleHotTopicClick(item.title)}
-                      >
-                        <span
-                          className={`text-[10px] font-bold mt-0.5 w-4 h-4 flex items-center justify-center rounded ${
-                            index === 0
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : index === 1
-                              ? 'bg-stone-200 text-stone-600'
-                              : index === 2
-                              ? 'bg-[#d6cfc7] text-[#5c554e]'
-                              : 'text-stone-300'
-                          }`}
-                        >
-                          {index + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm text-stone-700 font-medium group-hover:text-[#C82E31] transition-colors truncate">
-                            {item.title}
-                          </div>
-                          <div className="text-[10px] text-stone-400 mt-0.5 flex items-center gap-1">
-                            <BookOpen className="w-3 h-3" /> {item.views} 人研习
-                          </div>
+                <div className="flex flex-col md:flex-row h-full relative z-10">
+                  {/* 左侧：图标区 */}
+                  <div className="md:w-64 p-8 flex flex-col justify-center items-center text-center relative border-b md:border-b-0 md:border-r border-white/5 bg-linear-to-b from-white/2 to-transparent">
+                    <div className="relative group-hover:scale-105 transition-transform duration-500 ease-out">
+                        {/* 红色光晕背景 */}
+                        <div className="absolute inset-0 bg-[#C82E31] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 rounded-full" />
+                        <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-[#C82E31] to-[#7f1d1d] flex items-center justify-center mb-6 shadow-inner border border-white/10 relative z-10">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white drop-shadow-md">
+                                <path d="M2 6C2 5.44772 2.44772 5 3 5H10.5C11.3284 5 12 5.67157 12 6.5V19.5C12 18.6716 11.3284 18 10.5 18H3C2.44772 18 2 17.5523 2 17V6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                                <path d="M22 6C22 5.44772 21.5523 5 21 5H13.5C12.6716 5 12 5.67157 12 6.5V19.5C12 18.6716 12.6716 18 13.5 18H21C21.5523 18 22 17.5523 22 17V6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                                <path d="M12 5V19.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                <path d="M12 0L13.5 3L16.5 4.5L13.5 6L12 9L10.5 6L7.5 4.5L10.5 3L12 0Z" fill="currentColor"/>
+                            </svg>
                         </div>
-                      </div>
-                    ))}
+                    </div>
+                    
+                    {latestArticle ? (
+                       <div className="space-y-1">
+                          <h3 className="font-serif text-lg font-bold tracking-widest text-white/90">
+                            智慧·推演
+                          </h3>
+                          <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] font-medium">
+                            Logic & Wisdom
+                          </p>
+                       </div>
+                    ) : (
+                        <div className="h-4 w-20 bg-white/10 animate-pulse rounded mx-auto"/>
+                    )}
                   </div>
-                </div>
 
-                <div>
-                  <h4 className="text-sm font-bold font-serif text-stone-800 mb-4 flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-stone-400" /> 技法反查
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {['月破', '暗动', '伏吟', '反吟', '三合局', '六合', '旬空', '进神', '退神', '飞伏'].map(
-                      (tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="bg-white border border-stone-200 text-stone-600 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-red-50/50 px-3 py-1 font-serif cursor-pointer transition-all shadow-sm"
-                          onClick={() => handleTagClick(tag)}
+                  {/* 右侧：内容区 */}
+                  <div className="p-8 md:p-10 flex-1 flex flex-col justify-center">
+                    {articleLoading ? (
+                      <div className="space-y-4 max-w-lg">
+                        <div className="flex gap-2"><div className="h-4 w-16 bg-white/10 rounded"/><div className="h-4 w-12 bg-white/10 rounded"/></div>
+                        <div className="h-8 w-3/4 bg-white/10 rounded"/>
+                        <div className="h-20 w-full bg-white/10 rounded"/>
+                      </div>
+                    ) : latestArticle ? (
+                      <>
+                        <div className="flex items-center gap-3 mb-4">
+                          {latestArticle.category_name && (
+                            <span className="text-[11px] font-bold text-[#ff6b6b] bg-[#C82E31]/10 px-2 py-0.5 rounded border border-[#C82E31]/20">
+                              {latestArticle.category_name}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-stone-500 flex items-center gap-1">
+                             <div className="w-1 h-1 rounded-full bg-stone-500"/>
+                             {latestArticle.view_count || 0} 人正在研习
+                          </span>
+                        </div>
+                        
+                        <h2
+                          className="text-3xl font-serif font-bold text-white mb-4 leading-snug group-hover:text-[#ff8a8a] transition-colors cursor-pointer text-glow"
+                          onClick={() => router.push(`/library/wiki/${latestArticle.slug}`)}
                         >
-                          {tag}
-                        </Badge>
-                      ),
+                          {latestArticle.title}
+                        </h2>
+                        
+                        {latestArticle.summary && (
+                          <p className="text-stone-400 text-sm leading-7 font-serif mb-8 max-w-2xl line-clamp-2">
+                            {latestArticle.summary}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center gap-4">
+                            <Button
+                                className="bg-white text-stone-950 hover:bg-stone-200 border-none h-10 px-6 font-medium font-serif tracking-wide transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:-translate-y-0.5"
+                                onClick={() => router.push(`/library/wiki/${latestArticle.slug}`)}
+                            >
+                                <BookOpen className="w-4 h-4 mr-2" /> 开始研读
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                className="text-stone-400 hover:text-white hover:bg-white/5 font-serif text-sm"
+                                asChild
+                            >
+                                <Link href="/library/wiki">
+                                    浏览往期 <ArrowRight className="w-3 h-3 ml-1"/>
+                                </Link>
+                            </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-stone-400 font-serif">暂无今日内容</div>
                     )}
                   </div>
                 </div>
+              </Card>
 
-                <Card className="bg-gradient-to-br from-[#fcfbf9] to-[#f5f5f4] border border-stone-200 shadow-sm relative overflow-hidden group cursor-pointer hover:border-[#C82E31]/30 transition-colors">
-                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <ScrollText className="w-16 h-16" />
+              {/* 2. Knowledge Graph (优化版：卡片质感) */}
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold font-serif text-stone-800 flex items-center gap-3">
+                    <span className="w-1 h-5 bg-[#C82E31] rounded-full" />
+                    知识图谱
+                  </h3>
+                  <Link href="/library/wiki" className="text-xs text-stone-400 hover:text-[#C82E31] inline-flex items-center gap-1 transition-colors hover-underline whitespace-nowrap">
+                    查看全部<ArrowRight className="w-3 h-3"/>
+                  </Link>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-5">
+                  {[
+                    { title: '基础理论', desc: '五行 / 八卦 / 干支', char: '基', color: 'bg-stone-100 text-stone-600' },
+                    { title: '象数推演', desc: '六爻 / 梅花 / 奇门', char: '象', color: 'bg-stone-100 text-stone-600' },
+                    { title: '命理推演', desc: '八字 / 紫薇 ', char: '命', color: 'bg-stone-100 text-stone-600' },
+                    { title: '应期法则', desc: '远近 / 快慢 / 定数', char: '应', color: 'bg-stone-100 text-stone-600' },
+                    { title: '进阶技法', desc: '进退 / 反吟 / 暗动', char: '技', color: 'bg-stone-100 text-stone-600' },
+                    { title: '分类占验', desc: '求财 / 功名 / 感情', char: '占', color: 'bg-stone-100 text-stone-600' },
+                  ].map((item) => (
+                    <div
+                      key={item.title}
+                      className="group cursor-pointer relative bg-white border border-stone-200/60 rounded-xl p-5 hover:border-[#C82E31]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+                      onClick={() => handleCategoryClick(item.title)}
+                    >
+                      {/* 背景装饰字 */}
+                      <div className="absolute -right-4 -bottom-4 text-[80px] font-serif font-black text-stone-50 opacity-[0.03] group-hover:opacity-[0.05] pointer-events-none select-none transition-opacity">
+                          {item.char}
+                      </div>
+
+                      <div className="flex flex-row items-center gap-4 relative z-10">
+                        <div className={`w-12 h-12 rounded-xl ${item.color} border border-stone-200/50 flex items-center justify-center shrink-0 group-hover:bg-[#C82E31] group-hover:text-white group-hover:border-[#C82E31] transition-all duration-300 font-serif font-bold text-xl shadow-sm group-hover:shadow-md`}>
+                          {item.char}
+                        </div>
+                        <div className="space-y-1.5 min-w-0">
+                          <h4 className="text-base font-bold text-stone-800 font-serif group-hover:text-[#C82E31] transition-colors truncate">
+                            {item.title}
+                          </h4>
+                          <p className="text-xs text-stone-400 group-hover:text-stone-500 transition-colors truncate font-medium">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Classic Books (优化版：拟真书架) */}
+              <div className="space-y-5 pt-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold font-serif text-stone-800 flex items-center gap-3">
+                    <span className="w-1 h-5 bg-[#C82E31] rounded-full" />
+                    经典古籍
+                  </h3>
+                  <Link href="/library/books" className="text-xs text-stone-400 hover:text-[#C82E31] flex items-center gap-1 transition-colors hover-underline">
+                    全部藏书 <ArrowRight className="w-3 h-3"/>
+                  </Link>
+                </div>
+
+                <div className="relative bg-[#f0efeb] border border-[#e6e4df] rounded-xl p-8 pb-10 shadow-inner overflow-hidden">
+                  {/* 书架木纹背景 */}
+                  <div className="absolute inset-0 opacity-[0.08] bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] mix-blend-multiply" />
+                  {/* 书架阴影层 */}
+                  <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-black/5 to-transparent z-0"/>
+
+                  <ScrollArea className="w-full whitespace-nowrap z-10">
+                    <div className="flex w-max space-x-10 pl-4 pr-4 pb-4 pt-2">
+                      {booksLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <div key={`skeleton-${i}`} className="shrink-0 w-[120px] h-[180px] bg-stone-300/50 animate-pulse rounded-sm shadow-sm" />
+                        ))
+                      ) : books.length > 0 ? (
+                        books.map((book) => (
+                          <div
+                            key={book.id}
+                            className="group relative shrink-0 w-[120px] cursor-pointer perspective-500"
+                            onClick={() => handleBookClick(book.id)}
+                          >
+                            <div className="relative aspect-2/3 bg-[#FDFBF7] shadow-[4px_0_10px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.02)] group-hover:-translate-y-3 group-hover:shadow-[10px_20px_30px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out border-r border-stone-300 rounded-[2px] overflow-hidden transform-style-3d">
+                              
+                              {/* 书脊细节 */}
+                              <div className="absolute left-0 top-0 bottom-0 w-5 book-spine z-10 flex flex-col justify-between py-6 items-center border-r border-black/5">
+                                <div className="space-y-1 w-full flex flex-col items-center">
+                                    <div className="w-3/4 h-px bg-stone-400/40" />
+                                    <div className="w-3/4 h-px bg-stone-400/40" />
+                                </div>
+                                <div className="space-y-1 w-full flex flex-col items-center">
+                                    <div className="w-3/4 h-px bg-stone-400/40" />
+                                    <div className="w-3/4 h-px bg-stone-400/40" />
+                                </div>
+                              </div>
+
+                              {/* 封面内容 */}
+                              <div className="absolute top-5 left-8 right-3 bottom-5 border border-stone-800/10 flex justify-center items-center p-2 bg-white/50">
+                                <div 
+                                    className="font-serif text-stone-800 font-bold tracking-[0.3em] text-center leading-loose"
+                                    style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}
+                                >
+                                    {book.title.length > 6 ? (
+                                        <>
+                                            <span className="text-sm opacity-80">{book.title.slice(0,5)}</span>
+                                            <span className="text-sm opacity-80">{book.title.slice(5)}</span>
+                                        </>
+                                    ) : (
+                                        <span className="text-base">{book.title}</span>
+                                    )}
+                                </div>
+                              </div>
+                              
+                              {/* 册数标记 */}
+                              {(book.volume_type === 'upper' || book.volume_type === 'lower') && (
+                                <div className="absolute right-1.5 bottom-2">
+                                    <span className="text-[10px] font-serif text-stone-500 border border-stone-300 px-0.5 py-1 rounded-sm writing-mode-vertical">
+                                        {book.volume_type === 'upper' ? '上' : '下'}
+                                    </span>
+                                </div>
+                              )}
+
+                              {/* 作者印章 */}
+                              <div className="absolute bottom-3 left-7 opacity-70">
+                                <div className="border border-[#C82E31] text-[#C82E31] text-[8px] px-1 py-1 rounded-[2px] font-serif leading-none bg-white/80">
+                                  {book.author?.slice(0,2)}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* 悬浮时的底部阴影 */}
+                            <div className="absolute -bottom-4 left-4 right-4 h-2 bg-black/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-stone-400 text-sm py-8 w-full text-center">暂无书籍</div>
+                      )}
+                    </div>
+                    <ScrollBar 
+                      orientation="horizontal" 
+                      className="bg-stone-300/50 h-2" 
+                      style={{ width: `${booksContainerWidth}px` }}
+                    />
+                  </ScrollArea>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="lg:col-span-3 space-y-8">
+              
+              {/* Hot Topics (优化版：更干净的列表) */}
+              <div className="bg-white border border-stone-200/60 rounded-xl p-6 shadow-sm">
+                <h4 className="text-sm font-bold font-serif text-stone-800 mb-6 flex items-center gap-2">
+                  <div className="p-1 bg-red-50 rounded text-[#C82E31]">
+                    <Flame className="w-3.5 h-3.5" />
                   </div>
-                  <CardContent className="p-5 text-center space-y-3 relative z-10">
-                    <h5 className="font-serif font-bold text-stone-800">共建藏经阁</h5>
-                    <p className="text-xs text-stone-500 leading-relaxed">
-                      发现古籍缺漏？或是对技法有独到见解？诚邀您成为贡献者。
+                  热门研读
+                </h4>
+                <div className="space-y-5">
+                  {[
+                    { title: '如何判断用神旺衰', views: 234 },
+                    { title: '暗动的吉凶法则', views: 189 },
+                    { title: '三合局应期判断', views: 156 },
+                    { title: '墓库论与入墓', views: 112 },
+                    { title: '六兽发动歌诀', views: 98 },
+                  ].map((item, index) => (
+                    <div
+                      key={item.title}
+                      className="flex items-baseline gap-3 group cursor-pointer"
+                      onClick={() => handleHotTopicClick(item.title)}
+                    >
+                      <span className={`text-[10px] font-bold w-4 text-center shrink-0 font-serif ${
+                        index < 3 ? 'text-[#C82E31]' : 'text-stone-300'
+                      }`}>
+                        {index + 1 < 10 ? `0${index + 1}` : index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0 pb-3 border-b border-stone-100 group-last:border-0 group-hover:border-stone-200 transition-colors">
+                        <div className="text-sm text-stone-700 font-medium font-serif group-hover:text-[#C82E31] transition-colors truncate">
+                          {item.title}
+                        </div>
+                        <div className="text-[10px] text-stone-400 mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-1 group-hover:translate-y-0">
+                          <BookOpen className="w-3 h-3" /> {item.views} 研习
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tags (优化版：印章风格) */}
+              <div>
+                <h4 className="text-sm font-bold font-serif text-stone-800 mb-4 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-stone-400" /> 技法反查
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {['月破', '暗动', '伏吟', '反吟', '三合局', '六合', '旬空', '进神', '退神', '飞伏'].map(
+                    (tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="bg-stone-50/50 border-stone-200 text-stone-600 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white px-2.5 py-1 font-serif cursor-pointer transition-all hover:shadow-sm"
+                        onClick={() => handleTagClick(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Co-build Card (优化版：黑金风格，视觉平衡) */}
+              <Card className="group relative overflow-hidden border-none shadow-xl bg-[#1c1917] text-stone-100 mt-4 rounded-xl card-background">
+                {/* 装饰边框 */}
+                <div className="absolute inset-0 border border-[#C5A065]/20 rounded-xl m-1 pointer-events-none" />
+                
+                {/* 背景大水印 */}
+                <div className="absolute -right-4 -bottom-4 opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-500 transform rotate-[-10deg] scale-125">
+                     <ScrollText className="w-32 h-32 text-[#C5A065]" />
+                </div>
+
+                <CardContent className="p-6 relative z-10">
+                  <div className="flex flex-col gap-5">
+                    <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                            <div className="inline-flex items-center gap-1.5 border border-[#C5A065]/30 text-[#C5A065] bg-[#C5A065]/5 px-2 py-0.5 text-[10px] font-bold font-serif tracking-widest rounded-sm">
+                                <Sparkles className="w-3 h-3" /> 共修藏经阁
+                            </div>
+                            <h5 className="font-serif font-bold text-xl text-white group-hover:text-[#C5A065] transition-colors">
+                                添砖加瓦
+                            </h5>
+                        </div>
+                        
+                        {/* 动态图标 */}
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#C5A065]/20 to-transparent border border-[#C5A065]/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                             <PenTool className="w-5 h-5 text-[#C5A065]" />
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-stone-400 leading-relaxed font-serif opacity-90 border-l-2 border-[#C5A065]/30 pl-3">
+                      古籍浩如烟海，难免遗珠之憾。<br/>诚邀您补全缺漏，让智慧完整传承。
                     </p>
+                    
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full text-xs h-8 border-stone-300 hover:text-[#C82E31] hover:border-[#C82E31] bg-white"
+                      className="w-full border-[#C5A065]/40 text-[#C5A065] hover:bg-[#C5A065] hover:text-[#1c1917] hover:border-[#C5A065] bg-transparent h-9 font-serif font-bold tracking-wide transition-all duration-300"
                     >
-                      申请加入
+                      我要修缮
                     </Button>
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
+
             </div>
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </>
   )

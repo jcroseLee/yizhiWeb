@@ -11,8 +11,9 @@ export default function ConditionalLayout({
 }) {
   const pathname = usePathname()
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password'
+  const isHomePage = pathname === '/'
 
-  if (isAuthPage) {
+  if (isAuthPage || isHomePage) {
     return <>{children}</>
   }
 

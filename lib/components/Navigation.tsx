@@ -1,6 +1,7 @@
 'use client'
 
 import { HeaderSearch } from '@/lib/components/HeaderSearch'
+import Logo from '@/lib/components/Logo'
 import { Button } from '@/lib/components/ui/button'
 import { Input } from '@/lib/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
@@ -204,7 +205,7 @@ export default function Navigation() {
           {/* 左侧：Logo区域 - 响应式宽度 */}
           <div className="w-64 shrink-0 flex px-4 h-full border-r max-md:w-auto max-md:px-2 max-md:border-r-0 max-md:min-w-0">
             <Link href="/" className="flex pl-2 pt-2 max-md:pl-1">
-              <svg width="300" height="50" viewBox="0 0 300 50" className="max-md:w-[200px] max-md:h-[33px]" xmlns="http://www.w3.org/2000/svg">
+              {/* <svg width="300" height="50" viewBox="0 0 300 50" className="max-md:w-[200px] max-md:h-[33px]" xmlns="http://www.w3.org/2000/svg">
                 <g transform="translate(0, 5)">
                   <path d="M10 6 Q 8 12 8 18" stroke="#2C3E50" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
                   <path d="M8 22 Q 8 28 10 34" stroke="#2C3E50" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
@@ -218,7 +219,8 @@ export default function Navigation() {
                   易知
                 </text>
                 
-              </svg>
+              </svg> */}
+              <Logo />
             </Link>
           </div>
           

@@ -15,6 +15,8 @@ type ImportRequestBody = {
   limit?: number
 }
 
+const ALLOWED_LIBRARY_BOOK_STATUSES = new Set(['draft', 'reviewed', 'published'])
+
 function limitString(input: string, maxLen: number) {
   if (input.length <= maxLen) return input
   return input.slice(0, maxLen)
@@ -439,6 +441,42 @@ function normalizeHomeInMistsTitle(input: string) {
   return t
 }
 
+function normalizeLibraryBookStatus(input: string | undefined | null) {
+  const raw = (input || '').trim()
+  if (!raw) return null
+  const s = raw.toLowerCase()
+
+  if (ALLOWED_LIBRARY_BOOK_STATUSES.has(s)) return s
+
+  const zh = raw.replace(/\s+/g, '')
+  if (zh === '草稿' || zh === '待审核' || zh === '采集导入' || zh === '导入' || zh === '未发布') return 'draft'
+  if (zh === '已审核' || zh === '待发布') return 'reviewed'
+  if (zh === '已发布' || zh === '发布' || zh === '公开') return 'published'
+
+  return null
+}
+
+function formatUnknownError(e: unknown) {
+  if (e instanceof Error) return e.message || 'Unknown error'
+  if (typeof e === 'string') return e || 'Unknown error'
+  if (e && typeof e === 'object') {
+    const anyErr = e as any
+    if (typeof anyErr.message === 'string' && anyErr.message.trim()) return anyErr.message
+    if (typeof anyErr.error === 'string' && anyErr.error.trim()) return anyErr.error
+    if (typeof anyErr.details === 'string' && anyErr.details.trim()) return anyErr.details
+    if (typeof anyErr.hint === 'string' && anyErr.hint.trim()) return anyErr.hint
+    if (typeof anyErr.code === 'string' && anyErr.code.trim()) {
+      return `Error code: ${anyErr.code}`
+    }
+    try {
+      return JSON.stringify(anyErr)
+    } catch {
+      return 'Unknown error'
+    }
+  }
+  return 'Unknown error'
+}
+
 export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
@@ -452,6 +490,15 @@ export async function POST(req: NextRequest) {
     const ctx = await getAdminContext(token)
     if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { headers: { ...corsHeaders }, status: ctx.status })
 
+    const warnings: string[] = []
+    const warningSet = new Set<string>()
+    const addWarning = (msg: string) => {
+      const m = msg.trim()
+      if (!m || warningSet.has(m)) return
+      warningSet.add(m)
+      warnings.push(m)
+    }
+
     const body = (await req.json().catch(() => null)) as ImportRequestBody | null
     const sourceType = body?.source_type
     if (!sourceType || !['github', 'wikisource', 'legacy'].includes(sourceType)) {
@@ -459,7 +506,12 @@ export async function POST(req: NextRequest) {
     }
 
     const defaultCategory = (body?.default_category || '古籍').trim()
-    const defaultStatus = (body?.default_status || '采集导入').trim()
+    const providedDefaultStatus = body?.default_status
+    const normalizedDefaultStatus = normalizeLibraryBookStatus(providedDefaultStatus)
+    if (providedDefaultStatus && !normalizedDefaultStatus) {
+      addWarning(`default_status="${providedDefaultStatus}" 不合法，已回退为 draft`)
+    }
+    const defaultStatus = normalizedDefaultStatus || 'draft'
     const limit = typeof body?.limit === 'number' && Number.isFinite(body.limit) ? Math.min(200, Math.max(1, Math.floor(body.limit))) : 50
 
     const nowIso = new Date().toISOString()
@@ -486,7 +538,7 @@ export async function POST(req: NextRequest) {
         author: payload.author || null,
         dynasty: payload.dynasty || null,
         category: payload.category || defaultCategory,
-        status: payload.status || defaultStatus,
+        status: normalizeLibraryBookStatus(payload.status || undefined) || defaultStatus,
         cover_url: payload.cover_url || null,
         description,
         updated_at: nowIso,
@@ -535,7 +587,8 @@ export async function POST(req: NextRequest) {
           } catch (e: any) {
             const msg = typeof e?.message === 'string' ? e.message : ''
             if (/(relation|table).+library_book_contents.+does not exist/i.test(msg)) {
-              throw new Error('缺少表 library_book_contents，请先执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+              addWarning('缺少表 library_book_contents，章节目录未生成；请执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+              return { action: 'updated' as const, id: existing.id, title }
             }
             throw e
           }
@@ -570,7 +623,8 @@ export async function POST(req: NextRequest) {
             } catch (e: any) {
               const msg = typeof e?.message === 'string' ? e.message : ''
               if (/(relation|table).+library_book_contents.+does not exist/i.test(msg)) {
-                throw new Error('缺少表 library_book_contents，请先执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+                addWarning('缺少表 library_book_contents，章节目录未生成；请执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+                return { action: 'inserted' as const, id: fallbackId2, title }
               }
               throw e
             }
@@ -584,7 +638,8 @@ export async function POST(req: NextRequest) {
           } catch (e: any) {
             const msg = typeof e?.message === 'string' ? e.message : ''
             if (/(relation|table).+library_book_contents.+does not exist/i.test(msg)) {
-              throw new Error('缺少表 library_book_contents，请先执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+              addWarning('缺少表 library_book_contents，章节目录未生成；请执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+              return { action: 'inserted' as const, id: fallbackId1, title }
             }
             throw e
           }
@@ -597,7 +652,8 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           const msg = typeof e?.message === 'string' ? e.message : ''
           if (/(relation|table).+library_book_contents.+does not exist/i.test(msg)) {
-            throw new Error('缺少表 library_book_contents，请先执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+            addWarning('缺少表 library_book_contents，章节目录未生成；请执行迁移：supabase/migrations/20260106_create_library_book_contents.sql')
+            return { action: 'inserted' as const, id: inserted.id as string, title }
           }
           throw e
         }
@@ -645,7 +701,10 @@ export async function POST(req: NextRequest) {
         source_payload: { api_url: url, mode: 'parse' },
       })
 
-      return NextResponse.json({ inserted: item.action === 'inserted' ? 1 : 0, updated: item.action === 'updated' ? 1 : 0, items: [item] }, { headers: { ...corsHeaders } })
+      return NextResponse.json(
+        { inserted: item.action === 'inserted' ? 1 : 0, updated: item.action === 'updated' ? 1 : 0, items: [item], warnings },
+        { headers: { ...corsHeaders } }
+      )
     }
 
     if (sourceType === 'legacy') {
@@ -744,7 +803,7 @@ export async function POST(req: NextRequest) {
           if (item.action === 'updated') updated += 1
         }
 
-        return NextResponse.json({ inserted, updated, items: results }, { headers: { ...corsHeaders } })
+        return NextResponse.json({ inserted, updated, items: results, warnings }, { headers: { ...corsHeaders } })
       }
 
       let html: string
@@ -767,7 +826,10 @@ export async function POST(req: NextRequest) {
         source_payload: { extracted_title: title },
       })
 
-      return NextResponse.json({ inserted: item.action === 'inserted' ? 1 : 0, updated: item.action === 'updated' ? 1 : 0, items: [item] }, { headers: { ...corsHeaders } })
+      return NextResponse.json(
+        { inserted: item.action === 'inserted' ? 1 : 0, updated: item.action === 'updated' ? 1 : 0, items: [item], warnings },
+        { headers: { ...corsHeaders } }
+      )
     }
 
     const githubUrl = (body?.github_raw_url || '').trim()
@@ -826,11 +888,11 @@ export async function POST(req: NextRequest) {
       results.push(item)
     }
 
-    return NextResponse.json({ inserted, updated, items: results }, { headers: { ...corsHeaders } })
+    return NextResponse.json({ inserted, updated, items: results, warnings }, { headers: { ...corsHeaders } })
   } catch (e) {
     console.error('admin library import error:', e)
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Unknown error' },
+      { error: formatUnknownError(e) },
       { headers: { ...corsHeaders }, status: 500 }
     )
   }

@@ -214,28 +214,27 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
         <div className="flex-1 min-w-0 flex flex-col">
           {/* 标题 */}
           <Link href={`/community/${post.id}`} className="block mb-2">
-            <h3 className="text-[17px] sm:text-[19px] font-bold text-stone-900 leading-snug tracking-tight group-hover:text-[#C82E31] transition-colors line-clamp-2">
+            <h3 className="text-[17px] sm:text-[19px] font-bold text-stone-900 leading-snug tracking-tight group-hover:text-[#C82E31] transition-colors line-clamp-2" style={{ fontFamily: "'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif" }}>
               {post.title}
             </h3>
           </Link>
 
           {/* 摘要 */}
-          <p className="text-[14px] sm:text-[15px] text-stone-500 leading-relaxed line-clamp-3 mb-3">
+          <p className="text-[14px] sm:text-[15px] font-normal text-stone-700 leading-relaxed line-clamp-3 mb-3 tracking-[1px]" style={{ fontFamily: "'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif" }}>
             {post.excerpt}
           </p>
 
           {/* 底部：作者与标签 */}
           <div className="mt-auto pt-2 flex items-center justify-between">
-            {/* 作者 */}
-            <div className="flex items-center gap-2 group/author cursor-pointer">
-              <Avatar className="w-6 h-6 border border-stone-100">
-                <AvatarImage src={post.author.avatar} alt={post.author.name} />
-                <AvatarFallback className="text-[9px] bg-stone-100 text-stone-500">{post.author.name?.[0]}</AvatarFallback>
-              </Avatar>
-              <span className="text-xs text-stone-500 font-medium group-hover/author:text-stone-800 transition-colors truncate max-w-[100px]">
-                {post.author.name}
-              </span>
+            {/* 标签组 */}
+            <div className="flex flex-wrap gap-2 overflow-hidden h-6">
+              {post.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="text-[12px] px-2 py-0.5 bg-stone-50 text-sky-950/70 rounded-full border border-stone-100">
+                  #{tag}
+                </span>
+              ))}
             </div>
+            
           </div>
         </div>
 
@@ -267,15 +266,17 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
       </div>
 
       {/* 底部操作栏 - 分离线 */}
-      <div className="relative z-10 mt-4 pt-3 border-t border-stone-50 flex items-center justify-between">
+      <div className="relative z-10 mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
         
-        {/* 标签组 */}
-        <div className="flex flex-wrap gap-2 overflow-hidden h-6">
-          {post.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="text-[10px] px-2 py-0.5 bg-stone-50 text-stone-400 rounded-full border border-stone-100">
-              #{tag}
-            </span>
-          ))}
+        {/* 作者 */}
+        <div className="flex items-center gap-2 group/author cursor-pointer">
+          <Avatar className="w-6 h-6 border border-stone-100">
+            <AvatarImage src={post.author.avatar} alt={post.author.name} />
+            <AvatarFallback className="text-[9px] bg-stone-100 text-stone-500">{post.author.name?.[0]}</AvatarFallback>
+          </Avatar>
+          <span className="text-xs text-stone-500 font-medium group-hover/author:text-stone-800 transition-colors truncate max-w-[100px]">
+            {post.author.name}
+          </span>
         </div>
 
         {/* 动作按钮组 */}
@@ -405,7 +406,7 @@ function StatusStamp({ status }: { status?: string }) {
         "w-20 h-20 sm:w-24 sm:h-24 rounded-full",
         "border-[3px] border-double",
         // 颜色：使用灰石色模拟陈旧印记，若要红色印章可用 border-red-800/20 text-red-800/20
-        "border-stone-300/70 text-stone-300/70", 
+        "border-red-800/20 text-red-800/20", 
         "transform -rotate-15",
         "mix-blend-multiply transition-all duration-500",
         // 父级 hover 时，印章稍微加深，增加"显影"感

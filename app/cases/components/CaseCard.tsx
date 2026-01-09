@@ -115,16 +115,16 @@ export default function CaseCard({ data, className }: CaseCardProps) {
 
   return (
     <Link href={`/cases/${data.id}`} className={cn('block group', className)}>
-      <Card className="bg-white border border-ink-200/50 card-shadow active:scale-[0.99] transition-transform duration-200 lg:hover:shadow-lg lg:hover:border-ink-300/60 cursor-pointer relative overflow-hidden">
+      <Card className="bg-white border border-stone-200 rounded-2xl shadow-sm active:scale-[0.99] transition-all duration-200 hover:shadow-md hover:border-stone-300 cursor-pointer relative overflow-hidden">
         {/* 印章 */}
         <CaseStamp feedback={data.feedback} />
         
         <CardContent className="p-4 lg:p-7">
           {/* Header */}
-          <div className="flex items-center justify-between mb-3 lg:mb-4 pb-2 lg:pb-3 border-b border-ink-200/40">
+          <div className="flex items-center justify-between mb-3 lg:mb-4 pb-2 lg:pb-3 border-b border-stone-100">
             <div className="flex items-center gap-2 lg:gap-2.5">
               <div 
-                className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-br from-ink-200 to-ink-300 flex items-center justify-center text-xs lg:text-sm text-ink-700 font-medium shadow-sm overflow-hidden"
+                className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 flex items-center justify-center text-xs lg:text-sm text-stone-700 font-medium shadow-sm overflow-hidden"
                 onClick={(e) => {
                   if (data.author.id) {
                     e.preventDefault()
@@ -136,12 +136,12 @@ export default function CaseCard({ data, className }: CaseCardProps) {
                 {data.author.avatar ? <img src={data.author.avatar} alt="" className="w-full h-full object-cover" /> : data.author.name.charAt(0)}
               </div>
               <div className="flex items-center gap-1.5 text-xs lg:text-sm">
-                <span className="font-medium text-ink-800">{data.author.name}</span>
-                <span className="text-ink-400">·</span>
-                <span className="text-ink-500 scale-90 lg:scale-100 origin-left">LV.{data.author.level}</span>
+                <span className="font-medium text-stone-800">{data.author.name}</span>
+                <span className="text-stone-400">·</span>
+                <span className="text-stone-500 scale-90 lg:scale-100 origin-left">LV.{data.author.level}</span>
                 {data.author.isVerified && (
                   <>
-                    <span className="text-ink-400 hidden lg:inline">·</span>
+                    <span className="text-stone-400 hidden lg:inline">·</span>
                     <span className="font-medium text-[#C82E31] scale-90 lg:scale-100 origin-left hidden lg:inline">认证卦师</span>
                     <span className="lg:hidden text-[#C82E31] scale-75 origin-left border border-[#C82E31] px-1 rounded ml-1">V</span>
                   </>
@@ -162,7 +162,7 @@ export default function CaseCard({ data, className }: CaseCardProps) {
 
             {/* Right: Text */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg lg:text-2xl font-serif font-bold text-ink-900 mb-2 lg:mb-3 leading-snug line-clamp-2">
+              <h3 className="text-lg lg:text-2xl font-serif font-bold text-stone-900 mb-2 lg:mb-3 leading-snug line-clamp-2">
                 <span className="text-[#C82E31] mr-1">求测：</span>{data.question}
               </h3>
               <p className="text-xs lg:text-sm text-[#666] mb-3 lg:mb-4 line-clamp-2 leading-relaxed">
@@ -181,13 +181,13 @@ export default function CaseCard({ data, className }: CaseCardProps) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-3 lg:mt-4 pt-2 lg:pt-3 border-t border-ink-200/40 text-[10px] lg:text-xs text-ink-500">
+          <div className="flex items-center justify-between mt-3 lg:mt-4 pt-2 lg:pt-3 border-t border-stone-100 text-[10px] lg:text-xs text-stone-500">
             <div className="flex items-center gap-3 lg:gap-5">
               <span>{data.stats.views} 浏览</span>
               <span>{data.stats.comments} 断语</span>
               <span className="hidden lg:inline">{data.stats.favorites} 收藏</span>
             </div>
-            <span className="text-ink-400">{data.publishTime}</span>
+            <span className="text-stone-400">{data.publishTime}</span>
           </div>
         </CardContent>
       </Card>

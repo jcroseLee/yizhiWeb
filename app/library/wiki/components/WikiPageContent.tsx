@@ -1,11 +1,26 @@
 import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/lib/components/ui/breadcrumb"
 import { Button } from '@/lib/components/ui/button'
 import { createClient } from '@/lib/supabase/server'
-import { Share2 } from 'lucide-react'
+import {
+    FileQuestion,
+    Hash,
+    LayoutGrid,
+    Library,
+    Share2
+} from 'lucide-react'
 import Link from 'next/link'
 import { WikiArticleContainer } from './WikiArticleContainer'
 import { WikiArticleList } from './WikiArticleList'
 import { WikiSidebar } from './WikiSidebar'
+import { WikiStyles } from './WikiStyles'
 
 // Shared Server Component for Wiki Page Logic
 export async function WikiPageContent({ slug }: { slug: string }) {
@@ -90,26 +105,58 @@ export async function WikiPageContent({ slug }: { slug: string }) {
       }
 
       return (
-        <div className="flex flex-col h-screen paper-texture">
-           <header className="flex-none h-14 border-b border-stone-200/60 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-30 px-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                 <Link href="/library/wiki" className="font-serif font-bold text-lg text-[#1a252f]">藏经阁</Link>
-                 <span className="text-stone-300">/</span>
-                 <span className="text-sm text-stone-500">{article.wiki_categories?.name}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="text-stone-600 hover:text-[#1a252f] hover:bg-stone-100">
-                      <Share2 className="w-4 h-4 mr-2" /> 分享
-                  </Button>
-              </div>
-           </header>
-           <div className="flex-1 flex overflow-hidden">
-              <WikiSidebar className="hidden lg:flex border-r border-stone-200/60 !bg-transparent" initialCategories={treeData} />
-              <main className="flex-1 overflow-y-auto scroll-smooth">
-                 <WikiArticleContainer article={article} relatedBooks={relatedBooks} />
-              </main>
-           </div>
-        </div>
+        <>
+            <WikiStyles />
+            <div className="flex flex-col h-screen paper-texture text-stone-800">
+                {/* Header */}
+                <header className="flex-none h-14 border-b border-stone-200/50 bg-[#F9F7F2]/80 backdrop-blur-md sticky top-0 z-40 px-6 lg:px-8 flex items-center justify-between transition-all duration-300">
+                    <div className="flex items-center gap-4">
+                        <Breadcrumb>
+                            <BreadcrumbList className="text-sm">
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="/library/wiki" className="font-serif hover:text-[#C82E31] transition-colors flex items-center gap-1">
+                                        <Library className="w-3.5 h-3.5" /> 藏经阁
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink 
+                                        href={`/library/wiki/${article.wiki_categories?.slug}`} 
+                                        className="font-serif hover:text-[#C82E31] transition-colors"
+                                    >
+                                        {article.wiki_categories?.name}
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage className="font-bold text-stone-800 font-serif truncate max-w-[200px]">
+                                        {article.title}
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="h-8 text-stone-500 hover:text-stone-900 hover:bg-stone-200/50 font-serif">
+                            <Share2 className="w-3.5 h-3.5 mr-2" /> 分享
+                        </Button>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex overflow-hidden relative">
+                    {/* Sidebar */}
+                    <WikiSidebar 
+                        className="hidden lg:flex w-72 border-r border-stone-200/50 bg-transparent" 
+                        initialCategories={treeData} 
+                    />
+                    
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto scroll-smooth">
+                        <WikiArticleContainer article={article} relatedBooks={relatedBooks} />
+                    </main>
+                </div>
+            </div>
+        </>
       )
   }
 
@@ -146,28 +193,48 @@ export async function WikiPageContent({ slug }: { slug: string }) {
       }))
 
       return (
-        <div className="flex flex-col h-screen bg-[#FAFAFA]">
-           <header className="flex-none h-14 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-30 px-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                 <Link href="/library/wiki" className="font-serif font-bold text-lg text-slate-900">藏经阁</Link>
-                 <span className="text-slate-300">/</span>
-                 <span className="text-sm text-slate-500">{category.name}</span>
-              </div>
-           </header>
-           <div className="flex-1 flex overflow-hidden">
-              <WikiSidebar className="hidden lg:flex" initialCategories={treeData} />
-              <main className="flex-1 overflow-y-auto bg-white scroll-smooth">
-                 <div className="max-w-4xl mx-auto px-8 py-10 lg:px-12 lg:py-12">
-                     <WikiArticleList 
-                        title={category.name} 
-                        description={category.description} 
-                        type="category" 
-                        articles={formattedArticles} 
-                     />
-                 </div>
-              </main>
-           </div>
-        </div>
+        <>
+            <WikiStyles />
+            <div className="flex flex-col h-screen paper-texture text-stone-800">
+                <header className="flex-none h-14 border-b border-stone-200/50 bg-[#F9F7F2]/80 backdrop-blur-md sticky top-0 z-40 px-6 lg:px-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Breadcrumb>
+                            <BreadcrumbList className="text-sm">
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="/library/wiki" className="font-serif hover:text-[#C82E31] transition-colors flex items-center gap-1">
+                                        <Library className="w-3.5 h-3.5" /> 藏经阁
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage className="font-bold text-stone-800 font-serif flex items-center gap-2">
+                                        <LayoutGrid className="w-3.5 h-3.5 text-[#C82E31]" />
+                                        {category.name}
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex overflow-hidden relative">
+                    <WikiSidebar 
+                        className="hidden lg:flex w-72 border-r border-stone-200/50 bg-transparent" 
+                        initialCategories={treeData} 
+                    />
+                    <main className="flex-1 overflow-y-auto scroll-smooth">
+                        <div className="max-w-4xl mx-auto px-6 py-12 lg:px-12 lg:py-16">
+                            <WikiArticleList 
+                                title={category.name} 
+                                description={category.description} 
+                                type="category" 
+                                articles={formattedArticles} 
+                            />
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </>
       )
   }
 
@@ -193,40 +260,74 @@ export async function WikiPageContent({ slug }: { slug: string }) {
         }))
 
       return (
-        <div className="flex flex-col h-screen bg-[#FAFAFA]">
-           <header className="flex-none h-14 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-30 px-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                 <Link href="/library/wiki" className="font-serif font-bold text-lg text-slate-900">藏经阁</Link>
-                 <span className="text-slate-300">/</span>
-                 <span className="text-sm text-slate-500">标签: {tag.name}</span>
-              </div>
-           </header>
-           <div className="flex-1 flex overflow-hidden">
-              <WikiSidebar className="hidden lg:flex" initialCategories={treeData} />
-              <main className="flex-1 overflow-y-auto bg-white scroll-smooth">
-                 <div className="max-w-4xl mx-auto px-8 py-10 lg:px-12 lg:py-12">
-                     <WikiArticleList 
-                        title={tag.name} 
-                        type="tag" 
-                        articles={articles} 
-                     />
-                 </div>
-              </main>
-           </div>
-        </div>
+        <>
+            <WikiStyles />
+            <div className="flex flex-col h-screen paper-texture text-stone-800">
+                <header className="flex-none h-14 border-b border-stone-200/50 bg-[#F9F7F2]/80 backdrop-blur-md sticky top-0 z-40 px-6 lg:px-8 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Breadcrumb>
+                            <BreadcrumbList className="text-sm">
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="/library/wiki" className="font-serif hover:text-[#C82E31] transition-colors flex items-center gap-1">
+                                        <Library className="w-3.5 h-3.5" /> 藏经阁
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator />
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage className="font-bold text-stone-800 font-serif flex items-center gap-2">
+                                        <Hash className="w-3.5 h-3.5 text-[#C82E31]" />
+                                        {tag.name}
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex overflow-hidden relative">
+                    <WikiSidebar 
+                        className="hidden lg:flex w-72 border-r border-stone-200/50 bg-transparent" 
+                        initialCategories={treeData} 
+                    />
+                    <main className="flex-1 overflow-y-auto scroll-smooth">
+                        <div className="max-w-4xl mx-auto px-6 py-12 lg:px-12 lg:py-16">
+                            <WikiArticleList 
+                                title={tag.name} 
+                                type="tag" 
+                                articles={articles} 
+                            />
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </>
       )
   }
 
-  // 4. Not Found
+  // 4. Not Found - 优雅的空状态
   return (
-    <div className="flex items-center justify-center h-screen bg-[#FAFAFA]">
-        <div className="text-center">
-            <h1 className="text-2xl font-serif font-bold text-slate-900 mb-2">未找到页面</h1>
-            <p className="text-slate-500 mb-4">该词条、分类或标签可能已被移除或尚未创建。</p>
-            <Link href="/library/wiki">
-                <Button>返回藏经阁</Button>
-            </Link>
+    <>
+        <WikiStyles />
+        <div className="flex items-center justify-center h-screen paper-texture text-stone-800">
+            <div className="text-center max-w-md px-6 animate-in fade-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center mx-auto mb-6 shadow-sm">
+                    <FileQuestion className="w-10 h-10 text-stone-400" />
+                </div>
+                <h1 className="text-2xl font-serif font-bold text-stone-800 mb-3 tracking-wide">
+                    卷帙未存
+                </h1>
+                <p className="text-stone-500 mb-8 leading-relaxed font-serif">
+                    “此处空空如也，或许是遗失在时光中的篇章。”
+                    <br />
+                    <span className="text-sm text-stone-400 mt-2 block">该词条、分类或标签可能已被移除。</span>
+                </p>
+                <Link href="/library/wiki">
+                    <Button className="bg-[#C82E31] hover:bg-[#a61b1f] text-white px-8 h-10 shadow-md shadow-red-900/10 font-serif">
+                        返回藏经阁
+                    </Button>
+                </Link>
+            </div>
         </div>
-    </div>
+    </>
   )
 }

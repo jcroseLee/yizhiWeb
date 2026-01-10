@@ -145,7 +145,7 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
 
   // 生成月份标签
   const monthLabels = useMemo(() => {
-    const labels = []
+    const labels: Array<{ weekIndex: number; label: string }> = []
     let lastMonth = -1
     
     heatmapData.weeks.forEach((week, index) => {

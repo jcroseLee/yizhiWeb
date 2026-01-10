@@ -28,6 +28,16 @@ interface DivinationFormProps {
   questionError?: boolean
 }
 
+const EXAMPLE_QUESTIONS = [
+  "求测财运：近期财运如何？",
+  "求测事业：工作变动是否顺利？",
+  "求测感情：这段感情会有结果吗？",
+  "求测健康：身体不适何时能好？",
+  "求测出行：这次出行是否平安？",
+  "求测失物：丢失的物品能找回吗？",
+  "求测学业：这次考试能否通过？"
+]
+
 export default function DivinationForm({
   question,
   onQuestionChange,
@@ -40,6 +50,7 @@ export default function DivinationForm({
 }: DivinationFormProps) {
   // 当前时间状态，每秒更新一次
   const [currentTime, setCurrentTime] = useState(() => new Date())
+  const [isQuestionFocused, setIsQuestionFocused] = useState(false)
 
   useEffect(() => {
     // 每秒更新一次当前时间
@@ -112,12 +123,37 @@ export default function DivinationForm({
                 placeholder="所占何事？请在此处简述（必填）..." 
                 value={question}
                 onChange={(e) => onQuestionChange(e.target.value)}
+                onFocus={() => setIsQuestionFocused(true)}
+                onBlur={() => setTimeout(() => setIsQuestionFocused(false), 200)}
                 className={`bg-transparent border-0 border-b rounded-none px-0 py-2 min-h-[80px] resize-none text-base text-stone-700 placeholder:text-stone-300 placeholder:font-light focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:bg-stone-50/50 transition-colors ${
                   questionError 
                     ? 'border-solid border-red-500 focus:border-red-500' 
                     : 'border-dashed border-stone-300 focus:border-[#C82E31]'
                 }`}
               />
+              
+              {/* 推荐问题下拉框 */}
+              {isQuestionFocused && (
+                <div className="absolute top-full left-0 w-full z-10 bg-white border border-stone-200 shadow-lg rounded-sm mt-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+                  <div className="px-3 py-2 text-xs text-stone-400 bg-stone-50 border-b border-stone-100 font-sans">
+                    问题示例
+                  </div>
+                  {EXAMPLE_QUESTIONS.map((q, i) => (
+                    <div
+                      key={i}
+                      className="px-3 py-2 text-sm text-stone-600 hover:bg-[#C82E31]/5 hover:text-[#C82E31] cursor-pointer transition-colors border-b border-stone-50 last:border-0"
+                      onMouseDown={(e) => {
+                        e.preventDefault() // 防止失去焦点
+                        onQuestionChange(q)
+                        setIsQuestionFocused(false)
+                      }}
+                    >
+                      {q}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <PenLine className="absolute right-0 bottom-2 w-4 h-4 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
             </div>
             {questionError && (

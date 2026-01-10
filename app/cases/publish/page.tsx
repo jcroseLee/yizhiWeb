@@ -6,9 +6,9 @@ import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Input } from '@/lib/components/ui/input'
 import {
-  Sheet,
-  SheetContent,
-  SheetTitle
+    Sheet,
+    SheetContent,
+    SheetTitle
 } from "@/lib/components/ui/sheet"
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -16,15 +16,15 @@ import { getCurrentUser } from '@/lib/services/auth'
 import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord } from '@/lib/services/profile'
 import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Loader2,
-  Plus,
-  Save,
-  ScrollText,
-  Send,
-  X
+    ArrowLeft,
+    Check,
+    ChevronRight,
+    Loader2,
+    Plus,
+    Save,
+    ScrollText,
+    Send,
+    X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -198,7 +198,7 @@ const RecordSelectionList = ({
             <div className="w-1 h-4 bg-[#C82E31] rounded-full"></div>
             选择排盘
           </div>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open('/6yao', '_blank')}>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => window.open('/tools/6yao', '_blank')}>
             <Plus className="w-3 h-3" /> 新建排盘
           </Button>
         </h3>

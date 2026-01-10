@@ -155,17 +155,6 @@ const styles = `
   .react-datepicker__navigation:hover *::before {
     border-color: #C82E31;
   }
-  
-  /* 错误震动动画 */
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-    20%, 40%, 60%, 80% { transform: translateX(4px); }
-  }
-  
-  .animate-shake {
-    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-  }
 `
 
 // 类型定义
@@ -291,7 +280,7 @@ export default function ToolsPage() {
   const handleViewResult = () => {
     // 优先使用保存的结果ID
     if (lastResultId) {
-      router.push(`/6yao/${lastResultId}`)
+      router.push(`/tools/6yao/${lastResultId}`)
       return
     }
     
@@ -301,18 +290,18 @@ export default function ToolsPage() {
       if (resultsListStr) {
         const resultsList: StoredResultWithId[] = JSON.parse(resultsListStr)
         if (resultsList.length > 0) {
-          router.push(`/6yao/${resultsList[0].id}`)
+          router.push(`/tools/6yao/${resultsList[0].id}`)
           return
         }
       }
       // 向后兼容：如果没有结果列表，尝试读取旧存储
       const stored = localStorage.getItem(RESULT_STORAGE_KEY)
       if (stored) {
-        router.push('/6yao/latest')
+        router.push('/tools/6yao/latest')
         return
       }
     }
-    router.push('/6yao')
+    router.push('/tools/6yao')
   }
   
   const handleGoBack = () => {

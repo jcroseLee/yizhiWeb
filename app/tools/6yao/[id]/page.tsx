@@ -1,24 +1,24 @@
 'use client'
 
 import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Calendar,
-  Check,
-  ChevronDown, ChevronUp,
-  CloudFog, Download,
-  Edit2,
-  Loader2,
-  Moon,
-  PenLine,
-  Plus,
-  RefreshCw,
-  RotateCcw, Save, Send,
-  Share2, Sparkles,
-  Sun,
-  Trash2,
-  X
+    ArrowLeft,
+    ArrowRight,
+    BookOpen,
+    Calendar,
+    Check,
+    ChevronDown, ChevronUp,
+    CloudFog, Download,
+    Edit2,
+    Loader2,
+    Moon,
+    PenLine,
+    Plus,
+    RefreshCw,
+    RotateCcw, Save, Send,
+    Share2, Sparkles,
+    Sun,
+    Trash2,
+    X
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -30,21 +30,21 @@ import { Card } from '@/lib/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/lib/components/ui/dialog'
 import { Textarea } from '@/lib/components/ui/textarea'
 import {
-  LINE_LABELS,
-  RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
+    LINE_LABELS,
+    RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
-  addDivinationNote,
-  deleteDivinationNote,
-  getDivinationNotes,
-  getDivinationRecordById,
-  saveDivinationRecord,
-  updateDivinationNote,
-  updateDivinationQuestion,
-  type DivinationNote
+    addDivinationNote,
+    deleteDivinationNote,
+    getDivinationNotes,
+    getDivinationRecordById,
+    saveDivinationRecord,
+    updateDivinationNote,
+    updateDivinationQuestion,
+    type DivinationNote
 } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
 import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
@@ -145,7 +145,7 @@ function ResultPageContent() {
   
   const handleLoginRedirect = useCallback(() => {
     // 构造登录重定向 URL，包含当前页面路径
-    const currentPath = `/6yao/${resultId}`
+    const currentPath = `/tools/6yao/${resultId}`
     const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}`
     
     toast({
@@ -326,7 +326,7 @@ function ResultPageContent() {
               console.error("Failed to load notes:", err)
             })
           } else {
-            router.push('/6yao')
+            router.push('/tools/6yao')
           }
         } else {
           // ... existing local storage logic ...
@@ -365,15 +365,15 @@ function ResultPageContent() {
                  setHasUnsavedChanges(false)
                  setNotes(loadLocalNotes(resultId))
                }
-               else router.push('/6yao')
+               else router.push('/tools/6yao')
             }
           } else {
-             router.push('/6yao')
+             router.push('/tools/6yao')
           }
         }
       } catch (e) {
         console.error("Failed to load result:", e)
-        router.push('/6yao')
+        router.push('/tools/6yao')
       } finally {
         setLoading(false)
       }
@@ -1345,7 +1345,7 @@ function ResultPageContent() {
                      <ArrowLeft className="w-3.5 h-3.5" /> 返回上一页
                    </Button>
                  )}
-                 <Button variant="outline" className="w-full border-stone-200 bg-[#fdfbf7] text-stone-500 hover:text-stone-800 hover:bg-white gap-2 h-9 text-xs" onClick={() => router.push('/6yao')}>
+                 <Button variant="outline" className="w-full border-stone-200 bg-[#fdfbf7] text-stone-500 hover:text-stone-800 hover:bg-white gap-2 h-9 text-xs" onClick={() => router.push('/tools/6yao')}>
                    <RotateCcw className="w-3.5 h-3.5" /> 重新排盘
                  </Button>
                </div>
@@ -1355,7 +1355,7 @@ function ResultPageContent() {
           {/* 移动端底部固定工具栏 */}
           <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
              <div className="flex items-center gap-4 flex-1 justify-between pr-4">
-               <button onClick={() => router.push('/6yao')} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
+               <button onClick={() => router.push('/tools/6yao')} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
                   <RotateCcw className="w-5 h-5" />
                   <span className="text-[10px] font-medium">重排</span>
                </button>

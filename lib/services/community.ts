@@ -131,6 +131,7 @@ export interface Post {
     id: string
     nickname: string | null
     avatar_url: string | null
+    title_level?: number
   } | null
   // 是否已点赞
   is_liked?: boolean
@@ -166,6 +167,7 @@ export interface Comment {
     id: string
     nickname: string | null
     avatar_url: string | null
+    title_level?: number
   } | null
   // 是否已点赞
   is_liked?: boolean
@@ -401,9 +403,68 @@ export async function getPosts(options?: {
 }
 
 /**
+ * 获取相关文章列表（排除求测类帖子）
+ */
+export async function getRelatedPosts(currentPostId: string, limit = 5): Promise<Post[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase client not initialized')
+  }
+
+  // 获取不包含 help 类型的帖子，且不包含当前帖子
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*')
+    .neq('type', 'help') // 排除求测类
+    .neq('id', currentPostId) // 排除当前帖子
+    .in('status', ['published']) // 只显示已发布
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching related posts:', error)
+    return []
+  }
+
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  // 获取用户信息
+  const userIds = [...new Set(data.map((post) => post.user_id).filter(Boolean))]
+  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
+  
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, nickname, avatar_url')
+      .in('id', userIds)
+
+    if (profiles) {
+      profiles.forEach((profile) => {
+        profilesMap.set(profile.id, profile)
+      })
+    }
+  }
+
+  return data.map((post) => ({
+    ...post,
+    author: profilesMap.get(post.user_id) || null,
+    // 相关文章列表不需要点赞/收藏状态，简化处理
+    is_liked: false,
+    is_favorited: false,
+  }))
+}
+
+/**
  * 获取单个帖子详情
  */
 export async function getPost(postId: string): Promise<Post | null> {
+  if (!postId) {
+    console.warn('getPost called with empty postId')
+    return null
+  }
+
   const supabase = getSupabaseClient()
   if (!supabase) {
     throw new Error('Supabase client not initialized')
@@ -496,9 +557,10 @@ export async function getPost(postId: string): Promise<Post | null> {
       code: error.code,
       details: error.details,
       hint: error.hint,
-      postId
+      postId,
+      rawError: error
     }
-    console.error('Error fetching post:', errorDetails)
+    console.error('Error fetching post:', JSON.stringify(errorDetails, null, 2))
     throw new Error(`Failed to fetch post: ${errorMessage}`)
   }
 

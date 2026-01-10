@@ -67,76 +67,6 @@ const styles = `
     box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05);
   }
 
-  /* --- 以下动效保持不变 --- */
-
-  /* 水墨呼吸 */
-  @keyframes organic-breathe {
-    0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-    33% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
-    66% { transform: translate(-50%, -50%) scale(1.05) rotate(-5deg); border-radius: 70% 30% 50% 50% / 30% 60% 40% 70%; }
-    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-  }
-  .ink-aura-main {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 650px;
-    height: 650px;
-    background: radial-gradient(circle at center, rgba(60, 60, 60, 0.15) 0%, rgba(200, 200, 200, 0) 70%);
-    filter: blur(50px);
-    animation: organic-breathe 12s infinite ease-in-out;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .ink-aura-sub {
-    position: absolute;
-    top: 45%;
-    left: 55%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle at center, rgba(220, 50, 50, 0.12) 0%, transparent 70%);
-    mix-blend-mode: multiply;
-    filter: blur(60px);
-    animation: organic-breathe 15s infinite ease-in-out reverse;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  /* 浮动卦象 */
-  @keyframes float-up {
-    0% { transform: translateY(120px) rotate(0deg) scale(0.8); opacity: 0; }
-    20% { opacity: 0.3; }
-    80% { opacity: 0.3; }
-    100% { transform: translateY(-120px) rotate(15deg) scale(1.1); opacity: 0; }
-  }
-  .digital-trigram {
-    position: absolute;
-    color: #44403c;
-    font-family: serif;
-    pointer-events: none;
-    animation: float-up linear infinite;
-    z-index: 1;
-  }
-
-  /* 全息扫描动效 */
-  @keyframes scan-line {
-    0% { top: 0%; opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { top: 100%; opacity: 0; }
-  }
-  .holo-scan {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #C82E31, transparent);
-    box-shadow: 0 0 10px #C82E31;
-    animation: scan-line 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    z-index: 10;
-    pointer-events: none;
-  }
-
   /* 卡片悬浮视差 */
   .parallax-card {
     transition: transform 0.1s linear, box-shadow 0.3s ease;
@@ -145,71 +75,6 @@ const styles = `
   .parallax-card:hover {
     box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.15);
     z-index: 10;
-  }
-
-  /* 图标旋转 */
-  @keyframes slow-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  .spin-slow {
-    animation: slow-spin 20s linear infinite;
-  }
-
-  /* 模糊入场 */
-  @keyframes blur-in {
-    0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
-    100% { filter: blur(0); opacity: 1; transform: translateY(0); }
-  }
-  .animate-blur-in {
-    animation: blur-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-    opacity: 0;
-  }
-
-  /* 边框流光 */
-  @keyframes border-flow {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  .gradient-border-mask {
-    position: absolute;
-    inset: -1px;
-    border-radius: 9999px;
-    padding: 1px;
-    background: linear-gradient(90deg, transparent, rgba(200, 46, 49, 0.3), transparent);
-    background-size: 200% 100%;
-    animation: border-flow 3s linear infinite;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-  
-  /* 脉冲光点 */
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(200, 46, 49, 0.2); transform: scale(1); }
-    50% { box-shadow: 0 0 0 6px rgba(200, 46, 49, 0); transform: scale(1.1); }
-  }
-
-  /* 虚空网格 */
-  @keyframes grid-flow {
-    0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
-    100% { transform: perspective(500px) rotateX(60deg) translateY(40px); }
-  }
-  .cyber-grid {
-    position: absolute;
-    width: 200%;
-    height: 200%;
-    left: -50%;
-    top: 0;
-    background-image: 
-      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    animation: grid-flow 2s linear infinite;
-    mask-image: linear-gradient(to bottom, transparent, black 40%, black 80%, transparent);
-    pointer-events: none;
   }
 
   /* 藏经阁书页堆叠 */
@@ -230,32 +95,6 @@ const styles = `
     background-image: radial-gradient(rgba(16, 185, 129, 0.2) 1px, transparent 1px);
     background-size: 20px 20px;
   }
-  
-  /* 呼吸光渊 */
-  @keyframes abyss-pulse {
-    0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
-    50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.2); }
-  }
-  .abyss-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 800px;
-    height: 400px;
-    background: radial-gradient(ellipse at center, rgba(200, 46, 49, 0.15), transparent 70%);
-    filter: blur(80px);
-    animation: abyss-pulse 8s infinite ease-in-out;
-    pointer-events: none;
-  }
-  
-  /* 旋转图腾 */
-  @keyframes spin-slow-reverse {
-    from { transform: rotate(360deg); }
-    to { transform: rotate(0deg); }
-  }
-  .totem-spin { animation: spin-slow 20s linear infinite; }
-  .totem-spin-rev { animation: spin-slow-reverse 15s linear infinite; }
-  .compass-spin { animation: spin-slow 60s linear infinite; }
 `
 
 // --- SVG 图标 ---
@@ -304,14 +143,16 @@ const CentralAura = () => (
   </div>
 )
 
+const TRIGRAMS = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷', '0', '1', '∞', '☳', '☵'];
+
 const FloatingTrigrams = () => {
-  const trigrams = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷', '0', '1', '∞', '☳', '☵'];
   const [particles, setParticles] = useState<{id:number, char:string, left:string, top:string, delay:string, duration:string, size:string}[]>([])
 
   useEffect(() => {
+    // 只在客户端挂载后生成随机值，避免 hydration 不匹配
     setParticles(Array.from({ length: 24 }).map((_, i) => ({
       id: i,
-      char: trigrams[Math.floor(Math.random() * trigrams.length)],
+      char: TRIGRAMS[Math.floor(Math.random() * TRIGRAMS.length)],
       left: `${Math.random() * 80 + 10}%`,
       top: `${Math.random() * 80 + 10}%`,
       delay: `${Math.random() * 8}s`,
@@ -465,7 +306,7 @@ export default function LandingPage() {
                       { label: '藏经阁', href: '/library', isAnchor: false },
                       { label: '社区', href: '/community', isAnchor: false },
                       { label: '案例库', href: '/cases', isAnchor: false },
-                      { label: '工具', href: '/6yao', isAnchor: false },
+                      { label: '工具', href: '/tools/6yao', isAnchor: false },
                       { label: '关于我们', href: '#', isAnchor: false }
                   ].map((item) => (
                       item.isAnchor ? (
@@ -581,7 +422,7 @@ export default function LandingPage() {
                         className="mt-20 relative group cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
                     >
                         <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-transparent to-stone-300/50" />
-                        <div className="co-build-card rounded-full px-3 py-2 pr-6 flex items-center gap-4 max-w-md mx-auto">
+                        <div className="co-build-card rounded-full px-3 py-4 pr-6 flex items-center gap-4 max-w-md mx-auto">
                             <div className="gradient-border-mask" />
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-stone-100 to-white border border-stone-100 shadow-sm flex items-center justify-center relative overflow-hidden">
                                 <div className="absolute inset-0 bg-[#C82E31]/5 animate-pulse" />
@@ -683,7 +524,7 @@ export default function LandingPage() {
 
                       {/* Split Cards */}
                       <div className="flex-1 grid grid-cols-2 gap-6" style={{ transform: `translateY(${getParallaxY(-0.02)}px)` }}>
-                          <Link href="/6yao" className="block h-full">
+                          <Link href="/tools/6yao" className="block h-full">
                               <Card className="border-none shadow-lg rounded-[2.5rem] p-6 flex flex-col justify-between group cursor-pointer bg-[#2c2826] text-white relative overflow-hidden parallax-card h-full">
                               <div className="absolute -right-12 -bottom-12 opacity-10"><IconCompass className="w-48 h-48 compass-spin text-white" /></div>
                               <div className="relative z-10">

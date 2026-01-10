@@ -5,11 +5,11 @@ import TagPanel from '@/lib/components/TagPanel'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/lib/components/ui/card'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
@@ -20,22 +20,22 @@ import { getCurrentUser } from '@/lib/services/auth'
 import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, uploadPostCover, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord as ProfileDivinationRecord } from '@/lib/services/profile'
 import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  CircleDashed,
-  Coins,
-  FileText,
-  History,
-  Image as ImageIcon,
-  LayoutGrid,
-  Loader2,
-  PenTool,
-  Save,
-  ScrollText,
-  Send,
-  Sparkles,
-  X
+    ArrowLeft,
+    Check,
+    ChevronRight,
+    CircleDashed,
+    Coins,
+    FileText,
+    History,
+    Image as ImageIcon,
+    LayoutGrid,
+    Loader2,
+    PenTool,
+    Save,
+    ScrollText,
+    Send,
+    Sparkles,
+    X
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -903,7 +903,7 @@ function PublishPageContent() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => router.push("/6yao")}
+                    onClick={() => router.push("/tools/6yao")}
                     className="mt-2 border-[#C82E31] text-[#C82E31] hover:bg-red-50"
                   >
                     去排盘
@@ -932,7 +932,7 @@ function PublishPageContent() {
               <Button
                 variant="link"
                 className="text-[#C82E31] h-auto p-0 hover:no-underline flex items-center gap-1"
-                onClick={() => router.push("/6yao")}
+                onClick={() => router.push("/tools/6yao")}
               >
                 新建排盘 <ChevronRight className="w-3 h-3" />
               </Button>

@@ -1,8 +1,8 @@
 'use client'
 
+import { Button } from '@/lib/components/ui/button'
 import { BookOpen, PlusCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/lib/components/ui/button'
 
 export interface EmptyStateProps {
   onCreateClick?: () => void
@@ -15,7 +15,7 @@ export const EmptyState = ({ onCreateClick }: EmptyStateProps) => {
     if (onCreateClick) {
       onCreateClick()
     } else {
-      router.push('/6yao')
+      router.push('/tools/6yao')
     }
   }
   

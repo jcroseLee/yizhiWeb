@@ -589,29 +589,232 @@
   }
 }
 
-  /* 爻象显示样式 - 与小程序端保持一致 */
-  .changing-lines {
-    background: rgba(248, 230, 217, 0.5);
-  }
-  
-  /* 竖排宋体 - 用于卦名显示 */
-  .vertical-serif {
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    letter-spacing: 0.15em;
-    font-family: "Noto Serif SC", "Songti SC", serif;
+/* 爻象显示样式 - 与小程序端保持一致 */
+.changing-lines {
+  background: rgba(248, 230, 217, 0.5);
+}
+
+/* 竖排宋体 - 用于卦名显示 */
+.vertical-serif {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.15em;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+}
+
+/* 卡片悬浮效果 - 模拟宣纸浮起，增强纸张质感 */
+.paper-card {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.paper-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  border-color: rgba(200, 46, 49, 0.25); /* 悬浮微红边框 */
+}
+
+/* ===== 动画 Keyframes ===== */
+
+/* 错误震动动画 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+/* 水墨呼吸 */
+@keyframes organic-breathe {
+    0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+    33% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+    66% { transform: translate(-50%, -50%) scale(1.05) rotate(-5deg); border-radius: 70% 30% 50% 50% / 30% 60% 40% 70%; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
   }
 
-  /* 卡片悬浮效果 - 模拟宣纸浮起，增强纸张质感 */
-  .paper-card {
-    transition: all 0.3s ease;
-    border: 1px solid rgba(0,0,0,0.06);
-    background: white;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  }
-  
-  .paper-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-    border-color: rgba(200, 46, 49, 0.25); /* 悬浮微红边框 */
-  }
+/* 浮动卦象 */
+@keyframes float-up {
+  0% { transform: translateY(120px) rotate(0deg) scale(0.8); opacity: 0; }
+  20% { opacity: 0.3; }
+  80% { opacity: 0.3; }
+  100% { transform: translateY(-120px) rotate(15deg) scale(1.1); opacity: 0; }
+}
+
+/* 全息扫描动效 */
+@keyframes scan-line {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* 图标旋转 */
+@keyframes slow-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 旋转图腾（反向） */
+@keyframes spin-slow-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* 模糊入场 */
+@keyframes blur-in {
+  0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
+  100% { filter: blur(0); opacity: 1; transform: translateY(0); }
+}
+
+/* 边框流光 */
+@keyframes border-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 脉冲光点 */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 46, 49, 0.2); transform: scale(1); }
+  50% { box-shadow: 0 0 0 6px rgba(200, 46, 49, 0); transform: scale(1.1); }
+}
+
+/* 虚空网格 */
+@keyframes grid-flow {
+  0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+  100% { transform: perspective(500px) rotateX(60deg) translateY(40px); }
+}
+
+/* 呼吸光渊 */
+@keyframes abyss-pulse {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* ===== 动画类 ===== */
+
+/* 错误震动动画类 */
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* 水墨呼吸 - 主光晕 */
+.ink-aura-main {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle at center, rgba(60, 60, 60, 0.15) 0%, rgba(200, 200, 200, 0) 70%);
+  filter: blur(50px);
+  animation: organic-breathe 12s infinite ease-in-out;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 水墨呼吸 - 副光晕 */
+.ink-aura-sub {
+  position: absolute;
+  top: 45%;
+  left: 55%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle at center, rgba(220, 50, 50, 0.12) 0%, transparent 70%);
+  mix-blend-mode: multiply;
+  filter: blur(60px);
+  animation: organic-breathe 15s infinite ease-in-out reverse;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 浮动卦象 */
+.digital-trigram {
+  position: absolute;
+  color: #44403c;
+  font-family: serif;
+  pointer-events: none;
+  animation: float-up linear infinite;
+  z-index: 1;
+}
+
+/* 全息扫描动效 */
+.holo-scan {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #C82E31, transparent);
+  box-shadow: 0 0 10px #C82E31;
+  animation: scan-line 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 图标旋转 */
+.spin-slow {
+  animation: slow-spin 20s linear infinite;
+}
+
+/* 旋转图腾 */
+.totem-spin {
+  animation: slow-spin 20s linear infinite;
+}
+
+.totem-spin-rev {
+  animation: spin-slow-reverse 15s linear infinite;
+}
+
+.compass-spin {
+  animation: slow-spin 60s linear infinite;
+}
+
+/* 模糊入场 */
+.animate-blur-in {
+  animation: blur-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+/* 边框流光 */
+.gradient-border-mask {
+  position: absolute;
+  inset: -1px;
+  border-radius: 9999px;
+  padding: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200, 46, 49, 0.3), transparent);
+  background-size: 200% 100%;
+  animation: border-flow 3s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* 虚空网格 */
+.cyber-grid {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  left: -50%;
+  top: 0;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: grid-flow 2s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent, black 40%, black 80%, transparent);
+  pointer-events: none;
+}
+
+/* 呼吸光渊 */
+.abyss-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse at center, rgba(200, 46, 49, 0.15), transparent 70%);
+  filter: blur(80px);
+  animation: abyss-pulse 8s infinite ease-in-out;
+  pointer-events: none;
+}

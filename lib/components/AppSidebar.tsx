@@ -12,11 +12,11 @@ const navItems: NavItem[] = [
 
 const bottomItems: NavItem[] = [
   { 
-    href: '/6yao', 
+    href: '/tools/6yao', 
     label: '排盘工具', 
     icon: Compass,
     children: [
-      { href: '/6yao', label: '六爻排盘', icon: Settings },
+      { href: '/tools/6yao', label: '六爻排盘', icon: Settings },
     ]
   },
   {

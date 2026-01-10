@@ -209,7 +209,7 @@ export default function GuaPanel({ info, gua, recordId }: GuaPanelProps) {
       
       <div className="border-t border-stone-100 p-3 text-center">
         {recordId ? (
-          <Link href={`/6yao/${recordId}`}>
+          <Link href={`/tools/6yao/${recordId}`}>
             <Button 
               variant="ghost" 
               className="text-xs font-medium text-stone-500 hover:text-[#C82E31] w-full"

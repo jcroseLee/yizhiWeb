@@ -105,12 +105,12 @@ cd web
 
 ```bash
 # 复制背景图
-cp ../6yao/public/bg.png public/images/backgrounds/
-cp ../6yao/public/topbg.png public/images/backgrounds/
+cp ../tools/6yao/public/bg.png public/images/backgrounds/
+cp ../tools/6yao/public/topbg.png public/images/backgrounds/
 
 # 复制图标
-cp ../6yao/public/home.png public/images/icons/
-cp ../6yao/public/community.png public/images/icons/
+cp ../tools/6yao/public/home.png public/images/icons/
+cp ../tools/6yao/public/community.png public/images/icons/
 # ... 以此类推
 ```
 

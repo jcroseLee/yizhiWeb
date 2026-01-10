@@ -16,9 +16,9 @@
 ### 步骤 2: 确认你在正确的目录
 
 ```bash
-cd /Users/huanhuanli/Code/trae_liuyao/6yao/web
+cd /Users/huanhuanli/Code/trae_liuyao/tools/6yao/web
 pwd
-# 应该显示: .../6yao/web
+# 应该显示: .../tools/6yao/web
 ```
 
 ### 步骤 3: 清理并重新安装依赖（如果需要）
@@ -100,7 +100,7 @@ A: 你可能访问了错误的端口或项目。确认：
 运行这个命令来验证项目是否正确设置：
 
 ```bash
-cd /Users/huanhuanli/Code/trae_liuyao/6yao/web
+cd /Users/huanhuanli/Code/trae_liuyao/tools/6yao/web
 npm run dev
 ```
 

@@ -76,7 +76,7 @@ const GuaPanelDual = ({ data, recordId }: { data: FullGuaData; recordId?: string
 
   const handleViewDetail = () => {
     if (recordId) {
-      router.push(`/6yao/${recordId}?from=community`)
+      router.push(`/tools/6yao/${recordId}?from=community`)
     }
   }
   

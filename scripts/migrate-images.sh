@@ -7,7 +7,7 @@ set -e
 
 # 项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="$PROJECT_ROOT/../6yao/public"
+SOURCE_DIR="$PROJECT_ROOT/../tools/6yao/public"
 TARGET_DIR="$PROJECT_ROOT/public/images"
 
 echo "📦 开始迁移图片资源..."

@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   { href: '/community', label: '社区' },
   { href: '/cases', label: '案例库' },
   { href: '/library', label: '藏经阁' },
-  { href: '/6yao', label: '排盘工具' },
+  { href: '/tools/6yao', label: '排盘工具' },
 ]
 
 export default function Navigation() {

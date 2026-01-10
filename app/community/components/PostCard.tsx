@@ -4,9 +4,11 @@ import GuaBlock from '@/lib/components/GuaBlock'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
+import UserHoverCard from '@/lib/components/UserHoverCard'
 import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
 import { togglePostFavorite, togglePostLike } from '@/lib/services/community'
+import { getTitleName } from '@/lib/services/growth'
 import { cn } from '@/lib/utils/cn'
 import { Bookmark, Coins, Flag, Heart, MessageSquare, MoreHorizontal } from 'lucide-react'
 import Image from 'next/image'
@@ -78,7 +80,7 @@ export function getGuaInfo(divinationRecord: {
 export interface Post {
   id: string
   type: 'help' | 'theory' | 'debate' | 'chat'
-  author: { id?: string; name: string; avatar: string; level: number; isVerified?: boolean }
+  author: { id?: string; name: string; avatar: string; level: number; isVerified?: boolean; titleLevel?: number }
   title: string
   excerpt: string
   coverImage?: string
@@ -183,28 +185,21 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
   }
 
   return (
-    <article className="group relative bg-white rounded-2xl p-4 sm:p-6 mb-4 border border-stone-100 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-stone-200">
+    <article className="group relative bg-white rounded-2xl p-4 sm:p-6 mb-4 border border-stone-100 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-stone-200 overflow-hidden">
+      
+      {/* 悬赏帖/求测帖顶部装饰线 */}
+      {(post.type === 'help' || hasBounty) && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-100 via-yellow-200 to-amber-100 opacity-80" />
+      )}
       
       {/* 链接覆盖层 - 让整个卡片可点击，但又不影响内部按钮 */}
       <Link href={`/community/${post.id}`} className="absolute inset-0 z-0 rounded-2xl" aria-label={`查看帖子: ${post.title}`} />
-
+      
       {/* 头部元信息：标签 + 类型 */}
       <div className="relative z-10 flex items-center gap-2 mb-3 text-xs">
         {statusConfig && post.status !== 'archived' && (
           <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
         )}
-        <Badge className={typeConfig.className}>{typeConfig.label}</Badge>
-        
-        {hasBounty && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-medium">
-            <Coins className="w-3 h-3 mr-1 fill-amber-500 text-amber-600" />
-            {bountyAmount}
-          </span>
-        )}
-
-        <div className="ml-auto flex items-center gap-2 text-stone-400 text-[11px] sm:text-xs">
-          <span>{post.time}</span>
-        </div>
       </div>
 
       {/* 主体内容布局 */}
@@ -215,7 +210,13 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
           {/* 标题 */}
           <Link href={`/community/${post.id}`} className="block mb-2">
             <h3 className="text-[17px] sm:text-[19px] font-bold text-stone-900 leading-snug tracking-tight group-hover:text-[#C82E31] transition-colors line-clamp-2" style={{ fontFamily: "'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif" }}>
-              {post.title}
+              {hasBounty && (
+                <span className="inline-flex items-center px-2 py-0.5 mr-2 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-medium text-xs align-middle">
+                  <Coins className="w-3 h-3 mr-1 fill-amber-500 text-amber-600" />
+                  {bountyAmount}
+                </span>
+              )}
+              <span className="align-middle">{post.title}</span>
             </h3>
           </Link>
 
@@ -227,14 +228,13 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
           {/* 底部：作者与标签 */}
           <div className="mt-auto pt-2 flex items-center justify-between">
             {/* 标签组 */}
-            <div className="flex flex-wrap gap-2 overflow-hidden h-6">
+            <div className="flex flex-wrap gap-2 overflow-hidden h-6 items-center">
               {post.tags.slice(0, 3).map((tag) => (
                 <span key={tag} className="text-[12px] px-2 py-0.5 bg-stone-50 text-sky-950/70 rounded-full border border-stone-100">
                   #{tag}
                 </span>
               ))}
             </div>
-            
           </div>
         </div>
 
@@ -268,15 +268,27 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
       {/* 底部操作栏 - 分离线 */}
       <div className="relative z-10 mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
         
-        {/* 作者 */}
-        <div className="flex items-center gap-2 group/author cursor-pointer">
-          <Avatar className="w-6 h-6 border border-stone-100">
-            <AvatarImage src={post.author.avatar} alt={post.author.name} />
-            <AvatarFallback className="text-[9px] bg-stone-100 text-stone-500">{post.author.name?.[0]}</AvatarFallback>
-          </Avatar>
-          <span className="text-xs text-stone-500 font-medium group-hover/author:text-stone-800 transition-colors truncate max-w-[100px]">
-            {post.author.name}
-          </span>
+        {/* 作者与时间 */}
+        <div className="flex items-center gap-3">
+          <UserHoverCard userId={post.author.id} nickname={post.author.name} avatar={post.author.avatar}>
+            <div className="flex items-center gap-2 group/author cursor-pointer">
+              <Avatar className="w-6 h-6 border border-stone-100">
+                <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                <AvatarFallback className="text-[9px] bg-stone-100 text-stone-500">{post.author.name?.[0]}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-stone-500 font-medium group-hover/author:text-stone-800 transition-colors truncate max-w-[100px]">
+                {post.author.name}
+              </span>
+              {post.author.titleLevel && post.author.titleLevel > 1 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 font-medium group-hover/author:text-[#C82E31] transition-colors">
+                  {getTitleName(post.author.titleLevel)}
+                </span>
+              )}
+            </div>
+          </UserHoverCard>
+          
+          <span className="text-stone-300 text-[10px]">|</span>
+          <span className="text-xs text-stone-400">{post.time}</span>
         </div>
 
         {/* 动作按钮组 */}

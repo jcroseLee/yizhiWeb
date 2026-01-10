@@ -34,6 +34,7 @@ import {
   deleteComment,
   getComments,
   getPost,
+  getRelatedPosts,
   toggleCommentLike,
   togglePostFavorite,
   togglePostLike,
@@ -154,6 +155,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   // State
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<CommentType[]>([])
+  const [relatedPosts, setRelatedPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [replyText, setReplyText] = useState('')
   const [replyingTo, setReplyingTo] = useState<CommentType | null>(null)
@@ -183,6 +185,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     if (postId) {
       loadPost()
       loadComments()
+      loadRelatedPosts()
       loadCurrentUserProfile()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,15 +285,48 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     } catch (error) { console.error(error) }
   }
 
-  // Interactions (保持原有逻辑不变)
+  const loadRelatedPosts = async () => {
+    try {
+      const data = await getRelatedPosts(postId)
+      setRelatedPosts(data)
+    } catch (error) {
+      console.error('Error loading related posts:', error)
+    }
+  }
+
+  // Interactions
   const handleLike = async () => {
     if (!post) return
+
+    if (!currentUserProfile) {
+      toast({ title: '请先登录', description: '登录后即可点赞', variant: 'default' })
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+
+    const prevPost = { ...post }
+    const newIsLiked = !post.is_liked
+    const newLikeCount = newIsLiked ? post.like_count + 1 : Math.max(0, post.like_count - 1)
+    
+    // Optimistic update
+    setPost({ ...post, is_liked: newIsLiked, like_count: newLikeCount })
+    setIsLiking(true)
+
     try {
-      setIsLiking(true)
       const isLiked = await togglePostLike(postId)
-      setPost({ ...post, is_liked: isLiked, like_count: isLiked ? post.like_count + 1 : post.like_count - 1 })
-    } catch {
-      toast({ title: '操作失败', variant: 'destructive' })
+      
+      // If server state differs from optimistic state, sync with server
+      if (isLiked !== newIsLiked) {
+        setPost(prev => prev ? { 
+          ...prev, 
+          is_liked: isLiked, 
+          like_count: isLiked ? prev.like_count + 1 : Math.max(0, prev.like_count - 1) 
+        } : null)
+      }
+    } catch (error) {
+      // Revert on error
+      setPost(prevPost)
+      toast({ title: '操作失败', description: '点赞失败，请重试', variant: 'destructive' })
     } finally {
       setIsLiking(false)
     }
@@ -298,25 +334,70 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
   const handleFavorite = async () => {
     if (!post) return
+
+    if (!currentUserProfile) {
+      toast({ title: '请先登录', description: '登录后即可收藏', variant: 'default' })
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+
+    const prevPost = { ...post }
+    const newIsFavorited = !post.is_favorited
+    
+    // Optimistic update
+    setPost({ ...post, is_favorited: newIsFavorited })
+    setIsFavoriting(true)
+
     try {
-      setIsFavoriting(true)
       const isFavorited = await togglePostFavorite(postId)
-      setPost({ ...post, is_favorited: isFavorited })
+      
+      if (isFavorited !== newIsFavorited) {
+        setPost(prev => prev ? { ...prev, is_favorited: isFavorited } : null)
+      }
+      
       toast({ 
         title: isFavorited ? '已收藏' : '已取消收藏',
       })
-    } catch {
-      toast({ title: '操作失败', variant: 'destructive' })
+    } catch (error) {
+      // Revert on error
+      setPost(prevPost)
+      toast({ title: '操作失败', description: '收藏失败，请重试', variant: 'destructive' })
     } finally {
       setIsFavoriting(false)
     }
   }
 
   const handleCommentLike = async (commentId: string) => {
+    if (!currentUserProfile) {
+      toast({ title: '请先登录', description: '登录后即可点赞', variant: 'default' })
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+
+    const comment = comments.find(c => c.id === commentId)
+    if (!comment) return
+
+    const prevComments = [...comments]
+    const newIsLiked = !comment.is_liked
+    const newLikeCount = newIsLiked ? comment.like_count + 1 : Math.max(0, comment.like_count - 1)
+
+    // Optimistic update
+    setComments(prev => prev.map(c => c.id === commentId ? { ...c, is_liked: newIsLiked, like_count: newLikeCount } : c))
+
     try {
       const isLiked = await toggleCommentLike(commentId)
-      setComments(prev => prev.map(c => c.id === commentId ? { ...c, is_liked: isLiked, like_count: isLiked ? c.like_count + 1 : c.like_count - 1 } : c))
-    } catch (error) { console.error(error) }
+      
+      if (isLiked !== newIsLiked) {
+        setComments(prev => prev.map(c => c.id === commentId ? { 
+          ...c, 
+          is_liked: isLiked, 
+          like_count: isLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1) 
+        } : c))
+      }
+    } catch (error) {
+      setComments(prevComments)
+      toast({ title: '操作失败', description: '点赞失败，请重试', variant: 'destructive' })
+    }
   }
 
   // 采纳/删除评论逻辑 (保持不变)
@@ -726,7 +807,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     >
                       <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> 回复
                     </Button>
-                    {canArchive && (
+                    {canArchive && post?.type === 'help' && (
                       caseExists ? (
                         <Button variant="ghost" size="sm" className="gap-1.5 h-8 sm:h-9 text-xs sm:text-sm text-stone-500 hover:text-stone-900" asChild>
                           <Link href={`/cases/${post.id}`}>
@@ -903,6 +984,35 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 </div>
               </div>
             </div>
+
+            {/* Related Posts (Mobile) */}
+            {post?.type !== 'help' && relatedPosts.length > 0 && (
+              <div className="lg:hidden bg-white sm:rounded-xl shadow-sm border-y sm:border border-stone-100 p-4 sm:p-6">
+                <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-4 bg-[#C82E31] rounded-full"></span>
+                  相关文章
+                </h3>
+                <div className="space-y-4 divide-y divide-stone-50">
+                   {relatedPosts.map((post, i) => (
+                    <Link key={post.id} href={`/community/${post.id}`} className={`block group ${i !== 0 ? 'pt-4' : ''}`}>
+                      <h4 className="text-sm font-medium text-stone-800 group-hover:text-[#C82E31] transition-colors line-clamp-2 mb-1.5">
+                        {post.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs text-stone-400">
+                        <div className="flex items-center gap-1.5">
+                          <Avatar className="w-4 h-4 border border-stone-100">
+                            <AvatarImage src={post.author?.avatar_url || ''} />
+                            <AvatarFallback>{post.author?.nickname?.[0] || 'U'}</AvatarFallback>
+                          </Avatar>
+                          <span>{post.author?.nickname || '匿名'}</span>
+                        </div>
+                        <span>{formatTimeStr(post.created_at)}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Sidebar (Sticky, Hidden on Mobile) */}
@@ -975,6 +1085,35 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             {fullGuaData && (
               <div className="lg:sticky lg:top-20 lg:z-10">
                 <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+              </div>
+            )}
+
+            {/* Related Posts (Desktop) */}
+            {relatedPosts.length > 0 && (
+              <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+                <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-4 bg-[#C82E31] rounded-full"></span>
+                  相关文章
+                </h3>
+                <div className="space-y-4">
+                  {relatedPosts.map(post => (
+                    <Link key={post.id} href={`/community/${post.id}`} className="block group">
+                      <h4 className="text-sm font-medium text-stone-800 group-hover:text-[#C82E31] transition-colors line-clamp-2 mb-1.5">
+                        {post.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs text-stone-400">
+                        <div className="flex items-center gap-1.5">
+                          <Avatar className="w-4 h-4 border border-stone-100">
+                            <AvatarImage src={post.author?.avatar_url || ''} />
+                            <AvatarFallback>{post.author?.nickname?.[0] || 'U'}</AvatarFallback>
+                          </Avatar>
+                          <span>{post.author?.nickname || '匿名'}</span>
+                        </div>
+                        <span>{formatTimeStr(post.created_at)}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
             

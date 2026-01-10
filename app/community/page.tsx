@@ -102,10 +102,12 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     id: post.id,
     type: postType,
     author: {
+      id: post.author?.id,
       name: post.author?.nickname || '匿名用户',
       avatar: post.author?.avatar_url || '',
       level: 1,
       isVerified: false,
+      titleLevel: post.author?.title_level,
     },
     title: postType === 'help' ? `求测：${post.title}` : post.title,
     excerpt: postType === 'help'
@@ -261,7 +263,7 @@ export default function CommunityPage() {
               </div>
 
               {/* 2. 频道 Tab - 玻璃拟态吸顶 */}
-              <div className="sticky top-0 z-20 -mx-4 lg:mx-0">
+              <div className="sticky top-0 z-20">
                 <div className="bg-white/90 backdrop-blur-md px-4 lg:px-0 border-b border-stone-200/50 lg:border-none lg:bg-transparent lg:backdrop-blur-none">
                   <div className="flex items-center justify-between lg:bg-white lg:px-6 lg:py-1 lg:rounded-xl lg:border lg:border-stone-100 lg:shadow-sm">
                     {/* Channel List */}
@@ -373,7 +375,7 @@ export default function CommunityPage() {
 
               <div className="grid grid-cols-2 gap-3">
                  <button 
-                   onClick={() => router.push('/6yao')}
+                   onClick={() => router.push('/tools/6yao')}
                    className="bg-linear-to-br from-[#7f7562d6] to-[#716643] rounded-xl p-4 text-white relative overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] text-left"
                  >
                    <div className="absolute -right-3 -bottom-3 opacity-10 group-hover:opacity-20 transition-opacity">

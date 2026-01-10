@@ -91,24 +91,24 @@ export default function Component() {
 
 ```bash
 # 复制背景图
-cp ../../6yao/public/bg.png images/backgrounds/
-cp ../../6yao/public/topbg.png images/backgrounds/
+cp ../../tools/6yao/public/bg.png images/backgrounds/
+cp ../../tools/6yao/public/topbg.png images/backgrounds/
 
 # 复制图标
-cp ../../6yao/public/home.png images/icons/
-cp ../../6yao/public/community.png images/icons/
-cp ../../6yao/public/message.png images/icons/
-cp ../../6yao/public/my.png images/icons/
+cp ../../tools/6yao/public/home.png images/icons/
+cp ../../tools/6yao/public/community.png images/icons/
+cp ../../tools/6yao/public/message.png images/icons/
+cp ../../tools/6yao/public/my.png images/icons/
 
 # 复制卦象相关
-cp ../../6yao/public/coin.png images/hexagram/
-cp ../../6yao/public/coin-reverse.png images/hexagram/
-cp ../../6yao/public/guashi.png images/hexagram/
+cp ../../tools/6yao/public/coin.png images/hexagram/
+cp ../../tools/6yao/public/coin-reverse.png images/hexagram/
+cp ../../tools/6yao/public/guashi.png images/hexagram/
 
 # 复制插画
-cp ../../6yao/public/baishan.png images/illustrations/
-cp ../../6yao/public/cherry-blossom.png images/illustrations/
-cp ../../6yao/public/yu.png images/illustrations/
+cp ../../tools/6yao/public/baishan.png images/illustrations/
+cp ../../tools/6yao/public/cherry-blossom.png images/illustrations/
+cp ../../tools/6yao/public/yu.png images/illustrations/
 ```
 
 ## 🎯 新中式主题图片建议

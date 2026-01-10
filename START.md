@@ -7,7 +7,7 @@
 ### 1. 确认你在正确的目录
 
 ```bash
-cd /Users/huanhuanli/Code/trae_liuyao/6yao/web
+cd /Users/huanhuanli/Code/trae_liuyao/tools/6yao/web
 ```
 
 ### 2. 安装依赖（如果还没安装）
@@ -71,7 +71,7 @@ npm run dev
 ```bash
 # 1. 确认在正确的目录
 pwd
-# 应该显示: .../6yao/web
+# 应该显示: .../tools/6yao/web
 
 # 2. 确认 package.json 存在
 ls package.json

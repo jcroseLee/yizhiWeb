@@ -19,8 +19,8 @@ import {
   User
 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 
 // --- 样式补丁 ---
 const styles = `
@@ -95,11 +95,123 @@ const styles = `
     background-image: radial-gradient(rgba(16, 185, 129, 0.2) 1px, transparent 1px);
     background-size: 20px 20px;
   }
+
+  /* 3. 第一屏：水墨呼吸 (移动端优化) */
+  @keyframes organic-breathe {
+    0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+    33% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+    66% { transform: translate(-50%, -50%) scale(1.05) rotate(-5deg); border-radius: 70% 30% 50% 50% / 30% 60% 40% 70%; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  }
+  .ink-aura-main {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle at center, rgba(60, 60, 60, 0.15) 0%, rgba(200, 200, 200, 0) 70%);
+    filter: blur(50px);
+    animation: organic-breathe 12s infinite ease-in-out;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .ink-aura-sub {
+    position: absolute;
+    top: 45%;
+    left: 55%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle at center, rgba(220, 50, 50, 0.12) 0%, transparent 70%);
+    mix-blend-mode: multiply;
+    filter: blur(60px);
+    animation: organic-breathe 15s infinite ease-in-out reverse;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* 移动端媒体查询：减小光晕尺寸，防止喧宾夺主 */
+  @media (max-width: 768px) {
+    .ink-aura-main { width: 90vw; height: 90vw; opacity: 0.6; filter: blur(30px); }
+    .ink-aura-sub { width: 70vw; height: 70vw; opacity: 0.5; filter: blur(40px); }
+    /* 移动端隐藏部分多余粒子 */
+    .digital-trigram:nth-child(even) {
+        display: none;
+    }
+  }
+
+  /* 4. 第一屏：浮动卦象 */
+  @keyframes float-up {
+    0% { transform: translateY(120px) rotate(0deg) scale(0.8); opacity: 0; }
+    20% { opacity: 0.3; }
+    80% { opacity: 0.3; }
+    100% { transform: translateY(-120px) rotate(15deg) scale(1.1); opacity: 0; }
+  }
+  .digital-trigram {
+    position: absolute;
+    color: #44403c;
+    font-family: serif;
+    pointer-events: none;
+    animation: float-up linear infinite;
+    z-index: 1;
+  }
+
+  /* 模糊入场 */
+  @keyframes blur-in {
+    0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
+    100% { filter: blur(0); opacity: 1; transform: translateY(0); }
+  }
+  .animate-blur-in {
+    animation: blur-in 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    opacity: 0;
+  }
+
+  /* 共建计划卡片样式 */
+  .co-build-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(28, 25, 23, 0.05);
+    transition: all 0.3s ease;
+  }
+
+  .co-build-card:hover {
+    background: rgba(255, 255, 255, 0.85);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px -5px rgba(28, 25, 23, 0.08);
+  }
+
+  /* 脉冲光点 */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200, 46, 49, 0.2); transform: scale(1); }
+    50% { box-shadow: 0 0 0 6px rgba(200, 46, 49, 0); transform: scale(1.1); }
+  }
+
+  /* 动态边框遮罩 */
+  .gradient-border-mask {
+    position: absolute;
+    inset: -1px;
+    border-radius: 9999px;
+    padding: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 46, 49, 0.3), transparent);
+    background-size: 200% 100%;
+    animation: border-flow 3s linear infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  @keyframes border-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 `
 
 // --- SVG 图标 ---
-const IconAIChip = () => (
-  <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16 text-[#C82E31] opacity-90">
+const IconAIChip = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 64 64" fill="none" className={`w-16 h-16 opacity-90 ${className || ''}`}>
     <path d="M32 4L32 12M32 52L32 60M4 32L12 32M52 32L60 32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.3"/>
     <rect x="16" y="16" width="32" height="32" rx="4" stroke="currentColor" strokeWidth="2" fill="rgba(200, 46, 49, 0.05)" />
     <circle cx="32" cy="32" r="6" stroke="currentColor" strokeWidth="2" />
@@ -145,20 +257,28 @@ const CentralAura = () => (
 
 const TRIGRAMS = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷', '0', '1', '∞', '☳', '☵'];
 
-const FloatingTrigrams = () => {
-  const [particles, setParticles] = useState<{id:number, char:string, left:string, top:string, delay:string, duration:string, size:string}[]>([])
+function createRng(seed: number) {
+  let t = seed >>> 0
+  return () => {
+    t += 0x6D2B79F5
+    let r = Math.imul(t ^ (t >>> 15), 1 | t)
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r)
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296
+  }
+}
 
-  useEffect(() => {
-    // 只在客户端挂载后生成随机值，避免 hydration 不匹配
-    setParticles(Array.from({ length: 24 }).map((_, i) => ({
+const FloatingTrigrams = () => {
+  const particles = useMemo(() => {
+    const rng = createRng(20260111)
+    return Array.from({ length: 24 }).map((_, i) => ({
       id: i,
-      char: TRIGRAMS[Math.floor(Math.random() * TRIGRAMS.length)],
-      left: `${Math.random() * 80 + 10}%`,
-      top: `${Math.random() * 80 + 10}%`,
-      delay: `${Math.random() * 8}s`,
-      duration: `${20 + Math.random() * 15}s`,
-      size: `${14 + Math.random() * 24}px`
-    })))
+      char: TRIGRAMS[Math.floor(rng() * TRIGRAMS.length)],
+      left: `${rng() * 80 + 10}%`,
+      top: `${rng() * 80 + 10}%`,
+      delay: `${rng() * 8}s`,
+      duration: `${20 + rng() * 15}s`,
+      size: `${14 + rng() * 24}px`
+    }))
   }, [])
 
   return (
@@ -172,8 +292,10 @@ const FloatingTrigrams = () => {
   )
 }
 
-export default function LandingPage() {
+function LandingPageContent() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [scrolled, setScrolled] = useState(false)
   
   // 滚动容器的 Ref
@@ -369,81 +491,92 @@ export default function LandingPage() {
            </div>
         </header>
 
-        {/* --- 1. Hero Section --- */}
-        <section className="scroll-section relative px-6 min-h-screen flex flex-col items-center justify-center overflow-hidden">
+        {/* --- 1. Hero Section (Mobile Optimized) --- */}
+        <section className="scroll-section relative px-6 min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden pt-24 pb-20 md:pt-60 md:pb-48">
             <CentralAura />
             <FloatingTrigrams />
             
             <div className="max-w-5xl mx-auto text-center relative z-20 animate-in fade-in zoom-in duration-1000">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/40 border border-white/60 backdrop-blur-md shadow-sm mb-12 hover:bg-white/60 hover:border-[#C82E31]/30 transition-all duration-300 cursor-pointer group">
-                    <Sparkles className="w-3.5 h-3.5 text-[#C82E31] group-hover:rotate-12 transition-transform" />
-                    <span className="text-xs font-bold text-stone-600 tracking-wide">v2.0 全新上线：大模型辅助研判</span>
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white/40 border border-white/60 backdrop-blur-md shadow-sm mb-8 md:mb-12 hover:bg-white/60 hover:border-[#C82E31]/30 transition-all duration-300 cursor-pointer group">
+                    <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#C82E31] group-hover:rotate-12 transition-transform" />
+                    <span className="text-[10px] md:text-xs font-bold text-stone-600 tracking-wide">v2.0 全新上线：大模型辅助研判</span>
                     <ChevronRight className="w-3 h-3 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
                 </div>
 
-                <h1 className="text-6xl lg:text-8xl font-serif font-bold text-stone-900 leading-[1.15] mb-10 tracking-tight relative">
-                    <div>
-                        连接<span className="text-[#C82E31] relative inline-block mx-2">
+                {/* Headline */}
+                <h1 className="text-5xl md:text-8xl font-serif font-bold text-stone-900 leading-[1.1] md:leading-[1.15] mb-6 md:mb-10 tracking-tight relative">
+                    <div className="animate-blur-in" style={{ animationDelay: '0.3s' }}>
+                        连接<span className="text-[#C82E31] relative inline-block mx-1 md:mx-2">
                             古老智慧
-                            <svg className="absolute w-full h-4 -bottom-2 left-0 text-[#C82E31] opacity-40" viewBox="0 0 100 10" preserveAspectRatio="none">
+                            <svg className="absolute w-full h-3 md:h-4 -bottom-1 md:-bottom-2 left-0 text-[#C82E31] opacity-40" viewBox="0 0 100 10" preserveAspectRatio="none">
                                 <path d="M0 5 Q 50 12 100 5" stroke="currentColor" strokeWidth="3" fill="none">
                                     <animate attributeName="d" dur="6s" repeatCount="indefinite" values="M0 5 Q 50 12 100 5; M0 5 Q 50 -2 100 5; M0 5 Q 50 12 100 5" />
                                 </path>
                             </svg>
                         </span>
                     </div>
-                    <div className="flex items-center justify-center gap-4">
-                         <span className="text-stone-300 font-light text-5xl lg:text-7xl">/</span>
-                         <span>与未来算力</span>
+                    {/* 移动端换行显示，桌面端同行 */}
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-0 md:gap-4 animate-blur-in mt-2 md:mt-0" style={{ animationDelay: '0.5s' }}>
+                         <span className="hidden md:inline text-stone-300 font-light text-5xl lg:text-7xl">/</span>
+                         <span className="mt-1 md:mt-0">与未来算力</span>
                     </div>
                 </h1>
 
-                <p className="text-lg lg:text-xl text-stone-500 mb-14 max-w-2xl mx-auto leading-relaxed font-light">
-                    易知不仅仅是一个工具，它是通往传统文化的数字桥梁。<br/>
+                {/* Description */}
+                <p className="text-base md:text-xl text-stone-500 mb-10 md:mb-14 max-w-sm md:max-w-2xl mx-auto leading-relaxed font-light animate-blur-in px-2" style={{ animationDelay: '0.7s' }}>
+                    易知不仅仅是一个工具，它是通往传统文化的数字桥梁。<br className="hidden md:block" />
                     以<span className="text-stone-900 font-medium border-b border-stone-300/50">数据</span>重构文化脉络，以<span className="text-stone-900 font-medium border-b border-stone-300/50">AI</span> 演绎易理逻辑。
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
-                    <Link href="/community">
-                        <Button size="lg" className="relative overflow-hidden h-14 px-10 rounded-full bg-gradient-to-r from-[#C82E31] to-[#E63E41] hover:from-[#a61b1f] hover:to-[#C82E31] text-white text-lg font-bold shadow-xl shadow-red-900/20 hover:shadow-2xl hover:-translate-y-1 transition-all w-full sm:w-auto group">
-                            <span className="relative z-10 flex items-center">
+                {/* CTAs */}
+                <div className="flex flex-col w-full max-w-xs mx-auto md:max-w-none md:flex-row items-center justify-center gap-4 md:gap-5 animate-blur-in" style={{ animationDelay: '0.9s' }}>
+                    <Link href="/community" className="w-full md:w-auto">
+                        <Button size="lg" className="w-full md:w-auto relative overflow-hidden h-12 md:h-14 px-10 rounded-full bg-gradient-to-r from-[#C82E31] to-[#E63E41] hover:from-[#a61b1f] hover:to-[#C82E31] text-white text-base md:text-lg font-bold shadow-xl shadow-red-900/20 hover:shadow-2xl hover:-translate-y-1 transition-all group">
+                            <span className="relative z-10 flex items-center justify-center">
                                 开始修习 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                             </span>
                             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 rounded-full" />
                         </Button>
                     </Link>
-                    <Button size="lg" variant="outline" className="h-14 px-10 rounded-full border-stone-300 text-stone-600 hover:text-stone-900 hover:bg-white/80 backdrop-blur-md w-full sm:w-auto hover:border-stone-400 transition-all">
+                    <Button size="lg" variant="outline" className="w-full md:w-auto h-12 md:h-14 px-10 rounded-full border-stone-300 text-stone-600 hover:text-stone-900 hover:bg-white/80 backdrop-blur-md hover:border-stone-400 transition-all text-base md:text-lg">
                         <PlayCircle className="w-5 h-5 mr-2" /> 观看演示
                     </Button>
                 </div>
 
+                {/* Invitation Card (Simplified for Mobile) */}
                 <Link href="/co-build">
                     <div 
-                        className="mt-20 relative group cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
+                        className="mt-12 md:mt-20 relative group cursor-pointer animate-blur-in opacity-80 hover:opacity-100 transition-opacity"
+                        style={{ animationDelay: '1.2s' }}
                     >
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-transparent to-stone-300/50" />
-                        <div className="co-build-card rounded-full px-3 py-4 pr-6 flex items-center gap-4 max-w-md mx-auto">
+                        {/* Decorative Line (Hidden on mobile to reduce noise) */}
+                        <div className="hidden md:block absolute -top-8 left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-transparent to-stone-300/50" />
+                        
+                        <div className="co-build-card rounded-full p-1.5 md:px-3 md:py-2 pr-4 md:pr-6 flex items-center gap-3 md:gap-4 max-w-[280px] md:max-w-md mx-auto bg-white/50 backdrop-blur-md border border-white/60 shadow-sm">
                             <div className="gradient-border-mask" />
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-stone-100 to-white border border-stone-100 shadow-sm flex items-center justify-center relative overflow-hidden">
+                            
+                            {/* Icon */}
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-stone-100 to-white border border-stone-100 shadow-sm flex items-center justify-center relative overflow-hidden shrink-0">
                                 <div className="absolute inset-0 bg-[#C82E31]/5 animate-pulse" />
-                                <div className="w-2 h-2 rounded-full bg-[#C82E31] relative z-10" style={{ animation: 'pulse-glow 2s infinite' }} />
-                                <div className="absolute inset-2 border border-stone-200 rounded-full opacity-50" />
+                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#C82E31] relative z-10" style={{ animation: 'pulse-glow 2s infinite' }} />
                             </div>
+                            
+                            {/* Text */}
                             <div className="text-left flex-1 min-w-0">
-                                <div className="text-xs text-stone-500 flex items-center gap-1.5">
-                                    <span className="font-serif italic text-stone-400">Invitation</span>
-                                    <span className="w-1 h-1 rounded-full bg-stone-300" />
-                                    <span className="text-stone-400">早期共建计划</span>
+                                <div className="text-[10px] md:text-xs text-stone-500 flex items-center gap-1.5">
+                                    <span className="font-serif italic text-stone-400">Join Us</span>
                                 </div>
-                                <div className="text-sm text-stone-800 truncate">
-                                    诚邀您成为 <span className="font-bold font-serif text-[#C82E31] text-base mx-0.5">数字易学</span> 的开源共建者
+                                <div className="text-xs md:text-sm text-stone-800 truncate">
+                                    成为 <span className="font-bold font-serif text-[#C82E31]">数字易学</span> 共建者
                                 </div>
                             </div>
+                            
+                            {/* Arrow */}
                             <div className="text-stone-300 group-hover:text-[#C82E31] group-hover:translate-x-1 transition-all duration-300">
-                                <ArrowRight className="w-4 h-4" />
+                                <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
                             </div>
                         </div>
-                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-3/4 h-2 bg-[#C82E31]/5 blur-lg rounded-full pointer-events-none" />
                     </div>
                 </Link>
             </div>
@@ -475,7 +608,7 @@ export default function LandingPage() {
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-[#C82E31] transition-colors duration-500 shadow-inner">
-                                            <IconAIChip />
+                                            <IconAIChip className="text-[#C82E31] group-hover:text-white transition-colors duration-500" />
                                         </div>
                                         <span className="font-mono text-[10px] text-stone-500 border border-stone-800 px-2 py-1 rounded-full">MODEL-GEN-3</span>
                                     </div>
@@ -606,5 +739,20 @@ export default function LandingPage() {
         </footer>
       </div>
     </>
+  )
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#FDFBF7]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto border-4 border-stone-200 border-t-stone-600 rounded-full animate-spin" />
+          <p className="text-stone-600">加载中...</p>
+        </div>
+      </div>
+    }>
+      <LandingPageContent />
+    </Suspense>
   )
 }

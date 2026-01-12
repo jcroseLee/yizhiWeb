@@ -18,7 +18,9 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
+import BaZiPanelDual from '@/app/community/components/BaZiPanelDual'
 import GuaPanelDual from '@/app/community/components/GuaPanelDual'
+import { getBaziInfo } from '@/app/community/components/PostCard'
 import PostDetailSkeleton from '@/app/community/components/PostDetailSkeleton'
 import ReportDialog from '@/app/community/components/ReportDialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
@@ -601,10 +603,25 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   }, [post?.content_html, post?.content])
 
   const isHelpPost = post?.type === 'help' && post?.divination_record
+  
+  // 判断是否为八字排盘
+  const isBaziRecord = useMemo(() => {
+    if (!post?.divination_record) return false
+    const record = post.divination_record
+    return record.method === 1 || record.original_key === 'bazi'
+  }, [post?.divination_record])
+  
+  // 提取八字数据
+  const baziData = useMemo(() => {
+    if (!post?.divination_record) return null
+    return getBaziInfo(post.divination_record)
+  }, [post?.divination_record])
+  
+  // 提取六爻卦象数据（仅当不是八字时）
   const fullGuaData = useMemo(() => {
-    if (!isHelpPost || !post?.divination_record) return null
+    if (!isHelpPost || !post?.divination_record || isBaziRecord) return null
     return convertDivinationRecordToFullGuaData(post.divination_record)
-  }, [isHelpPost, post?.divination_record])
+  }, [isHelpPost, post?.divination_record, isBaziRecord])
   
   const divinationInfo = useMemo(() => {
     if (!isHelpPost || !post?.divination_record) return null
@@ -664,11 +681,11 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
         {/* Main Content - 响应式布局 */}
         <main className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-6 py-4 lg:py-8 flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
-          
           <div className="flex-1 min-w-0 space-y-6 w-full">
              
             {/* Post Card */}
             <div className="bg-white sm:rounded-xl shadow-sm border-y sm:border border-stone-100 overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-stone-200 via-[#C82E31]/40 to-stone-200"></div>
               {isHelpPost && (post.bounty || 0) > 0 && (
                 <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-amber-500 to-amber-600 z-10" />
               )}
@@ -694,7 +711,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 {post.author?.id && (
                   <Link 
                     href={`/u/${post.author.id}`} 
-                    className={`flex items-center gap-3 mb-6 group hover:bg-stone-50/50 p-2 -m-2 rounded-lg transition-colors ${isHelpPost ? 'lg:hidden' : ''}`}
+                    className="flex items-center gap-3 mb-6 group hover:bg-stone-50/50 p-2 -m-2 rounded-lg transition-colors lg:hidden"
                   >
                     <Avatar className="w-10 h-10 border border-stone-200 group-hover:ring-2 group-hover:ring-[#C82E31]/20 transition-all">
                       <AvatarImage src={post.author.avatar_url || ''} />
@@ -719,27 +736,15 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                       <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif-sc font-bold text-stone-900 leading-tight">
                         {divinationInfo.question || '未填写事项'}
                       </h1>
-                      {post.tags && post.tags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {post.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="text-xs px-2 py-1 rounded-full bg-stone-50 text-stone-600 border border-stone-200"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-[3px] h-4 bg-[#C82E31] rounded-full"></div>
-                        <h2 className="text-sm sm:text-base font-bold text-[#C82E31] uppercase tracking-[0.1em] font-sans">BACKGROUND / 背景说明</h2>
+                    <div className="mb-14">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-[3px] h-3.5 bg-stone-300"></div>
+                        <h3 className="text-xs sm:text-sm font-bold text-stone-400 uppercase tracking-widest">BACKGROUND / 背景</h3>
                       </div>
                       {safeHtml.backgroundHtml ? (
-                        <div className="prose prose-stone max-w-none text-stone-700 text-sm sm:text-[15px] leading-relaxed font-serif-sc" dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml }} />
+                        <p className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8" dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml }} />
                       ) : (
                         <div className="text-stone-500 text-sm sm:text-[15px] italic">暂无详细背景描述...</div>
                       )}
@@ -747,30 +752,19 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
                     {/* 卦理推演部分 */}
                     {safeHtml.analysisHtml && (
-                      <div className="mt-8">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-[3px] h-4 bg-[#C82E31] rounded-full"></div>
-                          <h2 className="text-sm sm:text-base font-bold text-[#C82E31] uppercase tracking-[0.1em] font-sans">ANALYSIS / 卦理推演</h2>
+                      <div className="mb-14">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-[3px] h-3.5 bg-[#C82E31]"></div>
+                          <h3 className="text-xs font-bold text-[#C82E31] uppercase tracking-[0.15em] font-sans">ANALYSIS / 卦理推演</h3>
                         </div>
-                        <div className="prose prose-stone max-w-none text-stone-800 text-sm sm:text-[15px] leading-relaxed font-serif-sc" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
+                        <div className="prose prose-stone max-w-none text-stone-800 text-base sm:text-[17px] leading-[1.8] font-serif-sc text-justify" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
                       </div>
                     )}
                   </>
                 ) : (
                   <div className="mb-6">
-                    <h1 className="text-xl sm:text-2xl font-serif-sc font-bold text-stone-900 mb-4">{post.title}</h1>
-                    {post.tags && post.tags.length > 0 && (
-                      <div className="mb-4 flex flex-wrap gap-2">
-                        {post.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs px-2 py-1 rounded-full bg-stone-50 text-stone-600 border border-stone-200"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <h1 className="text-xl sm:text-2xl font-bold text-stone-900 mb-4" style={{ fontFamily: "'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif" }}>{post.title}</h1>
+                    <div className="text-xs text-stone-400 mb-4">{formatTimeStr(post.created_at)} · {post.view_count} 浏览</div>
                     <div className="prose prose-stone max-w-none text-stone-700 text-sm sm:text-base font-serif-sc" dangerouslySetInnerHTML={{ __html: post.content_html || post.content }} />
                   </div>
                 )}
@@ -782,6 +776,27 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                       <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
                     </h2>
                     <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+                  </div>
+                )}
+                
+                {/* 移动端：八字排盘信息展示在正文下方 */}
+                {isHelpPost && baziData && baziData.pillars && (
+                  <div className="mt-8 lg:hidden bg-stone-50/50 rounded-lg border border-stone-100 p-2 sm:p-4">
+                    <BaZiPanelDual data={baziData} recordId={post.divination_record?.id} />
+                  </div>
+                )}
+
+                {/* 标签 */}
+                {post.tags && post.tags.length > 0 && (
+                  <div className="pt-16 flex flex-wrap gap-2">
+                    {post.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs px-2 py-1 rounded-full bg-stone-50 text-stone-600 border border-stone-200"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 )}
 
@@ -1085,6 +1100,13 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             {fullGuaData && (
               <div className="lg:sticky lg:top-20 lg:z-10">
                 <GuaPanelDual data={fullGuaData} recordId={post.divination_record?.id} />
+              </div>
+            )}
+
+            {/* Desktop Only: BaZi Panel */}
+            {baziData && baziData.pillars && (
+              <div className="lg:sticky lg:top-20 lg:z-10">
+                <BaZiPanelDual data={baziData} recordId={post.divination_record?.id} />
               </div>
             )}
 

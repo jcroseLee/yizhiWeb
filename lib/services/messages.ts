@@ -92,7 +92,27 @@ export async function getConversations(
     })
 
     if (error) {
-      logError('Error fetching conversations:', error)
+      // 如果错误对象为空或没有有用信息，提供更多上下文
+      const hasErrorInfo = error && (
+        error.message || 
+        error.code || 
+        error.details || 
+        error.hint ||
+        (typeof error === 'object' && Object.keys(error).length > 0)
+      )
+      
+      if (!hasErrorInfo) {
+        // 空错误对象通常表示 RPC 函数不存在或数据库连接问题
+        logError('Error fetching conversations:', {
+          ...error,
+          _context: 'RPC call to get_dm_conversations failed with empty error',
+          _suggestion: 'Check if the get_dm_conversations function exists in the database',
+          userId: user.id,
+        })
+        throw new Error('获取会话列表失败：数据库函数可能不存在或连接异常')
+      } else {
+        logError('Error fetching conversations:', error)
+      }
       throw error
     }
 

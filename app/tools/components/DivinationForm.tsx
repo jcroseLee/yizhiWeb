@@ -2,20 +2,14 @@
 
 import { DateTimePicker } from '@/lib/components/DateTimePicker'
 import { PenLine } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { Label } from '@/lib/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/lib/components/ui/select'
 import { Textarea } from '@/lib/components/ui/textarea'
-import { getKongWangPairForStemBranch } from '@/lib/utils/lunar'
 
-import type { DivinationMethod } from '../page'
-
-
-interface GanZhiData {
-  stems: Array<{ char: string }>
-  branches: Array<{ char: string }>
-}
+import type { DivinationMethod } from '../6yao/page'
+import { SiZhuCard } from './SiZhuCard'
 
 interface DivinationFormProps {
   question: string
@@ -24,7 +18,6 @@ interface DivinationFormProps {
   onDateChange: (date: Date | null) => void
   divinationMethod: DivinationMethod
   onDivinationMethodChange: (method: DivinationMethod) => void
-  ganZhiData: GanZhiData
   questionError?: boolean
 }
 
@@ -45,68 +38,15 @@ export default function DivinationForm({
   onDateChange,
   divinationMethod,
   onDivinationMethodChange,
-  ganZhiData,
   questionError = false,
 }: DivinationFormProps) {
-  // 当前时间状态，每秒更新一次
-  const [currentTime, setCurrentTime] = useState(() => new Date())
   const [isQuestionFocused, setIsQuestionFocused] = useState(false)
-
-  useEffect(() => {
-    // 每秒更新一次当前时间
-    const interval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   return (
     <>
       <div className="space-y-8 font-serif">
-        {/* 1. 四柱信息卡片 (保持不变) */}
-        <div className="bg-white border border-stone-200/80 rounded-sm p-5 relative overflow-hidden shadow-sm group hover:shadow-md transition-shadow">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#C82E31]/10"></div>
-          
-          <div className="flex justify-between items-baseline mb-4 border-b border-stone-100 pb-2">
-            <span className="text-xs text-stone-400 font-sans">当前时刻</span>
-            <span className="text-sm font-bold text-stone-700 font-mono tracking-wide">
-              {currentTime.toLocaleString('zh-CN', { 
-                year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false 
-              })}
-            </span>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-2 text-center">
-            {ganZhiData.stems.map((stem, index) => {
-              const branch = ganZhiData.branches[index]
-              const labels = ['年柱', '月柱', '日柱', '时柱']
-              return (
-                <div key={index} className="flex flex-col items-center gap-2">
-                  <span className="text-[10px] text-stone-400 tracking-widest">{labels[index]}</span>
-                  <div className="flex flex-col gap-1">
-                    <div className="w-8 h-8 rounded-full border border-[#C82E31]/30 bg-[#C82E31]/5 text-[#C82E31] flex items-center justify-center font-bold shadow-sm">
-                      {stem.char}
-                    </div>
-                    <div className="w-8 h-8 rounded-sm border border-stone-300 bg-stone-50 text-stone-800 flex items-center justify-center font-bold">
-                      {branch.char}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex justify-center gap-6 text-[10px] text-stone-400">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-stone-300"></span>
-              年空: {getKongWangPairForStemBranch(ganZhiData.stems[0].char, ganZhiData.branches[0].char)}
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-stone-300"></span>
-              日空: {getKongWangPairForStemBranch(ganZhiData.stems[2].char, ganZhiData.branches[2].char)}
-            </span>
-          </div>
-        </div>
+        {/* 1. 四柱信息卡片 */}
+        <SiZhuCard />
 
         {/* 2. 表单区域 */}
         <div className="space-y-6 pl-1">

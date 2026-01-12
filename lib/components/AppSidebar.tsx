@@ -1,13 +1,14 @@
 'use client'
 
+import { IconCases, IconCommunity, IconHome, IconLibrary } from '@/lib/components/CustomIcons'
 import SidebarNavigation, { NavItem } from '@/lib/components/SidebarNavigation'
-import { BookOpen, Bot, Compass, Home as HomeIcon, Library, Settings, Users } from 'lucide-react'
+import { Bot, Compass, Settings } from 'lucide-react'
 
 const navItems: NavItem[] = [
-  { href: '/', label: '首页', icon: HomeIcon },
-  { href: '/community', label: '社区', icon: Users },
-  { href: '/cases', label: '案例库', icon: Library },
-  { href: '/library', label: '藏经阁', icon: BookOpen },
+  { href: '/', label: '首页', icon: IconHome },
+  { href: '/community', label: '社区', icon: IconCommunity },
+  { href: '/cases', label: '案例库', icon: IconCases },
+  { href: '/library', label: '藏经阁', icon: IconLibrary },
 ]
 
 const bottomItems: NavItem[] = [

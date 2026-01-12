@@ -24,7 +24,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import DailyFortuneCard from './components/DailyFortuneCard'
-import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo } from './components/PostCard'
+import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo, getBaziInfo } from './components/PostCard'
 import PostCardSkeleton from './components/PostCardSkeleton'
 import PostComposer from './components/PostComposer'
 import TrendingTopicsCard from './components/TrendingTopicsCard'
@@ -89,12 +89,15 @@ function formatTime(dateString: string): string {
 
 // 提取卦象信息辅助函数
 const extractGuaInfo = getGuaInfo
+// 提取四柱八字信息辅助函数
+const extractBaziInfo = getBaziInfo
 
 type SectionType = 'help' | 'theory' | 'debate' | 'chat'
 
 // 转换数据格式
 function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] {
   const guaInfo = extractGuaInfo(post.divination_record)
+  const baziInfo = extractBaziInfo(post.divination_record)
   // 直接使用帖子类型，如果没有则默认为 'theory'
   const postType = (post.type as SectionType) || 'theory'
 
@@ -127,6 +130,8 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     guaName: guaInfo?.guaName,
     lines: guaInfo?.lines,
     changingLines: guaInfo?.changingLines,
+    hasBazi: !!baziInfo,
+    baziPillars: baziInfo?.pillars,
     coverImage: post.cover_image_url || undefined,
     status: post.status,
   }

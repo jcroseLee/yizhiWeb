@@ -31,7 +31,7 @@ function Calendar({
       locale={zhCN}
       showOutsideDays={showOutsideDays}
       className={cn(
-        "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent cursor-pointer",
+        "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className
@@ -55,12 +55,12 @@ function Calendar({
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-7 w-7 pointer-events-auto z-20 hover:opacity-100 text-muted-foreground hover:text-foreground",
+          "h-7 w-7 pointer-events-auto z-20 hover:opacity-100 text-muted-foreground hover:text-foreground cursor-pointer",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-7 w-7 pointer-events-auto z-20 hover:opacity-100 text-muted-foreground hover:text-foreground",
+          "h-7 w-7 pointer-events-auto z-20 hover:opacity-100 text-muted-foreground hover:text-foreground cursor-pointer",
           defaultClassNames.button_next
         ),
         month_caption: cn(
@@ -106,7 +106,9 @@ function Calendar({
           buttonVariants({ variant: "ghost" }),
           "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
           // 强制选中状态高亮 (使用 aria-selected 选择器，优先级更高)
-          "aria-selected:bg-primary aria-selected:text-primary-foreground hover:aria-selected:bg-primary hover:aria-selected:text-primary-foreground focus:aria-selected:bg-primary focus:aria-selected:text-primary-foreground"
+          "aria-selected:bg-primary aria-selected:text-primary-foreground hover:aria-selected:bg-primary hover:aria-selected:text-primary-foreground focus:aria-selected:bg-primary focus:aria-selected:text-primary-foreground",
+          // 确保可点击时显示手型
+          "!cursor-pointer"
         ),
         day_range_end: "day-range-end",
         day_selected:
@@ -118,11 +120,17 @@ function Calendar({
           // 今天的日期：未选中时显示背景
           "bg-accent/80 text-accent-foreground",
           // 今天的日期被选中时：保留边框，但使用选中背景色
-          "aria-selected:!border-primary aria-selected:!border-2"
+          "aria-selected:!border-primary aria-selected:!border-2",
+          // 确保可点击时显示手型
+          "!cursor-pointer"
         ),
-        day_outside:
-          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
-        day_disabled: "text-muted-foreground opacity-50",
+        day_outside: cn(
+          "day-outside",
+          "!text-muted-foreground !opacity-50",
+          "aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+          "!cursor-pointer"
+        ),
+        day_disabled: "text-muted-foreground opacity-50 cursor-not-allowed",
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
@@ -137,7 +145,7 @@ function Calendar({
         //   defaultClassNames.today
         // ),
         outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
+          "!text-muted-foreground !opacity-50 aria-selected:text-muted-foreground",
           defaultClassNames.outside
         ),
         disabled: cn(
@@ -156,6 +164,22 @@ function Calendar({
           return (
             <>
               <style>{`
+                .rdp-day_button {
+                  cursor: pointer !important;
+                }
+                .rdp-day_outside,
+                .rdp-day_outside.rdp-day_button,
+                button.rdp-day_outside,
+                .rdp-day.rdp-day_outside,
+                .rdp-day_button.rdp-day_outside {
+                  color: hsl(var(--muted-foreground)) !important;
+                  opacity: 0.5 !important;
+                }
+                .rdp-day_outside *,
+                .rdp-day_outside.rdp-day_button * {
+                  color: hsl(var(--muted-foreground)) !important;
+                  opacity: 0.5 !important;
+                }
                 .rdp-day_today,
                 button[data-today="true"],
                 [data-today="true"] {

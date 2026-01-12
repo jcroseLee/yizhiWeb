@@ -1,5 +1,9 @@
 'use client'
 
+import {
+  IconHulu,
+  IconLuoPan
+} from '@/lib/components/CustomIcons'
 import { cn } from '@/lib/utils/cn'
 import {
   Binary,
@@ -10,30 +14,13 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
-
-// --- 自定义图标 ---
-const IconLuoPan = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
-    <rect x="7.5" y="7.5" width="9" height="9" rx="1" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.6" />
-    <path d="M12 3V5M12 19V21M3 12H5M19 12H21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <path d="M12 10L13.5 14H10.5L12 10Z" fill="currentColor" />
-  </svg>
-)
-
-const IconHulu = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2.5C10.6 2.5 9.5 3.6 9.5 5C9.5 6.1 10.1 7 11 7.6C9.6 8.4 8.5 9.9 8.5 12C8.5 16 12 21 12 21C12 21 15.5 16 15.5 12C15.5 9.9 14.4 8.4 13 7.6C13.9 7 14.5 6.1 14.5 5C14.5 3.6 13.4 2.5 12 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    <path d="M12 10.5L12.4 11.6L13.5 12L12.4 12.4L12 13.5L11.6 12.4L10.5 12L11.6 11.6L12 10.5Z" fill="currentColor" />
-  </svg>
-)
+import React, { useCallback, useMemo, useState } from 'react'
 
 // --- 类型定义 ---
 export interface NavItem {
   href: string
   label: string
-  icon: any
+  icon: React.ElementType<{ className?: string }>
   children?: NavItem[]
 }
 
@@ -54,34 +41,11 @@ const checkIsActive = (href: string, item: NavItem): boolean => {
 
 // --- 样式补丁 ---
 const styles = `
-  /* 导航项激活态 */
-  .nav-item-active {
-    background-color: rgba(200, 46, 49, 0.04);
-    color: #9D2933;
-    font-weight: 600;
-  }
-  .nav-item-active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 16px;
-    background-color: #C82E31;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
-  
-  /* AI 卡片流光背景 */
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
+  /* AI 卡片流光背景 - 静态流光效果，不循环滑动 */
   .ai-card-bg {
     background: linear-gradient(110deg, #fff 0%, #fff5f5 30%, #fff 60%); 
     background-size: 200% 100%;
-    animation: shimmer 6s infinite linear;
+    background-position: 0% 0%;
   }
   .ai-card-bg:hover {
     background: linear-gradient(110deg, #fff5f5 0%, #ffeaeadd 30%, #fff5f5 60%); 
@@ -113,11 +77,11 @@ const AiToolItem = ({ isActive }: { isActive: boolean }) => {
       )}
     >
       {/* NEW 徽章 */}
-      <div className="absolute -top-2 -right-2 z-10">
+      {/* <div className="absolute -top-2 -right-2 z-10">
         <span className="flex h-5 w-auto min-w-[32px] items-center justify-center rounded-full bg-[#C82E31] px-1.5 text-[9px] font-bold text-white shadow-sm badge-pulse leading-none">
           NEW
         </span>
-      </div>
+      </div> */}
 
       <div className={cn(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-300",
@@ -137,7 +101,7 @@ const AiToolItem = ({ isActive }: { isActive: boolean }) => {
             <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />
         </div>
         <span className="text-[10px] text-stone-400 group-hover:text-stone-500 truncate">
-          AI 辅助研判助手
+          AI 小助手
         </span>
       </div>
     </Link>
@@ -146,15 +110,10 @@ const AiToolItem = ({ isActive }: { isActive: boolean }) => {
 
 // --- 组件：排盘工具组 (Accordion Style) ---
 const ToolGroup = ({ isActive }: { isActive: boolean }) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [userOpen, setUserOpen] = useState(false)
   const pathname = usePathname()
-
-  // 如果子路由激活，自动展开
-  useEffect(() => {
-    if (pathname.startsWith('/tools/')) {
-        setIsOpen(true)
-    }
-  }, [pathname])
+  const isForcedOpen = pathname.startsWith('/tools/')
+  const isOpen = isForcedOpen || userOpen
 
   const subTools = [
     { name: '四柱八字', href: '/tools/bazi', icon: LayoutGrid },
@@ -169,7 +128,7 @@ const ToolGroup = ({ isActive }: { isActive: boolean }) => {
     )}>
       {/* Header - Click to toggle */}
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { if (!isForcedOpen) setUserOpen(prev => !prev) }}
         className="flex items-center gap-3 p-3 cursor-pointer group select-none"
       >
         <div className={cn(
@@ -225,33 +184,65 @@ const ToolGroup = ({ isActive }: { isActive: boolean }) => {
   )
 }
 
-// --- 通用列表项 (保持不变) ---
-const SidebarItem = ({ item, level = 0, pathname, expandedItems, onToggle }: any) => {
-  const Icon = item.icon
+// --- 通用列表项 (优化版：更有分量感和设计感) ---
+interface SidebarItemProps {
+  item: NavItem
+  level?: number
+  pathname: string
+  expandedItems: Set<string>
+  onToggle: (href: string) => void
+}
+
+const SidebarItem = ({ item, level = 0, pathname, expandedItems, onToggle }: SidebarItemProps) => {
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedItems.has(item.href)
   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
   const isRedText = (level > 0 && isActive) || (!hasChildren && isActive)
+  const IconComponent = item.icon
   
   return (
-    <div className="w-full relative">
+    <div className="w-full relative mb-1"> {/* 增加间距 */}
       <Link
         href={item.href}
         onClick={(e) => { if (hasChildren) { e.preventDefault(); onToggle(item.href) } }}
         className={cn(
-          "group flex w-full items-center gap-3 rounded-lg py-2.5 text-sm transition-all duration-300 relative overflow-hidden",
-          "hover:bg-stone-100/60",
-          isRedText ? "nav-item-active" : "text-stone-600 hover:text-stone-900"
+          "group flex w-full items-center gap-4 rounded-xl py-3 px-3 text-sm transition-all duration-300 relative overflow-hidden",
+          // 悬停态：细腻的位移
+          "hover:bg-stone-50 hover:pl-4",
+          // 激活态：深色背景 + 强对比文字
+          isRedText ? "bg-stone-100 text-[#1c1917] font-bold shadow-sm" : "text-stone-500 hover:text-stone-800 font-medium"
         )}
-        style={{ paddingLeft: `${1 + level * 1}rem`, paddingRight: '1rem' }} 
+        style={{ paddingLeft: level > 0 ? `${1.5 + level * 1}rem` : undefined }} 
       >
-        {level === 0 && <Icon className={cn("h-4 w-4 shrink-0 transition-colors duration-300", isRedText ? "text-[#C82E31]" : "text-stone-400 group-hover:text-stone-600")} />}
-        <span className="flex-1 truncate tracking-wide">{item.label}</span>
-        {hasChildren && <div className="ml-auto shrink-0 pl-2"><ChevronRight className={cn("h-3.5 w-3.5 text-stone-400 transition-transform duration-300", isExpanded && "rotate-90")} /></div>}
+        {/* 激活指示条 (左侧) */}
+        {isRedText && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#C82E31] rounded-r-full" />
+        )}
+
+        {/* 图标容器 (仅一级菜单) */}
+        {level === 0 && IconComponent && (
+          <div className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-300",
+            isRedText ? "bg-white text-[#C82E31] shadow-sm" : "bg-stone-50 text-stone-400 group-hover:bg-white group-hover:text-stone-600"
+          )}>
+            { }
+            <IconComponent className="h-5 w-5" />
+          </div>
+        )}
+
+        <span className="flex-1 truncate tracking-wide text-[15px]">{item.label}</span>
+        
+        {hasChildren && (
+            <div className="ml-auto shrink-0 pl-2">
+                <ChevronRight className={cn("h-4 w-4 text-stone-300 transition-transform duration-300 group-hover:text-stone-500", isExpanded && "rotate-90")} />
+            </div>
+        )}
       </Link>
+      
+      {/* 子菜单容器 */}
       <div className={cn("grid transition-all duration-300 ease-in-out", isExpanded ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 mt-0")}>
         <div className="overflow-hidden space-y-0.5">
-          {item.children?.map((child: any) => (
+          {item.children?.map((child: NavItem) => (
             <SidebarItem key={child.href} item={child} level={level + 1} pathname={pathname} expandedItems={expandedItems} onToggle={onToggle} />
           ))}
         </div>
@@ -262,30 +253,32 @@ const SidebarItem = ({ item, level = 0, pathname, expandedItems, onToggle }: any
 
 export default function SidebarNavigation({ items, bottomItems }: SidebarNavigationProps) {
   const pathname = usePathname()
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const [userExpandedItems, setUserExpandedItems] = useState<Set<string>>(new Set())
 
-  // 自动展开逻辑
-  useEffect(() => {
-    const newExpanded = new Set<string>(expandedItems)
-    let hasChange = false
+  const autoExpandedItems = useMemo(() => {
+    const next = new Set<string>()
     const findAndExpand = (navItems: NavItem[]) => {
       navItems.forEach(item => {
         if (item.children) {
           const shouldExpand = item.children.some(child => checkIsActive(pathname, child))
-          if (shouldExpand) { if (!newExpanded.has(item.href)) { newExpanded.add(item.href); hasChange = true } }
+          if (shouldExpand) next.add(item.href)
           findAndExpand(item.children)
         }
       })
     }
     findAndExpand(items)
-    if (bottomItems) {
-      findAndExpand(bottomItems)
-    }
-    if (hasChange) setExpandedItems(newExpanded)
-  }, [pathname, items, bottomItems]) 
+    if (bottomItems) findAndExpand(bottomItems)
+    return next
+  }, [pathname, items, bottomItems])
+
+  const expandedItems = useMemo(() => {
+    const next = new Set<string>(autoExpandedItems)
+    userExpandedItems.forEach(href => next.add(href))
+    return next
+  }, [autoExpandedItems, userExpandedItems])
 
   const handleToggle = useCallback((href: string) => {
-    setExpandedItems(prev => {
+    setUserExpandedItems(prev => {
       const next = new Set(prev)
       if (next.has(href)) next.delete(href)
       else next.add(href)

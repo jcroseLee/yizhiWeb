@@ -14,6 +14,7 @@ import { Bookmark, Coins, Flag, Heart, MessageSquare, MoreHorizontal } from 'luc
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
+import BaZiThumbnail from './BaZiThumbnail'
 import ReportDialog from './ReportDialog'
 
 // -----------------------------------------------------------------------------
@@ -74,6 +75,134 @@ export function getGuaInfo(divinationRecord: {
   return { guaName, lines, changingLines }
 }
 
+/** 解析排盘记录为四柱八字信息 */
+export function getBaziInfo(divinationRecord: {
+  method?: number
+  original_key?: string
+  original_json?: Record<string, unknown> | string
+} | null | undefined) {
+  if (!divinationRecord) return null
+  
+  // 检查是否为八字排盘 (method=1 或 original_key='bazi')
+  const isBazi = divinationRecord.method === 1 || divinationRecord.original_key === 'bazi'
+  
+  // 调试日志
+  if (process.env.NODE_ENV === 'development') {
+    console.log('getBaziInfo check:', {
+      method: divinationRecord.method,
+      original_key: divinationRecord.original_key,
+      isBazi,
+      hasOriginalJson: !!divinationRecord.original_json,
+      original_json_type: typeof divinationRecord.original_json
+    })
+  }
+  
+  if (!isBazi) return null
+
+  try {
+    // 解析 original_json
+    let originalJson: Record<string, unknown> = {}
+    
+    if (typeof divinationRecord.original_json === 'string') {
+      try {
+        originalJson = JSON.parse(divinationRecord.original_json)
+      } catch (parseError) {
+        console.error('Failed to parse original_json as string:', parseError)
+        return null
+      }
+    } else if (divinationRecord.original_json) {
+      originalJson = divinationRecord.original_json
+    }
+
+    // 从 original_json 中提取 result
+    const result = originalJson.result as {
+      pillars?: Array<{
+        label: string
+        gan: { char: string; wuxing: string }
+        zhi: { char: string; wuxing: string }
+        zhuXing?: string
+        fuXing?: string[]
+        cangGan?: Array<{ char: string; wuxing: string }>
+        naYin?: string
+        shenSha?: string[]
+        xingYun?: string
+        ziZuo?: string
+        kongWang?: string
+      }>
+      basic?: {
+        name?: string
+        gender: string
+        lunarDate: string
+        solarDate: string
+        trueSolarDate: string
+        place?: string
+        solarTerm?: string
+        zodiac?: string
+      }
+    } | undefined
+
+    if (!result?.pillars || !Array.isArray(result.pillars) || result.pillars.length !== 4) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('getBaziInfo: invalid pillars data', {
+          hasResult: !!result,
+          pillarsLength: result?.pillars?.length,
+          pillars: result?.pillars,
+          originalJsonKeys: Object.keys(originalJson)
+        })
+      }
+      return null
+    }
+
+    // 验证每个 pillar 的数据结构
+    const validPillars = result.pillars.filter(p => 
+      p && 
+      p.label && 
+      p.gan && 
+      typeof p.gan.char === 'string' && 
+      typeof p.gan.wuxing === 'string' &&
+      p.zhi && 
+      typeof p.zhi.char === 'string' && 
+      typeof p.zhi.wuxing === 'string'
+    )
+
+    if (validPillars.length !== 4) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('getBaziInfo: invalid pillar structure', {
+          validPillarsCount: validPillars.length,
+          pillars: result.pillars
+        })
+      }
+      return null
+    }
+
+    return {
+      pillars: validPillars.map(p => ({
+        label: p.label,
+        gan: { char: p.gan.char, wuxing: p.gan.wuxing },
+        zhi: { char: p.zhi.char, wuxing: p.zhi.wuxing },
+        zhuXing: p.zhuXing,
+        fuXing: p.fuXing,
+        cangGan: p.cangGan,
+        naYin: p.naYin,
+        shenSha: p.shenSha,
+        xingYun: p.xingYun,
+        ziZuo: p.ziZuo,
+        kongWang: p.kongWang,
+      })),
+      basic: result.basic,
+      fullResult: result as any, // 保留完整结果以备后用
+    }
+  } catch (error) {
+    console.error('Error parsing bazi info:', error, {
+      method: divinationRecord.method,
+      original_key: divinationRecord.original_key,
+      original_json_type: typeof divinationRecord.original_json,
+      error_message: error instanceof Error ? error.message : String(error)
+    })
+    return null
+  }
+}
+
 // -----------------------------------------------------------------------------
 // 类型与配置
 // -----------------------------------------------------------------------------
@@ -92,6 +221,12 @@ export interface Post {
   guaName?: string
   lines?: boolean[]
   changingLines?: number[]
+  hasBazi?: boolean
+  baziPillars?: Array<{
+    label: string
+    gan: { char: string; wuxing: string }
+    zhi: { char: string; wuxing: string }
+  }>
   isLiked?: boolean
   isFavorited?: boolean
   status?: string
@@ -139,7 +274,7 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
     )
   }
   
-  const showMedia = (post.hasGua && post.guaName) || post.coverImage
+  const showMedia = (post.hasGua && post.guaName) || (post.hasBazi && post.baziPillars) || post.coverImage
   const bountyAmount = typeof post.bounty === 'number' ? post.bounty : Number(post.bounty) || 0
   const hasBounty = bountyAmount > 0
   const typeConfig = POST_TYPE_CONFIG[post.type] || POST_TYPE_CONFIG.chat
@@ -241,7 +376,10 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
         {/* 右侧 (PC) / 下方 (Mobile)：媒体展示区 */}
         {showMedia && (
           <div className="shrink-0 sm:w-[140px] md:w-[160px] w-full mt-2 sm:mt-0">
-            {post.hasGua && post.guaName ? (
+            {post.hasBazi && post.baziPillars ? (
+              // 四柱八字展示 - 优先显示八字
+              <BaZiThumbnail pillars={post.baziPillars} />
+            ) : post.hasGua && post.guaName ? (
               // 卦象展示 - 增加精致的边框容器
               <div className="w-full h-full min-h-[120px] bg-stone-50 rounded-xl border border-stone-100 flex items-center justify-center p-3 relative overflow-hidden">
                 <div className="opacity-10 absolute -right-2 -bottom-4 text-6xl font-serif select-none pointer-events-none text-stone-400">卦</div>

@@ -307,7 +307,9 @@ export async function getPosts(options?: {
         original_key,
         changed_key,
         lines,
-        changing_flags
+        changing_flags,
+        method,
+        original_json
       )
     `)
     .in('status', ['published', 'hidden', 'archived'])  // 显示发布、隐藏和已结案的帖子
@@ -822,7 +824,9 @@ export async function getUserPosts(options?: {
         original_key,
         changed_key,
         lines,
-        changing_flags
+        changing_flags,
+        method,
+        original_json
       )
     `)
     .eq('user_id', targetUserId)
@@ -957,7 +961,9 @@ export async function getUserFavoritePosts(options?: {
         original_key,
         changed_key,
         lines,
-        changing_flags
+        changing_flags,
+        method,
+        original_json
       )
     `)
     .in('id', postIds)
@@ -1078,7 +1084,9 @@ export async function getUserLikedPosts(options?: {
         original_key,
         changed_key,
         lines,
-        changing_flags
+        changing_flags,
+        method,
+        original_json
       )
     `)
     .in('id', postIds)
@@ -2223,7 +2231,9 @@ export async function getUserDrafts(
         original_key,
         changed_key,
         lines,
-        changing_flags
+        changing_flags,
+        method,
+        original_json
       )
     `)
     .eq('user_id', currentUser.id)

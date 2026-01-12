@@ -1556,6 +1556,208 @@ export async function deleteDivinationNote(noteId: string): Promise<{ success: b
 }
 
 /**
+ * 保存八字排盘记录到云端
+ */
+export async function saveBaZiRecord(payload: {
+  name?: string
+  gender: 'male' | 'female'
+  dateISO: string
+  trueSolarDateISO?: string
+  hour?: string
+  minute?: string
+  city?: string
+  solarTimeCorrection?: boolean
+  earlyZiHour?: boolean
+  result: Record<string, unknown>
+}): Promise<{ success: boolean; message: string; recordId?: string }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    // 将bazi数据保存到divination_records表，使用method=1表示bazi，将数据存储在original_json中
+    const { data, error } = await supabase
+      .from('divination_records')
+      .insert({
+        user_id: user.id,
+        question: payload.name || null,
+        divination_time: payload.dateISO,
+        method: 1, // 1表示bazi排盘
+        lines: [], // bazi不需要lines
+        changing_flags: [], // bazi不需要changing_flags
+        original_key: 'bazi', // 标识为bazi
+        changed_key: 'bazi',
+        original_json: {
+          name: payload.name,
+          gender: payload.gender,
+          dateISO: payload.dateISO,
+          trueSolarDateISO: payload.trueSolarDateISO,
+          hour: payload.hour,
+          minute: payload.minute,
+          city: payload.city,
+          solarTimeCorrection: payload.solarTimeCorrection,
+          earlyZiHour: payload.earlyZiHour,
+          result: payload.result,
+        },
+        changed_json: {},
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      console.error('Error saving bazi record:', error)
+      return { success: false, message: '保存失败：' + (error.message || '未知错误') }
+    }
+
+    return { 
+      success: true, 
+      message: '保存成功', 
+      recordId: data?.id 
+    }
+  } catch (error: unknown) {
+    console.error('Error saving bazi record:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '保存失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
+ * 获取八字排盘记录
+ */
+export async function getBaZiRecordById(recordId: string, requireOwnership: boolean = true): Promise<{
+  id: string
+  user_id: string
+  name: string | null
+  dateISO: string
+  gender: 'male' | 'female'
+  trueSolarDateISO?: string
+  hour?: string
+  minute?: string
+  city?: string
+  solarTimeCorrection?: boolean
+  earlyZiHour?: boolean
+  result: Record<string, unknown>
+  created_at: string
+} | null> {
+  const supabase = getSupabaseClient()
+  if (!supabase) return null
+
+  try {
+    let query = supabase
+      .from('divination_records')
+      .select('*')
+      .eq('id', recordId)
+      .eq('method', 1) // 只查询bazi记录
+    
+    // 如果需要所有权验证，添加 user_id 过滤
+    if (requireOwnership) {
+      const user = await getCurrentUser()
+      if (!user) return null
+      query = query.eq('user_id', user.id)
+    }
+    
+    const { data, error } = await query.single()
+
+    if (error) {
+      console.error('Error fetching bazi record:', error)
+      return null
+    }
+
+    if (!data) return null
+
+    const originalJson = typeof data.original_json === 'string' 
+      ? JSON.parse(data.original_json) 
+      : data.original_json || {}
+
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      name: data.question || originalJson.name || null,
+      dateISO: data.divination_time,
+      gender: originalJson.gender || 'male',
+      trueSolarDateISO: originalJson.trueSolarDateISO,
+      hour: originalJson.hour,
+      minute: originalJson.minute,
+      city: originalJson.city,
+      solarTimeCorrection: originalJson.solarTimeCorrection,
+      earlyZiHour: originalJson.earlyZiHour,
+      result: originalJson.result || {},
+      created_at: data.created_at,
+    }
+  } catch (error) {
+    console.error('Error fetching bazi record:', error)
+    return null
+  }
+}
+
+/**
+ * 更新八字排盘记录的姓名
+ */
+export async function updateBaZiName(recordId: string, name: string): Promise<{ success: boolean; message: string }> {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: '请先登录' }
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { success: false, message: '系统错误' }
+  }
+
+  try {
+    // 先获取当前记录
+    const { data: record, error: fetchError } = await supabase
+      .from('divination_records')
+      .select('original_json')
+      .eq('id', recordId)
+      .eq('user_id', user.id)
+      .eq('method', 1)
+      .single()
+
+    if (fetchError || !record) {
+      return { success: false, message: '记录不存在或无权访问' }
+    }
+
+    // 更新question字段（存储name）和original_json中的name
+    const originalJson = typeof record.original_json === 'string'
+      ? JSON.parse(record.original_json)
+      : record.original_json || {}
+
+    const updatedJson = {
+      ...originalJson,
+      name: name,
+    }
+
+    const { error } = await supabase
+      .from('divination_records')
+      .update({ 
+        question: name || null,
+        original_json: updatedJson
+      })
+      .eq('id', recordId)
+      .eq('user_id', user.id)
+      .eq('method', 1)
+
+    if (error) {
+      console.error('Error updating bazi name:', error)
+      return { success: false, message: '更新失败：' + (error.message || '未知错误') }
+    }
+
+    return { success: true, message: '更新成功' }
+  } catch (error: unknown) {
+    console.error('Error updating bazi name:', error)
+    const err = error as { message?: string }
+    return { success: false, message: '更新失败：' + (err.message || '未知错误') }
+  }
+}
+
+/**
  * 更新排盘记录的问题描述
  */
 export async function updateDivinationQuestion(recordId: string, question: string): Promise<{ success: boolean; message: string }> {

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import Image from 'next/image'
-
 import { AnimatePresence, motion } from 'framer-motion'
 
 import { Button } from '@/lib/components/ui/button'
@@ -30,6 +28,150 @@ const LINE_CONFIG: Record<LineType, { value: string; isChanging: boolean }> = {
 }
 
 const LINE_POSITIONS = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻']
+
+// -----------------------------------------------------------------------------
+// 子组件：铜钱 SVG - 磨砂金 · 矢量印刻
+// -----------------------------------------------------------------------------
+
+const CoinFrontSVG = ({ coinId }: { coinId: string }) => (
+  <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id={`gold-surface-front-${coinId}`} x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#F3E5AB"/>
+        <stop offset="30%" stopColor="#C5A065"/>
+        <stop offset="70%" stopColor="#8B6D29"/>
+        <stop offset="100%" stopColor="#5C4518"/>
+      </linearGradient>
+      
+      <linearGradient id={`rim-light-front-${coinId}`} x1="128" y1="128" x2="0" y2="0" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.6"/>
+        <stop offset="100%" stopColor="#5C4518" stopOpacity="0.6"/>
+      </linearGradient>
+
+      <linearGradient id={`text-highlight-${coinId}`} x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FFEDBC"/>
+        <stop offset="1" stopColor="#CCA860"/>
+      </linearGradient>
+
+      <filter id={`drop-shadow-front-${coinId}`} x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="2" dy="4" stdDeviation="3" floodColor="#000" floodOpacity="0.3"/>
+      </filter>
+      
+      <filter id={`inner-depth-front-${coinId}`} x="-50%" y="-50%" width="200%" height="200%">
+        <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+        <feGaussianBlur stdDeviation="2" />
+        <feOffset dx="1" dy="2" result="offsetblur" />
+        <feFlood floodColor="#5C4010" floodOpacity="0.4" />
+        <feComposite in2="offsetblur" operator="in" />
+        <feComposite in2="SourceAlpha" operator="in" />
+        <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode /></feMerge>
+      </filter>
+    </defs>
+
+    <g filter={`url(#drop-shadow-front-${coinId})`}>
+      <g filter={`url(#inner-depth-front-${coinId})`}>
+        <circle cx="64" cy="64" r="60" fill={`url(#gold-surface-front-${coinId})`}/>
+      </g>
+      
+      <circle cx="64" cy="64" r="58" stroke={`url(#rim-light-front-${coinId})`} strokeWidth="1.5" fill="none"/>
+      <circle cx="64" cy="64" r="48" fill="#000" fillOpacity="0.1"/>
+      <circle cx="64" cy="64" r="48" stroke={`url(#rim-light-front-${coinId})`} strokeWidth="1" opacity="0.5"/>
+
+      <g>
+         <rect x="44" y="44" width="40" height="40" rx="2" fill="#3E2B0D"/>
+         <rect x="46" y="46" width="36" height="36" rx="1" fill="#FDFBF7"/> 
+         <rect x="45" y="45" width="38" height="38" rx="1" stroke={`url(#rim-light-front-${coinId})`} strokeWidth="1"/>
+      </g>
+
+      <g fontFamily="'Noto Serif SC', 'Songti SC', serif" fontWeight="900" fontSize="22" textAnchor="middle">
+        <g fill="#5C4518" opacity="0.8" transform="translate(1, 1)">
+          <text x="65" y="36">乾</text><text x="65" y="112">隆</text><text x="106" y="74">通</text><text x="24" y="74">宝</text>
+        </g>
+        <g fill={`url(#text-highlight-${coinId})`} transform="translate(-0.5, -0.5)">
+          <text x="64" y="35">乾</text><text x="64" y="111">隆</text><text x="105" y="73">通</text><text x="23" y="73">宝</text>
+        </g>
+      </g>
+    </g>
+  </svg>
+)
+
+const CoinBackSVG = ({ coinId }: { coinId: string }) => (
+  <svg 
+    viewBox="0 0 128 128" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      {/* 1. 表面金属渐变 (磨砂古金) */}
+      <linearGradient id={`gold-surface-back-${coinId}`} x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#F3E5AB"/>
+        <stop offset="30%" stopColor="#C5A065"/>
+        <stop offset="70%" stopColor="#8B6D29"/>
+        <stop offset="100%" stopColor="#5C4518"/>
+      </linearGradient>
+      
+      {/* 2. 内边缘高光 (模拟倒角) */}
+      <linearGradient id={`rim-light-back-${coinId}`} x1="128" y1="128" x2="0" y2="0" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.6"/>
+        <stop offset="100%" stopColor="#5C4518" stopOpacity="0.6"/>
+      </linearGradient>
+
+      {/* 3. 文字/纹路浮雕高光 */}
+      <linearGradient id={`text-highlight-back-${coinId}`} x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FFEDBC"/>
+        <stop offset="1" stopColor="#CCA860"/>
+      </linearGradient>
+
+      {/* 4. 阴影滤镜 */}
+      <filter id={`drop-shadow-back-${coinId}`} x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="2" dy="4" stdDeviation="3" floodColor="#000" floodOpacity="0.3"/>
+      </filter>
+    </defs>
+
+    {/* 整体容器 */}
+    <g filter={`url(#drop-shadow-back-${coinId})`}>
+      {/* A. 钱币主体 */}
+      {/* 外圆 */}
+      <circle cx="64" cy="64" r="60" fill={`url(#gold-surface-back-${coinId})`}/>
+      <circle cx="64" cy="64" r="58" stroke={`url(#rim-light-back-${coinId})`} strokeWidth="1.5" fill="none"/>
+      
+      {/* 内部凹陷区域 */}
+      <circle cx="64" cy="64" r="48" fill="#000" fillOpacity="0.1"/>
+      <circle cx="64" cy="64" r="48" stroke={`url(#rim-light-back-${coinId})`} strokeWidth="1" opacity="0.5"/>
+
+      {/* B. 方孔 */}
+      <g>
+         <rect x="44" y="44" width="40" height="40" rx="2" fill="#3E2B0D"/>
+         <rect x="46" y="46" width="36" height="36" rx="1" fill="#FDFBF7"/> 
+         <rect x="45" y="45" width="38" height="38" rx="1" stroke={`url(#rim-light-back-${coinId})`} strokeWidth="1"/>
+      </g>
+
+      {/* C. 满文浮雕 (位置调整版) */}
+      {/* translate(64, 64) 将坐标原点移至中心 */}
+      <g transform="translate(64, 64)">
+          {/* 阴影层 (深色衬底) */}
+          <g transform="translate(1, 1)" stroke="#5C4518" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.8">
+              {/* 左侧：满文"宝"(Boo) - 向左调整至 x=-32 */}
+              {/* 路径优化：更加圆润，符合铸造特征 */}
+              <path d="M-30 -18 C-36 -18 -38 -10 -32 -8 C-28 -6 -36 -4 -36 2 C-36 8 -30 10 -26 8 M-26 8 C-34 12 -34 20 -28 24"/>
+              
+              {/* 右侧：满文"泉"(Chiowan) - 向右调整至 x=32 */}
+              {/* 路径优化：竖线挺拔，分叉有力 */}
+              <path d="M30 -22 V 18 M24 -14 H 36 M24 -4 H 36 M26 12 L 36 8 C 36 8 38 18 30 24"/>
+          </g>
+
+          {/* 高光层 (亮色顶层) */}
+          <g stroke={`url(#text-highlight-back-${coinId})`} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+               {/* 左侧：满文"宝"(Boo) */}
+              <path d="M-30 -18 C-36 -18 -38 -10 -32 -8 C-28 -6 -36 -4 -36 2 C-36 8 -30 10 -26 8 M-26 8 C-34 12 -34 20 -28 24"/>
+              
+              {/* 右侧：满文"泉"(Chiowan) */}
+              <path d="M30 -22 V 18 M24 -14 H 36 M24 -4 H 36 M26 12 L 36 8 C 36 8 38 18 30 24"/>
+          </g>
+      </g>
+    </g>
+  </svg>
+)
 
 // -----------------------------------------------------------------------------
 // 子组件：SVG 书法爻线
@@ -305,14 +447,15 @@ export default function DivinationCasting({
               // 错开每个铜钱的起跳时间
               delay: idx * 0.1 
             }}
-            className="relative w-20 h-20 shadow-xl rounded-full"
+            className="relative w-20 h-20 rounded-full"
             style={{ 
               transformStyle: 'preserve-3d',
+              boxShadow: '0 10px 15px -3px rgba(28, 25, 23, 0.1), 0 4px 6px -2px rgba(28, 25, 23, 0.05)',
             }}
           >
             {/* 正面 (阴/字) - 0度面 */}
             <div 
-              className="absolute inset-0 rounded-full overflow-hidden backface-hidden"
+              className="absolute inset-0 rounded-full overflow-hidden backface-hidden flex items-center justify-center"
               style={{ 
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -320,17 +463,14 @@ export default function DivinationCasting({
                 backgroundColor: '#fff' // 防止透明穿透
               }}
             >
-               <Image 
-                 src="/images/ui/coin.svg" 
-                 alt="阴" 
-                 fill 
-                 className="object-contain drop-shadow-md" 
-               />
+               <div className="w-full h-full flex items-center justify-center drop-shadow-md">
+                 <CoinFrontSVG coinId={`coin-${idx}`} />
+               </div>
             </div>
             
             {/* 反面 (阳/花) - 180度面 */}
             <div 
-              className="absolute inset-0 rounded-full overflow-hidden backface-hidden"
+              className="absolute inset-0 rounded-full overflow-hidden backface-hidden flex items-center justify-center"
               style={{ 
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
@@ -338,12 +478,9 @@ export default function DivinationCasting({
                 backgroundColor: '#fff'
               }}
             >
-               <Image 
-                 src="/images/ui/coin-reverse.svg" 
-                 alt="阳" 
-                 fill 
-                 className="object-contain drop-shadow-md" 
-               />
+               <div className="w-full h-full flex items-center justify-center drop-shadow-md">
+                 <CoinBackSVG coinId={`coin-${idx}`} />
+               </div>
             </div>
           </motion.div>
         ))}

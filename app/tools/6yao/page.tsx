@@ -21,11 +21,10 @@ import { RESULT_STORAGE_KEY, RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayl
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useAlert } from '@/lib/utils/alert'
 import { buildChangedLines, linesToBinaryString } from '@/lib/utils/divinationLineUtils'
-import { getGanZhiInfo } from '@/lib/utils/lunar'
 
 // Components
-import DivinationForm from './components/DivinationForm'
-import { TurtleIcon } from './components/TurtleIcon'
+import DivinationForm from '../components/DivinationForm'
+import { TurtleIcon } from '../components/TurtleIcon'
 
 // -----------------------------------------------------------------------------
 // 样式补丁：增强纸质感与书写感
@@ -196,10 +195,6 @@ export default function ToolsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [lastResultId, setLastResultId] = useState<string | null>(null)
 
-  // 计算四柱（基于选择的起卦时间）
-  const ganZhiData = useMemo(() => {
-    return getGanZhiInfo(divinationTime)
-  }, [divinationTime])
 
   // 时间自动更新
   useEffect(() => {
@@ -476,7 +471,6 @@ export default function ToolsPage() {
               onDateChange={handleDateChange}
               divinationMethod={divinationMethod}
               onDivinationMethodChange={setDivinationMethod}
-              ganZhiData={ganZhiData}
               questionError={questionError}
             />
           </div>
@@ -512,7 +506,6 @@ export default function ToolsPage() {
                 onDateChange={handleDateChange}
                 divinationMethod={divinationMethod}
                 onDivinationMethodChange={setDivinationMethod}
-                ganZhiData={ganZhiData}
                 questionError={questionError}
               />
             </div>

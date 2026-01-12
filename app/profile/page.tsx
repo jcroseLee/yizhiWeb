@@ -163,6 +163,9 @@ function ProfilePageContent() {
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set())
   const [isSelectMode, setIsSelectMode] = useState(false)
   const [batchDeleting, setBatchDeleting] = useState(false)
+  
+  // 排盘记录子菜单状态
+  const [divinationTab, setDivinationTab] = useState<'all' | 'bazi' | '6yao' | 'qimen'>('all')
 
   // Handle URL tab param
   useEffect(() => {
@@ -289,20 +292,34 @@ function ProfilePageContent() {
   }
   const handleRecordClick = async (record: DivinationRecord) => {
     try {
-      const fullRecord = await getDivinationRecordById(record.id); if (!fullRecord) return
-      const originalKey = String(fullRecord.original_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
-      const changedKey = String(fullRecord.changed_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
-      const changingLines: number[] = []; fullRecord.changing_flags.forEach((f, i) => { if(f) changingLines.push(i+1) })
-      const payload: StoredDivinationPayload = {
-        question: fullRecord.question || '', divinationTimeISO: fullRecord.divination_time, divinationMethod: fullRecord.method,
-        lines: fullRecord.lines, changingFlags: fullRecord.changing_flags,
-        result: { originalKey, changedKey, original: getHexagramResult(originalKey), changed: getHexagramResult(changedKey), changingLines }, isSaved: true
+      // 判断记录类型
+      const isBaZi = record.original_key === 'bazi' || (record.method === 1 && (!record.lines || record.lines.length === 0))
+      const isLiuYao = record.lines && record.lines.length > 0 && record.original_key !== 'bazi'
+      
+      if (isBaZi) {
+        // 八字记录，跳转到八字详情页
+        router.push(`/tools/bazi/${record.id}?from=profile`)
+        return
+      } else if (isLiuYao) {
+        // 六爻记录，跳转到六爻详情页
+        const fullRecord = await getDivinationRecordById(record.id); if (!fullRecord) return
+        const originalKey = String(fullRecord.original_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
+        const changedKey = String(fullRecord.changed_key).replace(/[^01]/g, '').padStart(6, '0').slice(0, 6)
+        const changingLines: number[] = []; fullRecord.changing_flags.forEach((f, i) => { if(f) changingLines.push(i+1) })
+        const payload: StoredDivinationPayload = {
+          question: fullRecord.question || '', divinationTimeISO: fullRecord.divination_time, divinationMethod: fullRecord.method,
+          lines: fullRecord.lines, changingFlags: fullRecord.changing_flags,
+          result: { originalKey, changedKey, original: getHexagramResult(originalKey), changed: getHexagramResult(changedKey), changingLines }, isSaved: true
+        }
+        const resultId = `db-${record.id}`; const storedResult: StoredResultWithId = { ...payload, id: resultId, createdAt: fullRecord.created_at }
+        let resultsList: StoredResultWithId[] = []; try { resultsList = JSON.parse(localStorage.getItem(RESULTS_LIST_STORAGE_KEY) || '[]') } catch {}
+        resultsList = resultsList.filter(r => r.id !== resultId); resultsList.unshift(storedResult)
+        localStorage.setItem(RESULTS_LIST_STORAGE_KEY, JSON.stringify(resultsList)); localStorage.setItem('latestDivinationResult', JSON.stringify(payload))
+        router.push(`/tools/6yao/${resultId}?from=profile`)
+      } else {
+        // 其他类型（如奇门遁甲），暂时提示
+        toast({ title: '该类型暂未支持', variant: 'destructive' })
       }
-      const resultId = `db-${record.id}`; const storedResult: StoredResultWithId = { ...payload, id: resultId, createdAt: fullRecord.created_at }
-      let resultsList: StoredResultWithId[] = []; try { resultsList = JSON.parse(localStorage.getItem(RESULTS_LIST_STORAGE_KEY) || '[]') } catch {}
-      resultsList = resultsList.filter(r => r.id !== resultId); resultsList.unshift(storedResult)
-      localStorage.setItem(RESULTS_LIST_STORAGE_KEY, JSON.stringify(resultsList)); localStorage.setItem('latestDivinationResult', JSON.stringify(payload))
-      router.push(`/tools/6yao/${resultId}?from=profile`)
     } catch { toast({ title: '加载失败', variant: 'destructive' }) }
   }
   const handleDeleteClick = (id: string) => { setRecordToDelete(id); setDeleteDialogOpen(true) }
@@ -331,8 +348,20 @@ function ProfilePageContent() {
     })
   }
   const handleSelectAll = () => {
-    if (selectedRecordIds.size === divinationRecords.length) setSelectedRecordIds(new Set())
-    else setSelectedRecordIds(new Set(divinationRecords.map(r => r.id)))
+    // 根据当前选中的子菜单过滤记录
+    const filteredRecords = divinationRecords.filter(record => {
+      if (divinationTab === 'all') return true
+      const isBaZi = record.original_key === 'bazi' || (record.method === 1 && (!record.lines || record.lines.length === 0))
+      const isLiuYao = record.lines && record.lines.length > 0 && record.original_key !== 'bazi'
+      const isQimen = !isBaZi && !isLiuYao
+      if (divinationTab === 'bazi') return isBaZi
+      if (divinationTab === '6yao') return isLiuYao
+      if (divinationTab === 'qimen') return isQimen
+      return true
+    })
+    
+    if (selectedRecordIds.size === filteredRecords.length) setSelectedRecordIds(new Set())
+    else setSelectedRecordIds(new Set(filteredRecords.map(r => r.id)))
   }
   const handleBatchDelete = async () => {
     if (selectedRecordIds.size === 0) return toast({ title: '请选择要删除的记录', variant: 'destructive' })
@@ -607,50 +636,91 @@ function ProfilePageContent() {
 
               {/* -------------------- 排盘记录 (卡片式优化) -------------------- */}
               <TabsContent value="divinations" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {divinationRecords.length === 0 ? (
-                  <div className="text-center py-20 bg-white/50 rounded-2xl border border-dashed border-stone-200">
-                    <p className="text-stone-400 text-sm">暂无排盘记录</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className={`sticky top-[60px] lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
-                      isSelectMode 
-                        ? 'bg-red-50/95 border-red-200 shadow-md p-3' 
-                        : 'bg-white/60 border-stone-100 shadow-sm p-4 backdrop-blur-md'
-                    }`}>
-                      <div className="flex items-center justify-between">
-                        {isSelectMode ? (
-                          <div className="flex items-center gap-4">
-                            <Button variant="ghost" size="icon" onClick={handleToggleSelectMode} className="h-8 w-8 rounded-full hover:bg-red-100 text-red-700">
-                              <X className="w-4 h-4" />
-                            </Button>
-                            <span className="text-sm font-bold text-red-800">已选择 {selectedRecordIds.size} 项</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-stone-600 font-medium pl-1">共 {divinationRecords.length} 条记录</span>
-                        )}
+                {/* 子菜单 */}
+                <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide">
+                  {[
+                    { id: 'all', label: '全部' },
+                    { id: 'bazi', label: '四柱八字' },
+                    { id: '6yao', label: '六爻起卦' },
+                    { id: 'qimen', label: '奇门遁甲' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setDivinationTab(tab.id as any)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                        divinationTab === tab.id
+                          ? 'bg-stone-800 text-white border-stone-800 shadow-sm'
+                          : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                        <div className="flex items-center gap-2">
+                {(() => {
+                  // 根据选中的类型过滤记录
+                  const filteredRecords = divinationRecords.filter(record => {
+                    if (divinationTab === 'all') return true
+                    
+                    const isBaZi = record.original_key === 'bazi' || (record.method === 1 && (!record.lines || record.lines.length === 0))
+                    const isLiuYao = record.lines && record.lines.length > 0 && record.original_key !== 'bazi'
+                    const isQimen = !isBaZi && !isLiuYao
+                    
+                    if (divinationTab === 'bazi') return isBaZi
+                    if (divinationTab === '6yao') return isLiuYao
+                    if (divinationTab === 'qimen') return isQimen
+                    return true
+                  })
+
+                  if (filteredRecords.length === 0) {
+                    return (
+                      <div className="text-center py-20 bg-white/50 rounded-2xl border border-dashed border-stone-200">
+                        <p className="text-stone-400 text-sm">暂无排盘记录</p>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <>
+                      <div className={`sticky top-[60px] lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
+                        isSelectMode 
+                          ? 'bg-red-50/95 border-red-200 shadow-md p-3' 
+                          : 'bg-white/60 border-stone-100 shadow-sm p-4 backdrop-blur-md'
+                      }`}>
+                        <div className="flex items-center justify-between">
                           {isSelectMode ? (
-                            <>
-                              <Button variant="ghost" size="sm" onClick={handleSelectAll} className="text-xs h-8 text-red-700 hover:bg-red-100 hover:text-red-900 rounded-full">
-                                {selectedRecordIds.size === divinationRecords.length ? '取消全选' : '全选'}
+                            <div className="flex items-center gap-4">
+                              <Button variant="ghost" size="icon" onClick={handleToggleSelectMode} className="h-8 w-8 rounded-full hover:bg-red-100 text-red-700">
+                                <X className="w-4 h-4" />
                               </Button>
-                              <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={selectedRecordIds.size === 0 || batchDeleting} className="text-xs h-8 bg-red-600 hover:bg-red-700 shadow-sm px-4 rounded-full">
-                                {batchDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5 mr-1.5" />删除</>}
-                              </Button>
-                            </>
+                              <span className="text-sm font-bold text-red-800">已选择 {selectedRecordIds.size} 项</span>
+                            </div>
                           ) : (
-                            <Button variant="outline" size="sm" onClick={handleToggleSelectMode} className="text-xs h-8 hover:border-[#C82E31] hover:text-[#C82E31] transition-colors rounded-full bg-white">
-                              <CheckSquare className="w-3.5 h-3.5 mr-1.5" /> 批量管理
-                            </Button>
+                            <span className="text-sm text-stone-600 font-medium pl-1">共 {filteredRecords.length} 条记录</span>
                           )}
+
+                          <div className="flex items-center gap-2">
+                            {isSelectMode ? (
+                              <>
+                                <Button variant="ghost" size="sm" onClick={handleSelectAll} className="text-xs h-8 text-red-700 hover:bg-red-100 hover:text-red-900 rounded-full">
+                                  {selectedRecordIds.size === filteredRecords.length ? '取消全选' : '全选'}
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={selectedRecordIds.size === 0 || batchDeleting} className="text-xs h-8 bg-red-600 hover:bg-red-700 shadow-sm px-4 rounded-full">
+                                  {batchDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5 mr-1.5" />删除</>}
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={handleToggleSelectMode} className="text-xs h-8 hover:border-[#C82E31] hover:text-[#C82E31] transition-colors rounded-full bg-white">
+                                <CheckSquare className="w-3.5 h-3.5 mr-1.5" /> 批量管理
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {divinationRecords.map((record) => (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredRecords.map((record) => (
                         <div 
                           key={record.id}
                           onClick={(e) => {
@@ -686,7 +756,13 @@ function ProfilePageContent() {
                             <h4 className={`font-bold text-stone-800 text-lg mb-2 line-clamp-1 group-hover:text-[#C82E31] transition-colors`}>{record.question || '无题排盘'}</h4>
                             <div className="flex items-center gap-3">
                                 <Badge variant="secondary" className="bg-stone-50 text-stone-600 hover:bg-stone-100 font-normal text-xs border border-stone-100">
-                                    {record.method === 1 ? '金钱课' : '时间起卦'}
+                                    {(() => {
+                                      const isBaZi = record.original_key === 'bazi' || (record.method === 1 && (!record.lines || record.lines.length === 0))
+                                      const isLiuYao = record.lines && record.lines.length > 0 && record.original_key !== 'bazi'
+                                      if (isBaZi) return '四柱八字'
+                                      if (isLiuYao) return record.method === 1 ? '金钱课' : '时间起卦'
+                                      return '奇门遁甲'
+                                    })()}
                                 </Badge>
                                 {!isSelectMode && (
                                     <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleDeleteClick(record.id) }}>
@@ -697,9 +773,10 @@ function ProfilePageContent() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </>
-                )}
+                      </div>
+                    </>
+                  )
+                })()}
               </TabsContent>
 
               {/* 关注 & 钱包 Tab (样式微调) */}

@@ -249,7 +249,8 @@ export default function AIResultDialog({ guaData, open, setOpen, question, recor
   }, [open]);
 
   const handleLogin = () => {
-    window.location.href = '/login';
+    const currentPath = window.location.pathname + window.location.search;
+    window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
   };
 
   const getErrorMessage = (error: Error) => {

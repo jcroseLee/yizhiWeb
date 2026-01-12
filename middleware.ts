@@ -39,9 +39,10 @@ export async function middleware(request: NextRequest) {
       return supabaseResponse
     }
     
-    // 如果没有检测到 user，我们仍然允许访问
-    // 让客户端组件做最终的认证检查
-    return supabaseResponse
+    // 如果没有检测到 user，重定向到登录页并带上 redirect 参数
+    const redirectUrl = new URL('/login', request.url)
+    redirectUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search)
+    return NextResponse.redirect(redirectUrl)
   }
 
   // 如果是公开路由（登录/注册页）且有 user，重定向

@@ -1,24 +1,21 @@
 'use client'
 
 import {
-    ArrowLeft,
-    ArrowRight,
-    BookOpen,
-    Calendar,
-    Check,
-    ChevronDown, ChevronUp,
-    CloudFog, Download,
-    Edit2,
-    Loader2,
-    Moon,
-    PenLine,
-    Plus,
-    RefreshCw,
-    RotateCcw, Save, Send,
-    Share2, Sparkles,
-    Sun,
-    Trash2,
-    X
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Calendar,
+  Check,
+  ChevronDown, ChevronUp,
+  CloudFog,
+  Loader2,
+  Moon,
+  PenLine,
+  RefreshCw,
+  RotateCcw, Save, Send,
+  Share2, Sparkles,
+  Sun,
+  X
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -27,32 +24,32 @@ import ReactMarkdown from 'react-markdown'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/lib/components/ui/dialog'
-import { Textarea } from '@/lib/components/ui/textarea'
 import {
-    LINE_LABELS,
-    RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
+  LINE_LABELS,
+  RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
-    addDivinationNote,
-    deleteDivinationNote,
-    getDivinationNotes,
-    getDivinationRecordById,
-    saveDivinationRecord,
-    updateDivinationNote,
-    updateDivinationQuestion,
-    type DivinationNote
+  addDivinationNote,
+  getDivinationNotes,
+  getDivinationRecordById,
+  saveDivinationRecord,
+  updateDivinationNote,
+  updateDivinationQuestion,
+  type DivinationNote
 } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
 import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
 import { calculateChangedLineDetails, calculateLineDetails, getExtendedShenSha, getFuShenAndGuaShen, getHexagramFullInfo, getHexagramNature } from '@/lib/utils/liuyaoDetails'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
 import { solarTermTextFrom } from '@/lib/utils/solarTerms'
-import { HexagramLine } from '../components/HexagramLine'
-import { ShenShaList } from '../components/ShenShaList'
+import { AiAnalysisCard } from '../../components/AiAnalysisCard'
+import { HexagramLine } from '../../components/HexagramLine'
+import { PrivateNotesSection, type PrivateNotesSectionRef } from '../../components/PrivateNotesSection'
+import { ResultActionsCard } from '../../components/ResultActionsCard'
+import { ShenShaList } from '../../components/ShenShaList'
 
 const GLOBAL_STYLES = `
   .font-serif-sc { font-family: "Source Han Serif CN", "Source Han Serif SC", "Source Han Serif", "Noto Serif SC", "Songti SC", serif; }
@@ -94,15 +91,6 @@ const loadLocalNotes = (resultId: string): DivinationNote[] => {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
-  }
-}
-
-const saveLocalNotes = (resultId: string, notes: DivinationNote[]) => {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(`${LOCAL_NOTES_STORAGE_PREFIX}${resultId}`, JSON.stringify(notes))
-  } catch (e) {
-    console.error("Failed to save local notes:", e)
   }
 }
 
@@ -167,13 +155,6 @@ function ResultPageContent() {
   const [showShenSha, setShowShenSha] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isAuthor, setIsAuthor] = useState(false)
-  const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false)
-  const [showAiSaveConfirm, setShowAiSaveConfirm] = useState(false)
-  const [showAiNotOwnerConfirm, setShowAiNotOwnerConfirm] = useState(false)
-  const [showAiCostConfirm, setShowAiCostConfirm] = useState(false)
-  const [aiBalanceChecking, setAiBalanceChecking] = useState(false)
-  const [pendingSaveAction, setPendingSaveAction] = useState<'ai' | 'note' | 'title' | null>(null)
-  const [forceAiAnalyze, setForceAiAnalyze] = useState(false)
   
   // AI Streaming state
   const [aiStreamContent, setAiStreamContent] = useState('')
@@ -183,16 +164,12 @@ function ResultPageContent() {
   const aiIdempotencyKeyRef = useRef<string | null>(null)
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
-  const noteSectionRef = useRef<HTMLDivElement>(null)
+  const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
   
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
   const [aiResult, setAiResult] = useState('')
   const [aiResultAt, setAiResultAt] = useState<string | null>(null)
-  const [newNoteContent, setNewNoteContent] = useState('')
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
-  const [editNoteContent, setEditNoteContent] = useState('')
-  const [noteLoading, setNoteLoading] = useState(false)
 
   
   // Question editing state
@@ -200,19 +177,21 @@ function ResultPageContent() {
   const [isEditingQuestion, setIsEditingQuestion] = useState(false)
   const [questionLoading, setQuestionLoading] = useState(false)
 
-  const displayNotes = useMemo(() => notes.filter((n) => !n.content.startsWith(AI_NOTE_PREFIX)), [notes])
   const recordIdForAi = savedRecordId || (isUUID(normalizedResultId) ? normalizedResultId : null)
   const aiStorageKey = recordIdForAi || normalizedResultId
   const canEditQuestion = isSaved && isAuthor
   const canAttemptEditQuestion = isLocalResult || canEditQuestion
   const canViewPrivateNotes = isLocalResult || isAuthor
 
-  const handleConfirmReanalyze = () => {
-    setShowReanalyzeConfirm(false)
-    aiIdempotencyKeyRef.current = null; // Force new analysis
-    startAiAnalysis();
-    setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-  }
+  const handleResetIdempotencyKey = useCallback(() => {
+    aiIdempotencyKeyRef.current = null
+  }, [])
+
+  const handleScrollToResult = useCallback(() => {
+    if (aiSectionRef.current) {
+      aiSectionRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [])
 
   const persistQuestionUpdate = useCallback(async (nextQuestion: string) => {
     const finalQuestion = (nextQuestion || '').trim() || '诚心求占此事吉凶'
@@ -305,7 +284,7 @@ function ResultPageContent() {
             setSavedRecordId(actualId)
             setHasUnsavedChanges(false)
             
-            // Fetch notes
+            // Fetch notes (component will handle loading, but we need to check for AI note)
             getDivinationNotes(actualId).then(fetchedNotes => {
               setNotes(fetchedNotes)
               const aiNote = fetchedNotes.find((n) => n.content.startsWith(AI_NOTE_PREFIX))
@@ -466,7 +445,9 @@ function ResultPageContent() {
         if (showToast) toast({ title: '保存成功' })
         const newRecordId = res.recordId
         if (newRecordId && isLocalResult) {
-          const localNotes = notes.filter((n) => !n.content.startsWith(AI_NOTE_PREFIX))
+          // Get local notes from component
+          const currentNotes = noteSectionRef.current?.getNotes() || []
+          const localNotes = currentNotes.filter((n) => !n.content.startsWith(AI_NOTE_PREFIX))
           if (localNotes.length > 0) {
             try {
               await Promise.all(localNotes.map((n) => addDivinationNote(newRecordId, n.content)))
@@ -495,7 +476,7 @@ function ResultPageContent() {
     } finally {
       setSaving(false)
     }
-  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges, isLocalResult, notes, handleLoginRedirect])
+  }, [payload, saving, isSaved, savedRecordId, resultId, toast, calculatedData, question, hasUnsavedChanges, isLocalResult, handleLoginRedirect])
 
   const persistAiResult = useCallback(async (result: string) => {
     if (!result.trim()) return;
@@ -542,8 +523,7 @@ function ResultPageContent() {
     savedOnceRef.current = false;
     setAiStreamContent('');
     setAiStreamError(null);
-    setIsAiStreaming(true);
-    setForceAiAnalyze(false); 
+    setIsAiStreaming(true); 
 
     // Generate idempotency key if not exists
     if (!aiIdempotencyKeyRef.current) {
@@ -624,7 +604,8 @@ function ResultPageContent() {
     }
   }, [calculatedData, question, persistAiResult]);
 
-  const handleAiAnalyzeClick = useCallback(async () => {
+  // 移动端按钮的处理函数，复用组件逻辑
+  const handleMobileAiAnalyzeClick = useCallback(async () => {
     const user = await getCurrentUser()
     if (!user) {
       handleLoginRedirect()
@@ -633,25 +614,65 @@ function ResultPageContent() {
 
     if (aiResult) {
       if (isSaved && !isAuthor) {
-        toast({ title: '提示', description: '你不是该排盘作者，AI 分析结果不会保存到该排盘记录' })
+        toast({
+          title: '提示',
+          description: '你不是该排盘作者，AI 分析结果不会保存到该排盘记录',
+        })
       }
-      setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      handleScrollToResult()
       return
     }
 
+    // 对于移动端，直接触发分析流程
+    // 如果需要保存，会通过 toast 提示用户
     if (!isSaved) {
-      setPendingSaveAction('ai')
-      setShowAiSaveConfirm(true)
+      toast({
+        title: '需要先保存',
+        description: '请先保存到云端后再使用 AI 分析',
+        variant: 'destructive',
+      })
       return
     }
 
     if (!isAuthor) {
-      setShowAiNotOwnerConfirm(true)
+      // 非作者也可以分析，但结果不会保存
+      startAiAnalysis()
+      handleScrollToResult()
       return
     }
 
-    setShowAiCostConfirm(true)
-  }, [aiResult, isAuthor, isSaved, toast])
+    // 检查余额并开始分析
+    const growth = await getUserGrowth()
+    const balance = growth?.yiCoins
+    if (typeof balance !== 'number') {
+      toast({
+        title: '无法使用 AI 分析',
+        description: '无法获取易币余额，请稍后重试',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (balance < 50) {
+      toast({
+        title: '易币余额不足',
+        description: '当前易币不足 50，无法使用 AI 分析',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    startAiAnalysis()
+    handleScrollToResult()
+  }, [
+    aiResult,
+    isSaved,
+    isAuthor,
+    toast,
+    handleLoginRedirect,
+    handleScrollToResult,
+    startAiAnalysis,
+  ])
 
   const handleQuestionEditClick = useCallback(async () => {
     if (!canAttemptEditQuestion) return
@@ -661,83 +682,12 @@ function ResultPageContent() {
       return
     }
     if (!isSaved) {
-      setPendingSaveAction('title')
-      setShowAiSaveConfirm(true)
+      toast({ title: '请先保存到云端', description: '保存后才能修改标题', variant: 'destructive' })
       return
     }
     if (!isAuthor) return
     setIsEditingQuestion(true)
-  }, [canAttemptEditQuestion, isAuthor, isSaved, toast])
-
-  const handleConfirmSaveForAi = async () => {
-    const action = pendingSaveAction
-    setShowAiSaveConfirm(false)
-    setPendingSaveAction(null)
-
-    const recordId = await saveRecordToCloud(false)
-    if (!recordId) {
-      toast({ title: '保存失败', variant: 'destructive' })
-      return
-    }
-
-    if (action === 'ai') {
-      toast({ title: '已保存到云端', description: '请再次点击 AI 分析开始推演' })
-      return
-    }
-    if (action === 'title') {
-      toast({ title: '已保存到云端', description: '现在可以修改标题' })
-      setIsEditingQuestion(true)
-      return
-    }
-    if (action === 'note') {
-      toast({ title: '已保存到云端', description: '现在可以添加笔记' })
-      return
-    }
-    toast({ title: '已保存到云端' })
-  }
-
-  const handleConfirmAiNotOwner = () => {
-    setShowAiNotOwnerConfirm(false)
-    setShowAiCostConfirm(true)
-  }
-
-  const handleConfirmAiAnalyze = async () => {
-    setAiBalanceChecking(true)
-    try {
-      const user = await getCurrentUser()
-      if (!user) {
-        setShowAiCostConfirm(false)
-        handleLoginRedirect()
-        return
-      }
-
-      if (!isSaved) {
-        setShowAiCostConfirm(false)
-        setPendingSaveAction('ai')
-        setShowAiSaveConfirm(true)
-        return
-      }
-
-      const growth = await getUserGrowth()
-      const balance = growth?.yiCoins
-      if (typeof balance !== 'number') {
-        toast({ title: '无法使用 AI 分析', description: '无法获取易币余额，请稍后重试', variant: 'destructive' })
-        return
-      }
-
-      if (balance < 50) {
-        setShowAiCostConfirm(false)
-        toast({ title: '易币余额不足', description: '当前易币不足 50，无法使用 AI 分析', variant: 'destructive' })
-        return
-      }
-
-      setShowAiCostConfirm(false)
-      startAiAnalysis()
-      setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    } finally {
-      setAiBalanceChecking(false)
-    }
-  }
+  }, [canAttemptEditQuestion, isAuthor, isSaved, handleLoginRedirect, toast])
 
   const handlePublish = async () => {
     let recordIdToUse = savedRecordId || (isUUID(resultId) ? resultId : null)
@@ -746,125 +696,6 @@ function ResultPageContent() {
     else toast({ title: '无法发布', description: '无法获取排盘记录ID', variant: 'destructive' })
   }
 
-  const handleAddNote = async () => {
-    if (!newNoteContent.trim()) return
-    
-    // 如果是本地结果，直接保存到本地，不需要登录
-    if (!isSaved) {
-       const newNote: DivinationNote = {
-         id: `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-         content: newNoteContent,
-         created_at: new Date().toISOString(),
-         updated_at: new Date().toISOString(),
-       }
-       const updatedNotes = [newNote, ...notes]
-       setNotes(updatedNotes)
-       saveLocalNotes(resultId, updatedNotes)
-       setNewNoteContent('')
-       toast({ title: '本地笔记已添加', description: '保存到云端后将自动同步' })
-       return
-    }
-
-    const user = await getCurrentUser()
-    if (!user) {
-      handleLoginRedirect()
-      return
-    }
-
-    const recordIdToUse = savedRecordId || (isUUID(resultId) ? resultId : null)
-    if (!recordIdToUse) {
-      toast({ title: '添加失败', description: '无法获取排盘记录ID', variant: 'destructive' })
-      return
-    }
-
-    setNoteLoading(true)
-    try {
-      const { success, note } = await addDivinationNote(recordIdToUse, newNoteContent)
-      if (success && note) {
-        setNotes(prev => [note, ...prev])
-        setNewNoteContent('')
-        toast({ title: '笔记添加成功' })
-      } else {
-        toast({ title: '添加失败', variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: '添加失败', variant: 'destructive' })
-    } finally {
-      setNoteLoading(false)
-    }
-  }
-
-  const handleUpdateNote = async (noteId: string) => {
-    if (!editNoteContent.trim()) return
-
-    // 如果是本地笔记或未保存到云端，直接更新本地
-    if (noteId.startsWith('local_') || !isSaved) {
-        const updatedNotes = notes.map(n => n.id === noteId ? { ...n, content: editNoteContent, updated_at: new Date().toISOString() } : n)
-        setNotes(updatedNotes)
-        saveLocalNotes(resultId, updatedNotes)
-        setEditingNoteId(null)
-        setEditNoteContent('')
-        toast({ title: '本地笔记已更新' })
-        return
-    }
-
-    const user = await getCurrentUser()
-    if (!user) {
-      handleLoginRedirect()
-      return
-    }
-
-    setNoteLoading(true)
-    try {
-      const { success, note } = await updateDivinationNote(noteId, editNoteContent)
-      if (success && note) {
-        setNotes(prev => prev.map(n => n.id === noteId ? note : n))
-        setEditingNoteId(null)
-        setEditNoteContent('')
-        toast({ title: '笔记更新成功' })
-      } else {
-        toast({ title: '更新失败', variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: '更新失败', variant: 'destructive' })
-    } finally {
-      setNoteLoading(false)
-    }
-  }
-
-  const handleDeleteNote = async (noteId: string) => {
-    if (!confirm('确定要删除这条笔记吗？')) return
-
-    // 如果是本地笔记或未保存到云端，直接删除本地
-    if (noteId.startsWith('local_') || !isSaved) {
-        const updatedNotes = notes.filter(n => n.id !== noteId)
-        setNotes(updatedNotes)
-        saveLocalNotes(resultId, updatedNotes)
-        toast({ title: '本地笔记已删除' })
-        return
-    }
-
-    const user = await getCurrentUser()
-    if (!user) {
-      handleLoginRedirect()
-      return
-    }
-
-    setNoteLoading(true)
-    try {
-      const { success } = await deleteDivinationNote(noteId)
-      if (success) {
-        setNotes(prev => prev.filter(n => n.id !== noteId))
-        toast({ title: '笔记删除成功' })
-      } else {
-        toast({ title: '删除失败', variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: '删除失败', variant: 'destructive' })
-    } finally {
-      setNoteLoading(false)
-    }
-  }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-400">加载中...</div>
   if (!payload || !calculatedData) return null
@@ -1167,7 +998,15 @@ function ResultPageContent() {
 
                    {!isAiStreaming && aiResult && (
                    <div className="flex justify-end pt-4">
-                      <Button variant="outline" className="gap-2 text-[#C82E31] border-[#C82E31]/30 hover:bg-red-50" onClick={() => setShowReanalyzeConfirm(true)}>
+                      <Button 
+                        variant="outline" 
+                        className="gap-2 text-[#C82E31] border-[#C82E31]/30 hover:bg-red-50" 
+                        onClick={() => {
+                          handleResetIdempotencyKey()
+                          startAiAnalysis()
+                          handleScrollToResult()
+                        }}
+                      >
                        <RefreshCw className="w-4 h-4" /> 重新分析
                      </Button>
                    </div>
@@ -1176,120 +1015,16 @@ function ResultPageContent() {
                 )}
 
                 {/* 5. 私密笔记 */}
-                {canViewPrivateNotes && (
-                <div ref={noteSectionRef} className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm scroll-mt-20">
-                   <div className="flex items-center gap-3 mb-4">
-                      <BookOpen className="w-5 h-5 text-[#C82E31]" />
-                      <h4 className="font-serif font-bold text-stone-800 text-base lg:text-lg tracking-wide">
-                        私密笔记
-                      </h4>
-                      <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">仅自己可见</span>
-                   </div>
-                   
-                   <div className="space-y-6">
-                     {/* 笔记列表 */}
-                     <div className="space-y-4">
-                       {displayNotes.length === 0 ? (
-                         <div className="text-center py-8 text-stone-400 text-sm italic bg-stone-50 rounded-lg border border-dashed border-stone-200">
-                           暂无笔记，记录下您的断语或反馈吧...
-                         </div>
-                       ) : (
-                         displayNotes.map(note => (
-                           <div key={note.id} className="group relative bg-stone-50/50 hover:bg-stone-50 border border-stone-100 rounded-lg p-4 transition-all">
-                             {editingNoteId === note.id ? (
-                               <div className="space-y-3">
-                                 <Textarea
-                                   value={editNoteContent}
-                                   onChange={(e) => setEditNoteContent(e.target.value)}
-                                   className="min-h-[80px] bg-white"
-                                 />
-                                 <div className="flex justify-end gap-2">
-                                   <Button
-                                     size="sm"
-                                     variant="ghost"
-                                     onClick={() => {
-                                       setEditingNoteId(null)
-                                       setEditNoteContent('')
-                                     }}
-                                     className="h-8 w-8 p-0"
-                                   >
-                                     <X className="w-4 h-4 text-stone-400" />
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="ghost"
-                                     onClick={() => handleUpdateNote(note.id)}
-                                     disabled={noteLoading}
-                                     className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                   >
-                                     <Check className="w-4 h-4" />
-                                   </Button>
-                                 </div>
-                               </div>
-                             ) : (
-                               <>
-                                 <div className="flex justify-between items-start mb-2">
-                                   <span className="text-xs text-stone-400 font-mono">
-                                     {formatDateTime(note.created_at)}
-                                   </span>
-                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0 hover:bg-stone-200 text-stone-400 hover:text-stone-600"
-                                      disabled={noteLoading}
-                                      onClick={() => {
-                                        setEditingNoteId(note.id)
-                                        setEditNoteContent(note.content)
-                                      }}
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                   <Button
-                                     variant="ghost"
-                                     size="sm"
-                                     className="h-6 w-6 p-0 hover:bg-red-100 text-stone-400 hover:text-red-600"
-                                     disabled={noteLoading}
-                                     onClick={() => handleDeleteNote(note.id)}
-                                   >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                   </div>
-                                 </div>
-                                 <p className="text-sm text-stone-700 font-serif whitespace-pre-wrap leading-relaxed">
-                                   {note.content}
-                                 </p>
-                               </>
-                             )}
-                           </div>
-                         ))
-                       )}
-                     </div>
-
-                     {/* 添加笔记 */}
-                     <div className="space-y-2 pt-2 border-t border-stone-100">
-                       <Textarea 
-                           placeholder="写下新的笔记..."
-                           className="min-h-[80px] bg-white border-stone-200 resize-none focus:border-[#C82E31]/30 transition-colors font-serif text-stone-700"
-                           value={newNoteContent}
-                           onChange={(e) => setNewNoteContent(e.target.value)}
-                       />
-                       <div className="flex justify-end">
-                           <Button 
-                           onClick={handleAddNote} 
-                           disabled={noteLoading || !newNoteContent.trim()}
-                           variant="outline"
-                           className="text-stone-600 hover:text-[#C82E31] hover:bg-red-50 border-stone-200 gap-1"
-                           size="sm"
-                           >
-                           <Plus className="w-4 h-4" />
-                           {noteLoading ? '添加中...' : '添加笔记'}
-                           </Button>
-                       </div>
-                     </div>
-                   </div>
-                </div>
-                )}
+                <PrivateNotesSection
+                  recordId={savedRecordId || (isUUID(normalizedResultId) ? normalizedResultId : resultId)}
+                  isSaved={isSaved}
+                  canView={canViewPrivateNotes}
+                  aiNotePrefix={AI_NOTE_PREFIX}
+                  localStoragePrefix={LOCAL_NOTES_STORAGE_PREFIX}
+                  onLoginRedirect={handleLoginRedirect}
+                  onNotesChange={setNotes}
+                  ref={noteSectionRef}
+                />
 
                 {/* 返回上一页按钮 */}
                 <div className="lg:hidden mt-4 mb-8">
@@ -1311,33 +1046,28 @@ function ResultPageContent() {
 
           {/* 右侧工具栏 (桌面端保持不变) */}
           <div className="hidden lg:flex w-72 flex-col gap-4 shrink-0">
-             <Card className="border-none shadow-md overflow-hidden relative group cursor-pointer bg-linear-to-br from-[#C82E31] to-[#A61B1F]">
-               <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="w-16 h-16 text-white" /></div>
-               <div className="relative p-6 text-white">
-                 <div className="flex items-center gap-2 mb-2"><Sparkles className="w-5 h-5" /><h3 className="font-bold font-serif text-lg">AI 智能详批</h3></div>
-                 <p className="text-red-100 text-xs mb-4 leading-relaxed opacity-90">基于《增删卜易》古法，结合大模型深度推理，为您解析吉凶应期。</p>
-                 <Button onClick={handleAiAnalyzeClick} className="w-full bg-white text-[#C82E31] hover:bg-red-50 border-none font-bold shadow-sm h-9 text-xs">开始分析</Button>
-               </div>
-            </Card>
-            <Card className="bg-white border-none shadow-sm p-3">
-               <div className="flex flex-col gap-1">
-                 <Button 
-                   variant="ghost" 
-                   className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9 text-sm" 
-                   onClick={() => saveRecordToCloud(true)} 
-                   disabled={(isSaved && !hasUnsavedChanges) || saving || questionLoading}
-                 >
-                    <Save className={`w-4 h-4 ${isSaved && !hasUnsavedChanges ? 'text-green-600' : ''}`} /> 
-                    {saving || questionLoading ? '保存中...' : isSaved && !hasUnsavedChanges ? '已保存到云端' : hasUnsavedChanges ? '更新到云端' : '保存到云端'}
-                 </Button>
-                 {(isAuthor || isLocalResult) && (
-                 <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9 text-sm" onClick={handlePublish} disabled={saving}>
-                    <Share2 className="w-4 h-4" /> {saving ? '保存中...' : '发布到社区'}
-                 </Button>
-                 )}
-                 <Button variant="ghost" className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9 text-sm"><Download className="w-4 h-4" /> 分享结果图</Button>
-               </div>
-            </Card>
+             <AiAnalysisCard
+               aiResult={aiResult}
+               isSaved={isSaved}
+               isAuthor={isAuthor}
+               saving={saving}
+               onStartAnalysis={startAiAnalysis}
+               onSaveToCloud={saveRecordToCloud}
+               onLoginRedirect={handleLoginRedirect}
+               onResetIdempotencyKey={handleResetIdempotencyKey}
+               onScrollToResult={handleScrollToResult}
+             />
+            <ResultActionsCard
+              isSaved={isSaved}
+              hasUnsavedChanges={hasUnsavedChanges}
+              saving={saving}
+              loading={questionLoading}
+              isAuthor={isAuthor}
+              isLocalResult={isLocalResult}
+              onSave={() => saveRecordToCloud(true)}
+              onPublish={handlePublish}
+              onWriteNote={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            />
             <div className="mt-8 text-center px-4 lg:px-0">
                <div className="flex flex-col gap-2">
                  {(from === 'community' || from === 'profile') && (
@@ -1403,7 +1133,7 @@ function ResultPageContent() {
              </div>
 
              <Button 
-               onClick={handleAiAnalyzeClick} 
+               onClick={handleMobileAiAnalyzeClick} 
                className="shrink-0 rounded-full bg-gradient-to-r from-[#C82E31] to-[#D94F4F] hover:from-[#A61B1F] hover:to-[#C82E31] text-white shadow-lg shadow-red-900/20 h-10 w-10 p-0 border-none flex items-center justify-center"
                title="AI 智能详批"
              >
@@ -1411,70 +1141,6 @@ function ResultPageContent() {
              </Button>
           </div>
         </div>
-          <Dialog open={showAiSaveConfirm} onOpenChange={setShowAiSaveConfirm}>
-            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>需要先保存到云端</DialogTitle>
-                <DialogDescription>
-                  使用该功能前，需要先将本次排盘保存到云端。
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setShowAiSaveConfirm(false)} disabled={saving} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
-                <Button onClick={handleConfirmSaveForAi} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10" disabled={saving}>
-                  保存到云端
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showAiNotOwnerConfirm} onOpenChange={setShowAiNotOwnerConfirm}>
-            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>提示</DialogTitle>
-                <DialogDescription>
-                  你不是该排盘作者，AI 分析结果不会保存到该排盘记录，仅会在当前设备缓存。
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setShowAiNotOwnerConfirm(false)} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
-                <Button onClick={handleConfirmAiNotOwner} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10">
-                  继续分析
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showAiCostConfirm} onOpenChange={setShowAiCostConfirm}>
-            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>确认 AI 分析</DialogTitle>
-                <DialogDescription>
-                  本次操作将扣除 50 易币，用于 AI 智能详批。
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setShowAiCostConfirm(false)} disabled={aiBalanceChecking} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
-                <Button onClick={handleConfirmAiAnalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10" disabled={aiBalanceChecking}>
-                  继续分析
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showReanalyzeConfirm} onOpenChange={setShowReanalyzeConfirm}>
-            <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>确认重新分析</DialogTitle>
-                <DialogDescription>
-                  本次操作将扣除 50 易币，重新分析的结果会覆盖之前的 AI 分析结果。
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)} className="rounded-full border-stone-200 text-stone-600 hover:bg-stone-50">取消</Button>
-                <Button onClick={handleConfirmReanalyze} className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-md shadow-red-900/10">
-                  继续分析
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
       </div>
     </>
   )

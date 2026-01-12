@@ -1,3 +1,5 @@
+import { getSolarTermDate } from './solarTerms'
+
 const LUNAR_INFO = [
   0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0,
   0x09ad0, 0x055d2, 0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540,
@@ -136,13 +138,78 @@ export const convertToLunar = (date: Date): { year: number; month: number; day: 
   return { year, month, day, isLeap }
 }
 
+/**
+ * 从农历日期转换为公历日期
+ * 使用遍历验证的方法，确保准确性
+ * @param lunarYear 农历年
+ * @param lunarMonth 农历月 (1-12)
+ * @param lunarDay 农历日 (1-30)
+ * @param isLeap 是否为闰月
+ * @returns 对应的公历日期，如果找不到则返回 undefined
+ */
+export const convertLunarToSolar = (
+  lunarYear: number,
+  lunarMonth: number,
+  lunarDay: number,
+  isLeap: boolean = false
+): Date | undefined => {
+  if (lunarYear < 1900 || lunarYear >= 2100) {
+    return undefined
+  }
+
+  const leap = leapMonth(lunarYear)
+  
+  // 验证闰月参数
+  if (isLeap && (leap === 0 || lunarMonth !== leap)) {
+    // 该年份没有闰月，或者闰月位置不对
+    return undefined
+  }
+
+  // 使用更简单的方法：在可能的日期范围内搜索
+  // 农历年份对应的公历年份范围大约是 lunarYear-1 到 lunarYear+1
+  const startYear = Math.max(1900, lunarYear - 1)
+  const endYear = Math.min(2099, lunarYear + 1)
+  
+  for (let year = startYear; year <= endYear; year++) {
+    for (let month = 0; month < 12; month++) {
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      for (let day = 1; day <= daysInMonth; day++) {
+        const testDate = new Date(year, month, day)
+        const lunar = convertToLunar(testDate)
+        if (
+          lunar.year === lunarYear &&
+          lunar.month === lunarMonth &&
+          lunar.day === lunarDay &&
+          lunar.isLeap === isLeap
+        ) {
+          return testDate
+        }
+      }
+    }
+  }
+
+  return undefined
+}
+
 export const getChineseHourIndex = (hours: number) => Math.floor((hours + 1) / 2) % 12
 export const getChineseHour = (hours: number) => EARTHLY_BRANCHES_FOR_HOUR[getChineseHourIndex(hours)]
+
+// 时辰代码到时辰名称的映射（用于农历模式）
+const HOUR_CODE_TO_NAME: Record<string, string> = {
+  'zi': '子', 'chou': '丑', 'yin': '寅', 'mao': '卯', 'chen': '辰', 'si': '巳',
+  'wu': '午', 'wei': '未', 'shen': '申', 'you': '酉', 'xu': '戌', 'hai': '亥',
+}
+
+// 时辰代码到地支索引的映射（用于计算时柱）
+const HOUR_CODE_TO_INDEX: Record<string, number> = {
+  'zi': 0, 'chou': 1, 'yin': 2, 'mao': 3, 'chen': 4, 'si': 5,
+  'wu': 6, 'wei': 7, 'shen': 8, 'you': 9, 'xu': 10, 'hai': 11,
+}
 
 const getStemTone = (stem: string) => STEM_TONE_MAP[stem] ?? 'green'
 const getBranchTone = (branch: string) => BRANCH_TONE_MAP[branch] ?? 'green'
 
-export const getLunarDateString = (date: Date) => {
+export const getLunarDateString = (date: Date, selectedHour?: string) => {
   const lunar = convertToLunar(date)
   const monthIndex = (lunar.month - 1 + 12) % 12
   const dayIndex = (lunar.day - 1 + 30) % 30
@@ -151,27 +218,73 @@ export const getLunarDateString = (date: Date) => {
   const monthText = `${lunar.isLeap ? '闰' : ''}${LUNAR_MONTH_NAMES[monthIndex] ?? ''}`
   const dayText = LUNAR_DAY_NAMES[dayIndex] ?? ''
 
-  const hourText = getChineseHour(date.getHours())
+  // 如果提供了用户选择的时辰（农历模式），使用它；否则从日期推导
+  const hourText = selectedHour && HOUR_CODE_TO_NAME[selectedHour] 
+    ? HOUR_CODE_TO_NAME[selectedHour]
+    : getChineseHour(date.getHours())
   return `${yearText}${monthText}${dayText} ${hourText}时`
 }
 
-export const getLunarDateStringWithoutYear = (date: Date) => {
+export const getLunarDateStringWithoutYear = (date: Date, selectedHour?: string) => {
   const lunar = convertToLunar(date)
   const monthIndex = (lunar.month - 1 + 12) % 12
   const dayIndex = (lunar.day - 1 + 30) % 30
 
   const monthText = `${lunar.isLeap ? '闰' : ''}${LUNAR_MONTH_NAMES[monthIndex] ?? ''}`
   const dayText = LUNAR_DAY_NAMES[dayIndex] ?? ''
-  const hourText = getChineseHour(date.getHours())
+  // 如果提供了用户选择的时辰（农历模式），使用它；否则从日期推导
+  const hourText = selectedHour && HOUR_CODE_TO_NAME[selectedHour] 
+    ? HOUR_CODE_TO_NAME[selectedHour]
+    : getChineseHour(date.getHours())
   return `${monthText}${dayText} ${hourText}时`
 }
 
-export const getGanZhiInfo = (date: Date) => {
+/**
+ * 获取干支信息
+ * @param date 日期对象
+ * @param earlyZiHour 是否使用早晚子时
+ * @param selectedHour 用户选择的时辰代码（农历模式，如 'xu' 表示戌时），如果提供则用于计算时柱地支
+ */
+export const getGanZhiInfo = (date: Date, earlyZiHour: boolean = false, selectedHour?: string) => {
   const year = date.getFullYear()
-  const hour = date.getHours()
+  let hour = date.getHours()
+  let dateForDayPillar = date
+  let dateForHourStem = date // 用于计算时柱天干的日期
 
-  const yearStemIndex = ((year - 4) % 10 + 10) % 10
-  const yearBranchIndex = ((year - 4) % 12 + 12) % 12
+  // 早晚子时处理
+  // 早子时（23:00-00:00）：日柱和时柱天干都用第二天的日干计算
+  // 晚子时（00:00-01:00）：日柱和时柱天干都用第二天的日干计算
+  if (earlyZiHour) {
+    if (hour >= 23 || hour < 1) {
+      // 子时范围：23:00-01:00
+      if (hour >= 23) {
+        // 早子时（23:00-00:00）：日柱和时柱天干都用第二天的日干
+        dateForDayPillar = new Date(date)
+        dateForDayPillar.setDate(dateForDayPillar.getDate() + 1)
+        dateForHourStem = dateForDayPillar
+      } else if (hour >= 0 && hour < 1) {
+        // 晚子时（00:00-01:00）：日柱和时柱天干都用第二天的日干
+        dateForDayPillar = new Date(date)
+        dateForDayPillar.setDate(dateForDayPillar.getDate() + 1)
+        dateForHourStem = dateForDayPillar
+      }
+    }
+  } else {
+    // 传统方式：23:00-01:00 都使用当天的日柱
+    // 保持原有逻辑，不改变 dateForDayPillar 和 dateForHourStem
+  }
+
+  // 年柱：以立春为界，如果日期在立春之前，使用上一年的干支
+  // 立春是第2个节气（index=2）
+  const springBeginDate = getSolarTermDate(year, 2) // 立春日期
+  let yearForGanZhi = year
+  if (date < springBeginDate) {
+    // 在立春之前，使用上一年的干支
+    yearForGanZhi = year - 1
+  }
+
+  const yearStemIndex = ((yearForGanZhi - 4) % 10 + 10) % 10
+  const yearBranchIndex = ((yearForGanZhi - 4) % 12 + 12) % 12
   const yearStem = HEAVENLY_STEMS[yearStemIndex]
   const yearBranch = EARTHLY_BRANCHES[yearBranchIndex]
 
@@ -217,43 +330,60 @@ export const getGanZhiInfo = (date: Date) => {
       break
   }
 
+  // 月柱：月干基于年柱的天干（yearStemIndex）来计算，而不是公历年的天干
   let monthStemStart = 0
   switch (yearStemIndex) {
-    case 0:
-    case 5:
-      monthStemStart = 2
+    case 0: // 甲
+    case 5: // 己
+      monthStemStart = 2 // 丙寅
       break
-    case 1:
-    case 6:
-      monthStemStart = 4
+    case 1: // 乙
+    case 6: // 庚
+      monthStemStart = 4 // 戊寅
       break
-    case 2:
-    case 7:
-      monthStemStart = 6
+    case 2: // 丙
+    case 7: // 辛
+      monthStemStart = 6 // 庚寅
       break
-    case 3:
-    case 8:
-      monthStemStart = 8
+    case 3: // 丁
+    case 8: // 壬
+      monthStemStart = 8 // 壬寅
       break
-    case 4:
-    case 9:
-      monthStemStart = 0
+    case 4: // 戊
+    case 9: // 癸
+      monthStemStart = 0 // 甲寅
       break
   }
+  // 将月支转换为序（寅=1, 卯=2, ..., 子=11, 丑=12）以确定月干
   const monthOrdinal = monthBranchIndex >= 2 ? (monthBranchIndex - 1) : (monthBranchIndex === 0 ? 11 : 12)
   const monthStemIndex = (monthStemStart + monthOrdinal - 1 + 10) % 10
   const monthStem = HEAVENLY_STEMS[monthStemIndex]
   const monthBranch = EARTHLY_BRANCHES[monthBranchIndex]
 
+  // 日柱：使用 dateForDayPillar（考虑早晚子时）
   const baseDate = new Date(1900, 0, 31)
-  const dayOffset = Math.floor((date.getTime() - baseDate.getTime()) / 86400000)
+  const dayOffset = Math.floor((dateForDayPillar.getTime() - baseDate.getTime()) / 86400000)
   const dayStemIndex = ((dayOffset % 10) + 10) % 10
   const dayBranchIndex = (((dayOffset + 4) % 12) + 12) % 12
   const dayStem = HEAVENLY_STEMS[dayStemIndex]
   const dayBranch = EARTHLY_BRANCHES[dayBranchIndex]
 
-  const hourIndex = Math.floor((hour + 1) / 2) % 12
-  const hourStemIndex = (dayStemIndex * 2 + hourIndex) % 10
+  // 时柱：基于日干确定子时起干，按 12 时支顺推
+  // 对于早子时（23:00-00:00），时干用第二天的日干计算
+  // 对于晚子时（00:00-01:00），时干也用第二天的日干计算
+  // 如果提供了用户选择的时辰（农历模式），使用它来确定时柱地支；否则从日期的小时数推导
+  let hourIndex: number
+  if (selectedHour && HOUR_CODE_TO_INDEX[selectedHour] !== undefined) {
+    // 使用用户选择的时辰
+    hourIndex = HOUR_CODE_TO_INDEX[selectedHour]
+  } else {
+    // 从日期的小时数推导
+    hourIndex = Math.floor((hour + 1) / 2) % 12
+  }
+  // 使用 dateForHourStem 来计算时柱天干
+  const hourStemDayOffset = Math.floor((dateForHourStem.getTime() - baseDate.getTime()) / 86400000)
+  const hourStemDayIndex = ((hourStemDayOffset % 10) + 10) % 10
+  const hourStemIndex = (hourStemDayIndex * 2 + hourIndex) % 10
   const hourStem = HEAVENLY_STEMS[hourStemIndex]
   const hourBranch = EARTHLY_BRANCHES[hourIndex]
 

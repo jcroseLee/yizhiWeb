@@ -13,7 +13,7 @@ import type { Session } from '@supabase/supabase-js'
 import { AlertTriangle, Bell, ChevronDown, FileText, LogOut, Menu, Search, User, X } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface NavItem {
@@ -33,6 +33,7 @@ const navItems: NavItem[] = [
 export default function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [mobileSearchQuery, setMobileSearchQuery] = useState('')
@@ -326,7 +327,7 @@ export default function Navigation() {
             ) : (
               /* 未登录用户：显示登录链接 */
               <Link
-                href="/login"
+                href={`/login?redirect=${encodeURIComponent(pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : ''))}`}
                 className="px-4 py-2 text-sm text-ink-700 hover:text-ink-800 transition-colors"
               >
                 登录

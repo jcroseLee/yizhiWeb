@@ -157,7 +157,7 @@ export default function TagPanel({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Label className="text-sm font-bold text-stone-700">门派</Label>
-          <Select value={method} onValueChange={(v: string) => onMethodChange(v as DivinationMethodType)} disabled={methodLocked}>
+          <Select value={method} onValueChange={(v: string) => onMethodChange(v as DivinationMethodType)}>
             <SelectTrigger className="w-[160px] bg-white">
               <SelectValue placeholder="选择门派" />
             </SelectTrigger>

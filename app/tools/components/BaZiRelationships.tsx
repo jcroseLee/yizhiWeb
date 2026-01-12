@@ -99,7 +99,8 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
            from: { type: 'zhi', pillar: start, char: pillars[start].zhi.char }, 
            to: { type: 'zhi', pillar: end, char: pillars[end].zhi.char }, 
            type: 'tuJu', 
-           label: `土局旺势` 
+           label: `土局旺势`,
+           description: '土局旺势'
          })
        }
     }
@@ -110,7 +111,13 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
         for (let j = i + 1; j < pillars.length; j++) {
             const pair = pillars[i].zhi.char + pillars[j].zhi.char
             if (archMap[pair]) {
-                extraRels.push({ from: { type: 'zhi', pillar: i, char: pillars[i].zhi.char }, to: { type: 'zhi', pillar: j, char: pillars[j].zhi.char }, type: 'gongHui', label: archMap[pair] })
+                extraRels.push({ 
+                    from: { type: 'zhi', pillar: i, char: pillars[i].zhi.char }, 
+                    to: { type: 'zhi', pillar: j, char: pillars[j].zhi.char }, 
+                    type: 'gongHe', 
+                    label: archMap[pair],
+                    description: '拱会'
+                })
             }
         }
     }
@@ -133,7 +140,7 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
     allRels = allRels.map(rel => {
         if (rel.type === 'zhiHe') {
             if ((heCounts[rel.from.pillar] > 1) || (heCounts[rel.to.pillar] > 1)) {
-                return { ...rel, type: 'zhengHe', label: '争合' } // 更改类型和标签
+                return { ...rel, type: 'zhiHe' as const, label: '争合', description: '争合' } // 保持类型为 zhiHe，通过 label 区分
             }
         }
         return rel

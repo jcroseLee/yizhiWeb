@@ -1,9 +1,9 @@
 'use client'
 
+import { toPng } from 'html-to-image'
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Calendar,
   Check,
   ChevronDown, ChevronUp,
@@ -12,8 +12,8 @@ import {
   Moon,
   PenLine,
   RefreshCw,
-  RotateCcw, Save, Send,
-  Share2, Sparkles,
+  RotateCcw,
+  Sparkles,
   Sun,
   X
 } from 'lucide-react'
@@ -24,6 +24,13 @@ import ReactMarkdown from 'react-markdown'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/lib/components/ui/dialog'
+import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import {
   LINE_LABELS,
   RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
@@ -47,6 +54,8 @@ import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutY
 import { solarTermTextFrom } from '@/lib/utils/solarTerms'
 import { AiAnalysisCard } from '../../components/AiAnalysisCard'
 import { HexagramLine } from '../../components/HexagramLine'
+import LiuyaoShareCard from '../../components/LiuyaoShareImage'
+import { MobileResultActionsBar } from '../../components/MobileResultActionsBar'
 import { PrivateNotesSection, type PrivateNotesSectionRef } from '../../components/PrivateNotesSection'
 import { ResultActionsCard } from '../../components/ResultActionsCard'
 import { ShenShaList } from '../../components/ShenShaList'
@@ -165,11 +174,14 @@ function ResultPageContent() {
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
+  const shareImageRef = useRef<HTMLDivElement>(null)
   
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
   const [aiResult, setAiResult] = useState('')
   const [aiResultAt, setAiResultAt] = useState<string | null>(null)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [downloading, setDownloading] = useState(false)
 
   
   // Question editing state
@@ -696,6 +708,83 @@ function ResultPageContent() {
     else toast({ title: '无法发布', description: '无法获取排盘记录ID', variant: 'destructive' })
   }
 
+  const handleShareImage = useCallback(async () => {
+    if (!calculatedData || !payload) {
+      toast({
+        title: '无法生成分享图',
+        description: '缺少必要的排盘数据',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // 打开对话框
+    setShareDialogOpen(true)
+  }, [calculatedData, payload, toast])
+
+  const handleDownloadAndShareImage = useCallback(async () => {
+    if (!shareImageRef.current || !calculatedData) return
+
+    setDownloading(true)
+    try {
+      // 使用 html-to-image 生成图片
+      const dataUrl = await toPng(shareImageRef.current, {
+        backgroundColor: '#F9F8F4',
+        pixelRatio: 2, // 2倍图，提高清晰度
+        cacheBust: true,
+      })
+
+      // 将 data URL 转换为 Blob
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+      const file = new File([blob], `易知六爻_${question.slice(0, 10) || '六爻'}_${new Date().toISOString().split('T')[0]}.png`, {
+        type: 'image/png',
+      })
+
+      // 尝试使用 Web Share API 分享图片
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: '六爻排盘结果',
+            text: `我正在查看排盘结果：${calculatedData.originalFullInfo.fullName} ${calculatedData.hasMovingLines ? `之 ${calculatedData.changedFullInfo.fullName}` : ''}`,
+            files: [file],
+          })
+          toast({ title: '分享成功', description: '图片已分享' })
+          setShareDialogOpen(false)
+          return
+        } catch (shareError: any) {
+          // 如果分享失败（用户取消等），继续执行下载逻辑
+          if (shareError.name !== 'AbortError') {
+            console.error('Share failed:', shareError)
+          }
+        }
+      }
+
+      // 如果不支持分享文件，则下载图片
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = `易知六爻_${question.slice(0, 10) || '六爻'}_${new Date().toISOString().split('T')[0]}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: '下载成功',
+        description: '分享图已保存到本地',
+      })
+      setShareDialogOpen(false)
+    } catch (error) {
+      console.error('Failed to generate share image:', error)
+      toast({
+        title: '生成失败',
+        description: '生成图片时出错，请稍后重试',
+        variant: 'destructive',
+      })
+    } finally {
+      setDownloading(false)
+    }
+  }, [question, calculatedData, toast])
+
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-400">加载中...</div>
   if (!payload || !calculatedData) return null
@@ -761,26 +850,30 @@ function ResultPageContent() {
                             />
                             {question !== (payload?.question || '诚心求占此事吉凶') && (
                               <div className="flex items-center gap-1 shrink-0">
-                                <button
+                                <Button
                                   onClick={() => {
                                     setQuestion(payload?.question || '诚心求占此事吉凶')
                                     setIsEditingQuestion(false)
                                     setHasUnsavedChanges(false)
                                   }}
-                                  className="p-1 text-stone-400 hover:text-stone-600 transition-colors"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="p-1 text-stone-400 hover:text-stone-600"
                                   disabled={questionLoading}
                                 >
                                   <X className="w-4 h-4" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   onClick={async () => {
                                     await persistQuestionUpdate(question)
                                   }}
-                                  className="p-1 text-green-600 hover:text-green-700 transition-colors"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="p-1 text-green-600 hover:text-green-700"
                                   disabled={questionLoading}
                                 >
                                   <Check className="w-4 h-4" />
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -795,12 +888,14 @@ function ResultPageContent() {
                         )}
                       </h1>
                       {canAttemptEditQuestion && !isEditingQuestion && (
-                        <button 
+                        <Button 
                           onClick={handleQuestionEditClick}
-                          className="p-1 text-stone-400 hover:text-[#C82E31] transition-colors"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="p-1 text-stone-400 hover:text-[#C82E31]"
                         >
                           <PenLine className="w-4 h-4" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -825,10 +920,15 @@ function ResultPageContent() {
                           <div className="flex items-center gap-1"><CloudFog className="w-3 h-3 text-stone-400" /><span className="bg-stone-200/50 px-1 py-0.5 rounded text-stone-600">空:{kongWang}</span></div>
                        </div>
                        
-                       <button onClick={() => setShowShenSha(!showShenSha)} className="flex items-center gap-1 text-[10px] sm:text-xs text-stone-400 hover:text-[#C82E31] transition-colors cursor-pointer w-fit mt-1 group">
+                       <Button 
+                         onClick={() => setShowShenSha(!showShenSha)} 
+                         variant="ghost"
+                         size="sm"
+                         className="flex items-center gap-1 text-[10px] sm:text-xs text-stone-400 hover:text-[#C82E31] w-fit mt-1 group h-auto py-0.5"
+                       >
                           <span className="border-b border-dashed border-stone-300 group-hover:border-[#C82E31] pb-0.5">{showShenSha ? '收起神煞' : '查看神煞互参'}</span>
                           {showShenSha ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                       </button>
+                       </Button>
                     </div>
 
                     {/* 右侧：四柱 (PC端样式还原：Label在上，Char在下，日柱红框) */}
@@ -886,7 +986,7 @@ function ResultPageContent() {
                         {originalFullInfo.fullName}
                       </h2>
                       <span className="text-[10px] sm:text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full block sm:inline">
-                        {originalNature.nature}宫
+                        {originalNature.nature}
                       </span>
                     </div>
                     <div className="flex flex-col gap-0 border-r border-dashed border-stone-200 sm:border-none pr-1 sm:pr-0">
@@ -915,7 +1015,7 @@ function ResultPageContent() {
                       </h2>
                       {hasMovingLines && (
                         <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-50 px-2 py-0.5 rounded-full block sm:inline">
-                           {changedNature.nature}宫
+                           {changedNature.nature}
                         </span>
                       )}
                     </div>
@@ -1067,6 +1167,37 @@ function ResultPageContent() {
               onSave={() => saveRecordToCloud(true)}
               onPublish={handlePublish}
               onWriteNote={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              liuyaoData={calculatedData ? {
+                question: question,
+                dateISO: payload.divinationTimeISO,
+                lunarDate: getLunarDateStringWithoutYear(date),
+                kongWang: kongWang,
+                benGua: {
+                  name: originalFullInfo.fullName || '',
+                  element: originalNature.element,
+                  key: payload.result.originalKey
+                },
+                bianGua: hasMovingLines ? {
+                  name: changedFullInfo.fullName || '',
+                  element: changedNature.element,
+                  key: payload.result.changedKey
+                } : undefined,
+                lines: lineDetails.map((detail, index) => {
+                  const position = 6 - index // 从下往上：1-6
+                  const isMoving = payload.changingFlags[index] || false
+                  const lineValue = payload.lines[index] || ''
+                  // 判断阴阳：'-----' 或 '---X---' 为阴(0)，其他为阳(1)
+                  const yinYang: 0 | 1 = (lineValue === '-----' || lineValue === '---X---') ? 0 : 1
+                  return {
+                    position,
+                    yinYang,
+                    moving: isMoving,
+                    detail
+                  }
+                }),
+                // fuShenMap: fuShenMap as Record<number, string> | undefined
+              } : undefined}
+              aiResult={aiResult}
             />
             <div className="mt-8 text-center px-4 lg:px-0">
                <div className="flex flex-col gap-2">
@@ -1083,68 +1214,113 @@ function ResultPageContent() {
         </div>
 
           {/* 移动端底部固定工具栏 */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-             <div className="flex items-center gap-4 flex-1 justify-between pr-4">
-               <button onClick={() => router.push('/tools/6yao')} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform">
-                  <RotateCcw className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">重排</span>
-               </button>
-               <button 
-                 onClick={() => saveRecordToCloud(true)} 
-                 className={`flex flex-col items-center gap-0.5 active:scale-95 transition-transform ${isSaved && !hasUnsavedChanges ? 'text-green-600' : 'text-stone-500'}`}
-                 disabled={saving}
-               >
-                  <Save className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{isSaved && !hasUnsavedChanges ? '已存' : '保存'}</span>
-               </button>
-               {canViewPrivateNotes && (
-                 <button 
-                   onClick={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })} 
-                   className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
-                 >
-                   <BookOpen className="w-5 h-5" />
-                   <span className="text-[10px] font-medium">笔记</span>
-                 </button>
-               )}
-               {(isAuthor || isLocalResult) && (
-                 <button onClick={handlePublish} className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform" disabled={saving}>
-                   <Send className="w-5 h-5" />
-                   <span className="text-[10px] font-medium">发布</span>
-                 </button>
-               )}
-               <button 
-                 onClick={() => {
-                   if (navigator.share) {
-                     navigator.share({
-                       title: '六爻排盘结果',
-                       text: `我正在查看排盘结果：${originalFullInfo.fullName} ${hasMovingLines ? `之 ${changedFullInfo.fullName}` : ''}`,
-                       url: window.location.href,
-                     }).catch(() => {})
-                   } else {
-                     navigator.clipboard.writeText(window.location.href)
-                     toast({ title: '链接已复制', description: '请粘贴分享给好友' })
-                   }
-                 }} 
-                 className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform"
-               >
-                 <Share2 className="w-5 h-5" />
-                 <span className="text-[10px] font-medium">分享</span>
-               </button>
-             </div>
-
-             <Button 
-               onClick={handleMobileAiAnalyzeClick} 
-               className="shrink-0 rounded-full bg-gradient-to-r from-[#C82E31] to-[#D94F4F] hover:from-[#A61B1F] hover:to-[#C82E31] text-white shadow-lg shadow-red-900/20 h-10 w-10 p-0 border-none flex items-center justify-center"
-               title="AI 智能详批"
-             >
-               <Sparkles className="w-5 h-5" />
-             </Button>
-          </div>
+          <MobileResultActionsBar
+            reroutePath="/tools/6yao"
+            isSaved={isSaved}
+            hasUnsavedChanges={hasUnsavedChanges}
+            saving={saving}
+            onSave={() => saveRecordToCloud(true)}
+            noteSectionRef={noteSectionRef}
+            canViewPrivateNotes={canViewPrivateNotes}
+            onShare={handleShareImage}
+            onPublish={handlePublish}
+            showPublish={isAuthor || isLocalResult}
+            onAiAnalyze={handleMobileAiAnalyzeClick}
+          />
         </div>
       </div>
+
+      {/* 分享图对话框 */}
+      {calculatedData && payload && (
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent className="paper-texture bg-[#FAF9F6] max-w-[95vw] max-h-[95vh]">
+            <DialogHeader>
+              <DialogTitle>分享结果图</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center py-4">
+              <ScrollArea className="w-full max-h-[80vh] overflow-y-auto">
+                <div ref={shareImageRef} className="w-full flex justify-center">
+                  <LiuyaoShareCard
+                    question={question}
+                    dateISO={payload.divinationTimeISO}
+                    lunarDate={getLunarDateStringWithoutYear(date)}
+                    kongWang={kongWang}
+                    benGua={{
+                      name: originalFullInfo.fullName || '',
+                      element: originalNature.element,
+                      key: payload.result.originalKey
+                    }}
+                    bianGua={hasMovingLines ? {
+                      name: changedFullInfo.fullName || '',
+                      element: changedNature.element,
+                      key: payload.result.changedKey
+                    } : undefined}
+                    lines={lineDetails.map((detail, index) => {
+                      const position = 6 - index // 从下往上：1-6
+                      const isMoving = payload.changingFlags[index] || false
+                      const lineValue = payload.lines[index] || ''
+                      // 判断阴阳：'-----' 或 '---X---' 为阴(0)，其他为阳(1)
+                      const yinYang: 0 | 1 = (lineValue === '-----' || lineValue === '---X---') ? 0 : 1
+                      return {
+                        position,
+                        yinYang,
+                        moving: isMoving,
+                        detail
+                      }
+                    })}
+                    aiResult={aiResult}
+                  />
+                </div>
+              </ScrollArea>
+              <Button
+                onClick={handleDownloadAndShareImage}
+                disabled={downloading}
+                className="w-full bg-[#C82E31] hover:bg-[#A61B1F] text-white mt-4"
+              >
+                {downloading ? '生成中...' : '生成并分享图片'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }
+
+
+const IconAISparkle = ({ className }: { className?: string }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={className}
+    style={{ filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.8))' }} // 增加图标自发光
+  >
+    {/* 字母 A */}
+    <path 
+      d="M3.5 20L8.5 6L13.5 20" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    />
+    
+    {/* 字母 I */}
+    <path 
+      d="M18.5 6V20" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+    />
+    
+    {/* 中间的星光 (实心填充，更明显) */}
+    <path 
+      d="M8.5 13.5L9.5 11.5L11.5 11L9.5 10.5L8.5 8.5L7.5 10.5L5.5 11L7.5 11.5L8.5 13.5Z" 
+      fill="currentColor" 
+      stroke="none"
+    />
+  </svg>
+)
 
 export default function ResultPage() {
   return (

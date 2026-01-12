@@ -2,12 +2,9 @@
 
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   PenLine,
   RotateCcw,
-  Save,
-  Share2,
   Sparkles,
   X
 } from 'lucide-react'
@@ -42,14 +39,15 @@ import {
 import { cn } from '@/lib/utils/cn'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
 import { getSolarTermsForYear } from '@/lib/utils/solarTerms'
-import { IconAISparkle } from '../../../../lib/components/IconAISparkle'
 import { AiAnalysisCard } from '../../components/AiAnalysisCard'
 import { BaZiBasicInfo } from '../../components/BaZiBasicInfo'
 import { BaZiChart } from '../../components/BaZiChart'
 import { BaZiDetailedTab } from '../../components/BaZiDetailedTab'
 import { BaZiRelationships } from '../../components/BaZiRelationships'
+import { MobileResultActionsBar } from '../../components/MobileResultActionsBar'
 import { PrivateNotesSection, type PrivateNotesSectionRef } from '../../components/PrivateNotesSection'
 import { ResultActionsCard } from '../../components/ResultActionsCard'
+import { ShareResultDialog } from '../../components/ShareResultDialog'
 
 // 存储常量
 const BAZI_RESULT_STORAGE_KEY = 'latestBaZiResult'
@@ -318,6 +316,9 @@ function ResultPageContent() {
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
+  
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
   
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
@@ -588,6 +589,12 @@ function ResultPageContent() {
     }
   }, [calculatedData, payload, name, persistAiResult])
 
+  const handleScrollToResult = useCallback(() => {
+    if (aiSectionRef.current) {
+      aiSectionRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [])
+
   const handleAiAnalyzeClick = useCallback(async () => {
     const user = await getCurrentUser()
     if (!user) {
@@ -616,6 +623,76 @@ function ResultPageContent() {
 
     setShowAiCostConfirm(true)
   }, [aiResult, isAuthor, isSaved, toast, handleLoginRedirect])
+
+  // 移动端专用的AI分析处理函数
+  const handleMobileAiAnalyzeClick = useCallback(async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+      handleLoginRedirect()
+      return
+    }
+
+    if (aiResult) {
+      if (isSaved && !isAuthor) {
+        toast({
+          title: '提示',
+          description: '你不是该排盘作者，AI 分析结果不会保存到该排盘记录',
+        })
+      }
+      handleScrollToResult()
+      return
+    }
+
+    // 对于移动端，直接触发分析流程
+    // 如果需要保存，会通过 toast 提示用户
+    if (!isSaved) {
+      toast({
+        title: '需要先保存',
+        description: '请先保存到云端后再使用 AI 分析',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!isAuthor) {
+      // 非作者也可以分析，但结果不会保存
+      startAiAnalysis()
+      handleScrollToResult()
+      return
+    }
+
+    // 检查余额并开始分析
+    const growth = await getUserGrowth()
+    const balance = growth?.yiCoins
+    if (typeof balance !== 'number') {
+      toast({
+        title: '无法使用 AI 分析',
+        description: '无法获取易币余额，请稍后重试',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (balance < 50) {
+      toast({
+        title: '易币余额不足',
+        description: '当前易币不足 50，无法使用 AI 分析',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    startAiAnalysis()
+    handleScrollToResult()
+  }, [
+    aiResult,
+    isSaved,
+    isAuthor,
+    toast,
+    handleLoginRedirect,
+    handleScrollToResult,
+    startAiAnalysis,
+  ])
 
   const handleConfirmSaveForAi = async () => {
     setShowAiSaveConfirm(false)
@@ -671,12 +748,6 @@ function ResultPageContent() {
 
   const handleResetIdempotencyKey = useCallback(() => {
     aiIdempotencyKeyRef.current = null
-  }, [])
-
-  const handleScrollToResult = useCallback(() => {
-    if (aiSectionRef.current) {
-      aiSectionRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
   }, [])
 
   const persistNameUpdate = useCallback(async (nextName: string) => {
@@ -845,6 +916,19 @@ function ResultPageContent() {
     if (recordIdToUse) router.push(`/community/publish?tab=divination&recordId=${recordIdToUse}`)
     else toast({ title: '无法发布', description: '无法获取排盘记录ID', variant: 'destructive' })
   }, [isSaved, hasUnsavedChanges, savedRecordId, normalizedResultId, saveRecordToCloud, router, toast])
+
+  // 分享功能 - 复用PC端的分享逻辑
+  const handleShareImage = useCallback(() => {
+    if (!payload?.result || !payload.result.pillars || payload.result.pillars.length !== 4) {
+      toast({
+        title: '无法生成分享图',
+        description: '缺少必要的排盘数据',
+        variant: 'destructive',
+      })
+      return
+    }
+    setShareDialogOpen(true)
+  }, [payload, toast])
 
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) return
@@ -1275,6 +1359,7 @@ function ResultPageContent() {
               isLocalResult={isLocalResult}
               onSave={() => saveRecordToCloud(true)}
               onPublish={handlePublish}
+              onDownload={handleShareImage}
               onWriteNote={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
               baziResult={payload?.result}
               baziPayload={payload ? {
@@ -1299,66 +1384,37 @@ function ResultPageContent() {
           </div>
 
           {/* 移动端底部固定工具栏 */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center gap-4 flex-1 justify-between pr-4">
-              <Button 
-                onClick={() => router.push('/tools/bazi')} 
-                variant="ghost"
-                className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
-              >
-                <RotateCcw className="w-5 h-5" />
-                <span className="text-[10px] font-medium">重排</span>
-              </Button>
-              <Button 
-                onClick={() => saveRecordToCloud(true)} 
-                variant="ghost"
-                className={`flex flex-col items-center gap-0.5 active:scale-95 transition-transform h-auto p-0 ${isSaved && !hasUnsavedChanges ? 'text-green-600' : 'text-stone-500'}`}
-                disabled={(isSaved && !hasUnsavedChanges) || saving || nameLoading || questionLoading}
-              >
-                <Save className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{isSaved && !hasUnsavedChanges ? '已存' : '保存'}</span>
-              </Button>
-              {canViewPrivateNotes && (
-                <Button 
-                  onClick={() => noteSectionRef.current?.scrollIntoView({ behavior: 'smooth' })} 
-                  variant="ghost"
-                  className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
-                >
-                  <BookOpen className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">笔记</span>
-                </Button>
-              )}
-              <Button 
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: '八字排盘结果',
-                      text: `我正在查看八字排盘结果`,
-                      url: window.location.href,
-                    }).catch(() => {})
-                  } else {
-                    navigator.clipboard.writeText(window.location.href)
-                    toast({ title: '链接已复制', description: '请粘贴分享给好友' })
-                  }
-                }} 
-                variant="ghost"
-                className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
-              >
-                <Share2 className="w-5 h-5" />
-                <span className="text-[10px] font-medium">分享</span>
-              </Button>
-            </div>
-
-            <Button 
-              onClick={handleAiAnalyzeClick} 
-              className="shrink-0 rounded-full bg-gradient-to-r from-[#C82E31] to-[#D94F4F] hover:from-[#A61B1F] hover:to-[#C82E31] text-white shadow-lg shadow-red-900/20 h-10 w-10 p-0 border-none flex items-center justify-center"
-              title="AI 智能详批"
-            >
-              <IconAISparkle className="w-5 h-5 text-[#C82E31] mr-2" />
-            </Button>
-          </div>
+          <MobileResultActionsBar
+            reroutePath="/tools/bazi"
+            isSaved={isSaved}
+            hasUnsavedChanges={hasUnsavedChanges}
+            saving={saving}
+            loading={nameLoading || questionLoading}
+            onSave={() => saveRecordToCloud(true)}
+            noteSectionRef={noteSectionRef}
+            canViewPrivateNotes={canViewPrivateNotes}
+            onShare={handleShareImage}
+            onPublish={handlePublish}
+            showPublish={isAuthor || isLocalResult}
+            onAiAnalyze={handleMobileAiAnalyzeClick}
+          />
         </div>
       </div>
+
+      {/* 分享图对话框 */}
+      {payload?.result && payload.result.pillars && payload.result.pillars.length === 4 && (
+        <ShareResultDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          baziResult={payload.result}
+          baziPayload={{
+            name: payload.name,
+            gender: payload.gender,
+            dateISO: payload.dateISO,
+          }}
+          aiResult={aiResult}
+        />
+      )}
     </>
   )
 }

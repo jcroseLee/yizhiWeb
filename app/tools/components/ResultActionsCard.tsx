@@ -2,19 +2,12 @@
 
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/lib/components/ui/dialog'
 import { useToast } from '@/lib/hooks/use-toast'
 import { type BaZiResult } from '@/lib/utils/bazi'
-import { toPng } from 'html-to-image'
+import { type LineDetail } from '@/lib/utils/liuyaoDetails'
 import { BookOpen, Download, Save, Share2 } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { ScrollArea } from '../../../lib/components/ui/scroll-area'
-import ShareImageCard from './BaZiShareImage'
+import { useState } from 'react'
+import { ShareResultDialog } from './ShareResultDialog'
 
 export interface ResultActionsCardProps {
   /** 是否已保存 */
@@ -47,6 +40,29 @@ export interface ResultActionsCardProps {
   }
   /** AI 分析结果 */
   aiResult?: string
+  /** 六爻数据（用于生成分享图） */
+  liuyaoData?: {
+    question?: string
+    dateISO?: string
+    lunarDate?: string
+    kongWang?: string
+    benGua?: {
+      name: string
+      element: string
+      key: string
+    }
+    bianGua?: {
+      name: string
+      element: string
+      key: string
+    }
+    lines?: Array<{
+      position: number
+      yinYang: 0 | 1
+      moving: boolean
+      detail?: LineDetail
+    }>
+  }
 }
 
 export function ResultActionsCard({
@@ -63,10 +79,9 @@ export function ResultActionsCard({
   baziResult,
   baziPayload,
   aiResult,
+  liuyaoData,
 }: ResultActionsCardProps) {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
-  const [downloading, setDownloading] = useState(false)
-  const shareImageRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   
   const isLoading = saving || loading
@@ -81,7 +96,9 @@ export function ResultActionsCard({
   const showPublishButton = onPublish && (isAuthor || isLocalResult)
   
   // 检查是否有足够的数据生成分享图
-  const canGenerateShareImage = baziResult && baziPayload && baziResult.pillars && baziResult.pillars.length === 4
+  const canGenerateBaziShareImage = baziResult && baziPayload && baziResult.pillars && baziResult.pillars.length === 4
+  const canGenerateLiuyaoShareImage = liuyaoData && liuyaoData.lines && liuyaoData.lines.length > 0
+  const canGenerateShareImage = canGenerateBaziShareImage || canGenerateLiuyaoShareImage
 
   const handleDownload = async () => {
     // 如果提供了自定义回调，使用它
@@ -104,40 +121,6 @@ export function ResultActionsCard({
     setShareDialogOpen(true)
   }
 
-  const handleDownloadImage = async () => {
-    if (!shareImageRef.current) return
-
-    setDownloading(true)
-    try {
-      // 使用 html-to-image 生成图片
-      const dataUrl = await toPng(shareImageRef.current, {
-        backgroundColor: '#FDFBF7',
-        pixelRatio: 2, // 2倍图，提高清晰度
-        cacheBust: true,
-      })
-
-      const link = document.createElement('a')
-      link.href = dataUrl
-      link.download = `易知命书_${baziPayload?.name || '八字'}_${new Date().toISOString().split('T')[0]}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      toast({
-        title: '下载成功',
-        description: '分享图已保存到本地',
-      })
-    } catch (error) {
-      console.error('Failed to generate share image:', error)
-      toast({
-        title: '下载失败',
-        description: '生成图片时出错，请稍后重试',
-        variant: 'destructive',
-      })
-    } finally {
-      setDownloading(false)
-    }
-  }
 
   return (
     <>
@@ -167,7 +150,6 @@ export function ResultActionsCard({
             variant="ghost"
             className="justify-start gap-3 text-stone-600 hover:text-[#C82E31] hover:bg-red-50 h-9 text-sm"
             onClick={handleDownload}
-            disabled={!canGenerateShareImage && !onDownload}
           >
             <Download className="w-4 h-4" />
             分享结果图
@@ -187,31 +169,14 @@ export function ResultActionsCard({
 
       {/* 分享图对话框 */}
       {canGenerateShareImage && (
-        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-          <DialogContent className="paper-texture bg-[#FAF9F6]">
-            <DialogHeader>
-              <DialogTitle>分享结果图</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col items-center py-4">
-              <ScrollArea className="w-full max-h-[80vh] overflow-y-auto">
-                <div ref={shareImageRef} className="w-full flex justify-center">
-                  <ShareImageCard
-                    result={baziResult}
-                    payload={baziPayload!}
-                    aiResult={aiResult}
-                  />
-                </div>
-              </ScrollArea>
-              <Button
-                onClick={handleDownloadImage}
-                disabled={downloading}
-                className="w-full bg-[#C82E31] hover:bg-[#A61B1F] text-white"
-              >
-                {downloading ? '生成中...' : '下载图片'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ShareResultDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          baziResult={baziResult}
+          baziPayload={baziPayload}
+          aiResult={aiResult}
+          liuyaoData={liuyaoData}
+        />
       )}
     </>
   )

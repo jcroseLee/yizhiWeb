@@ -1,5 +1,5 @@
-import React from 'react'
 import { type LineDetail } from '@/lib/utils/liuyaoDetails'
+import React from 'react'
 
 export interface HexagramLineProps {
   line: { barType: 'yin' | 'yang', isChanging: boolean, status: string }
@@ -45,10 +45,10 @@ export const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged
           {/* 2. 变卦文字 */}
           {/* PC端：ml-4 (间距恢复) */}
           <div className={`flex flex-col justify-center ml-2 lg:ml-4 ${opacityClass}`}>
-            <span className="font-bold font-serif text-stone-700 text-xs lg:text-sm leading-none mb-0.5">
+            <span className="font-bold font-serif text-stone-900 text-xs lg:text-sm leading-none mb-0.5">
               {changedDetail?.relationShort}
             </span>
-            <span className="font-serif text-[10px] lg:text-xs text-stone-500 leading-none scale-90 lg:scale-100 origin-left">
+            <span className="font-serif text-[10px] lg:text-xs text-stone-900 leading-none scale-90 lg:scale-100 origin-left">
               {changedDetail?.stem}{changedDetail?.branch}{changedDetail?.element}
             </span>
           </div>
@@ -96,7 +96,7 @@ export const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged
            <div className="lg:hidden flex items-center gap-1 mt-0.5">
               {detail?.isShi && <span className="text-[9px] text-white bg-[#C82E31] px-0.5 rounded-[2px] leading-none scale-90">世</span>}
               {detail?.isYing && <span className="text-[9px] text-stone-500 border border-stone-200 px-0.5 rounded-[2px] leading-none scale-90">应</span>}
-              {fuShen && <span className="text-[8px] text-[#C82E31] font-serif scale-75 origin-right">伏:{fuShen}</span>}
+              {/* {fuShen && <span className="text-[8px] text-[#C82E31] font-serif scale-75 origin-right">伏:{fuShen}</span>} */}
            </div>
 
            {/* PC端：伏神/卦身 (独立一行显示，红色高亮 - 严格恢复) */}
@@ -131,6 +131,15 @@ export const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged
 
         {/* 第四列：PC端专属状态栏 (世应/动爻标记 - 严格恢复) */}
         <div className="hidden lg:flex items-center gap-2 ml-3 w-12 shrink-0">
+           {/* 动爻 */}
+           <div className="w-4 flex justify-center">
+             {line.isChanging && (
+                <span className="text-xs font-serif text-[#C82E31] animate-pulse font-bold">
+                  {line.barType === 'yin' ? '✕' : '○'}
+                </span>
+             )}
+           </div>
+
            {/* 世应 */}
            <div className="w-5 flex justify-center">
              {detail?.isShi && (
@@ -145,14 +154,7 @@ export const HexagramLine = React.memo(({ line, detail, changedDetail, isChanged
              )}
            </div>
 
-           {/* 动爻 */}
-           <div className="w-4 flex justify-center">
-             {line.isChanging && (
-                <span className="text-xs font-serif text-[#C82E31] animate-pulse font-bold">
-                  {line.barType === 'yin' ? '✕' : '○'}
-                </span>
-             )}
-           </div>
+
         </div>
 
         {/* 移动端 动爻标记 (浮动在右侧) */}

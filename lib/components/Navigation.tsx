@@ -27,7 +27,15 @@ const navItems: NavItem[] = [
   { href: '/community', label: '社区' },
   { href: '/cases', label: '案例库' },
   { href: '/library', label: '藏经阁' },
-  { href: '/tools/6yao', label: '排盘工具' },
+  { 
+    href: '/tools', 
+    label: '排盘工具',
+    children: [
+      { href: '/tools/bazi', label: '四柱八字' },
+      { href: '/tools/6yao', label: '六爻排盘' },
+      { href: '/tools/qimen', label: '奇门遁甲' },
+    ]
+  },
 ]
 
 export default function Navigation() {
@@ -206,21 +214,6 @@ export default function Navigation() {
           {/* 左侧：Logo区域 - 响应式宽度 */}
           <div className="w-64 shrink-0 flex px-4 h-full border-r max-md:w-auto max-md:px-2 max-md:border-r-0 max-md:min-w-0">
             <Link href="/" className="flex pl-2 pt-2 max-md:pl-1">
-              {/* <svg width="300" height="50" viewBox="0 0 300 50" className="max-md:w-[200px] max-md:h-[33px]" xmlns="http://www.w3.org/2000/svg">
-                <g transform="translate(0, 5)">
-                  <path d="M10 6 Q 8 12 8 18" stroke="#2C3E50" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
-                  <path d="M8 22 Q 8 28 10 34" stroke="#2C3E50" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
-                  <path d="M18 8 Q 30 6, 42 8" stroke="#2C3E50" strokeWidth="4" strokeLinecap="round" fill="none" />
-                  <path d="M16 20 L 22 20" stroke="#2C3E50" strokeWidth="4" strokeLinecap="round" />
-                  <circle cx="30" cy="20" r="3.5" fill="#C82E31" />
-                  <path d="M38 20 L 44 20" stroke="#2C3E50" strokeWidth="4" strokeLinecap="round" />
-                  <path d="M18 32 Q 30 34, 42 32" stroke="#2C3E50" strokeWidth="4" strokeLinecap="round" fill="none" />
-                </g>
-                <text x="58" y="34" fontFamily="'Noto Serif SC', 'Songti SC', serif" fontWeight="bold" fontSize="34" fill="#2C3E50" letterSpacing="6">
-                  易知
-                </text>
-                
-              </svg> */}
               <Logo />
             </Link>
           </div>

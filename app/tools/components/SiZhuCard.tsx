@@ -10,14 +10,15 @@ export interface GanZhiData {
 
 export function SiZhuCard() {
   // 使用当前时间，每分钟刷新
-  const [currentTime, setCurrentTime] = useState(() => new Date())
+  // 初始化为 null 以避免服务端和客户端渲染不一致
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // 更新时间的函数
     const updateTime = () => setCurrentTime(new Date())
     
-    // 立即更新一次，确保时间是最新的
+    // 立即更新一次，确保时间是最新的（仅在客户端执行）
     updateTime()
     
     // 计算到下一个整分钟的剩余时间（毫秒）
@@ -43,15 +44,25 @@ export function SiZhuCard() {
   }, [])
 
   // 格式化日期显示
-  const dateStr = useMemo(() => 
-    `${currentTime.getFullYear()}年${currentTime.getMonth() + 1}月${currentTime.getDate()}日 ${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`, 
-    [currentTime]
-  )
+  const dateStr = useMemo(() => {
+    if (!currentTime) return '--'
+    return `${currentTime.getFullYear()}年${currentTime.getMonth() + 1}月${currentTime.getDate()}日 ${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`
+  }, [currentTime])
   
-  const lunarDate = useMemo(() => getLunarDateString(currentTime), [currentTime])
+  const lunarDate = useMemo(() => {
+    if (!currentTime) return '--'
+    return getLunarDateString(currentTime)
+  }, [currentTime])
 
   // 基于当前时间计算四柱信息，不受其他表单控件影响
-  const ganZhiData = useMemo(() => getGanZhiInfo(currentTime), [currentTime])
+  const ganZhiData = useMemo(() => {
+    if (!currentTime) {
+      // 返回一个默认值以避免渲染错误
+      const defaultDate = new Date()
+      return getGanZhiInfo(defaultDate)
+    }
+    return getGanZhiInfo(currentTime)
+  }, [currentTime])
 
   // 五行颜色映射函数
   const getToneClass = (tone: string) => {

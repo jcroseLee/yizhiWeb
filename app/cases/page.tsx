@@ -778,7 +778,7 @@ export default function CasesPage() {
               
               <p className="text-stone-500 text-sm font-serif max-w-lg leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
                 <TextType 
-                  text={["不语怪力乱神，但求卦理真知。汇聚万千易友的实战经验，探索象数理的奥秘。"]}
+                  text={["不语怪力乱神，但求卦理真知。", "汇聚万千易友的实战经验，探索象数理的奥秘。"]}
                   typingSpeed={80}
                   pauseDuration={2000}
                   showCursor={false}

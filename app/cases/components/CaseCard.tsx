@@ -115,7 +115,7 @@ export default function CaseCard({ data, className }: CaseCardProps) {
 
   return (
     <Link href={`/cases/${data.id}`} className={cn('block group', className)}>
-      <Card className="bg-white border border-stone-200 rounded-2xl shadow-sm active:scale-[0.99] transition-all duration-200 hover:shadow-md hover:border-stone-300 cursor-pointer relative overflow-hidden">
+      <Card className="bg-white border border-stone-50 rounded-2xl shadow-sm active:scale-[0.99] transition-all duration-200 hover:shadow-md hover:border-stone-300 cursor-pointer relative overflow-hidden">
         {/* 印章 */}
         <CaseStamp feedback={data.feedback} />
         

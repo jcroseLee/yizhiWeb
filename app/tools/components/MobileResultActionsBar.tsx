@@ -5,36 +5,7 @@ import { useToast } from '@/lib/hooks/use-toast'
 import { BookOpen, RotateCcw, Save, Send, Share2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { type RefObject } from 'react'
-
-// IconAISparkle 组件定义（复用6yao的样式）
-const IconAISparkle = ({ className }: { className?: string }) => (
-  <svg 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    xmlns="http://www.w3.org/2000/svg" 
-    className={className}
-    style={{ filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.8))' }}
-  >
-    <path 
-      d="M3.5 20L8.5 6L13.5 20" 
-      stroke="currentColor" 
-      strokeWidth="2.5" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    />
-    <path 
-      d="M18.5 6V20" 
-      stroke="currentColor" 
-      strokeWidth="2.5" 
-      strokeLinecap="round" 
-    />
-    <path 
-      d="M8.5 13.5L9.5 11.5L11.5 11L9.5 10.5L8.5 8.5L7.5 10.5L5.5 11L7.5 11.5L8.5 13.5Z" 
-      fill="currentColor" 
-      stroke="none"
-    />
-  </svg>
-)
+import { MobileAiButton } from './MobileAiButton'
 
 export interface MobileResultActionsBarProps {
   /** 重排按钮的目标路由 */
@@ -51,6 +22,8 @@ export interface MobileResultActionsBarProps {
   onSave: () => void
   /** 笔记区域的ref（用于滚动到笔记） */
   noteSectionRef?: RefObject<{ scrollIntoView: (options?: ScrollIntoViewOptions) => void } | null>
+  /** AI分析区域的ref（用于滚动到AI分析） */
+  aiSectionRef?: RefObject<HTMLDivElement | null>
   /** 是否可以查看笔记 */
   canViewPrivateNotes?: boolean
   /** 分享配置 */
@@ -76,6 +49,7 @@ export function MobileResultActionsBar({
   loading = false,
   onSave,
   noteSectionRef,
+  aiSectionRef,
   canViewPrivateNotes = false,
   shareConfig,
   onShare,
@@ -108,6 +82,13 @@ export function MobileResultActionsBar({
 
   const handleScrollToNotes = () => {
     noteSectionRef?.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleAiAnalyzeClick = () => {
+    // 执行AI分析回调（可能是异步的，但不等待它完成）
+    if (onAiAnalyze) {
+      Promise.resolve(onAiAnalyze()).catch(() => {})
+    }
   }
 
   const isDisabled = (isSaved && !hasUnsavedChanges) || saving || loading
@@ -172,76 +153,13 @@ export function MobileResultActionsBar({
         </Button>
       </div>
 
-      {/* AI分析按钮 - 统一使用6yao的AI按钮样式 */}
+      {/* AI分析按钮 */}
       {onAiAnalyze && (
-        <div className="relative shrink-0 group" onClick={onAiAnalyze}>
-          {/* 1. 动态流光光晕 (底层) */}
-          <div className="mobile-ai-border opacity-80 group-active:opacity-100 transition-opacity" />
-
-          {/* 2. 按钮主体 */}
-          <Button 
-            className="relative z-10 w-12 h-12 rounded-full p-0 border-none overflow-hidden shadow-xl transition-transform active:scale-95 flex items-center justify-center bg-[#1a1a1a]"
-            title="AI 智能详批"
-          >
-            {/* A. 内部深色背景 + 噪点纹理 */}
-            <div className="absolute inset-0 bg-[#1a1a1a]">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-40 mix-blend-overlay" />
-            </div>
-
-            {/* B. 内部呼吸红光 (模拟核心能量) */}
-            <div className="absolute inset-0 rounded-full mobile-ai-inner-pulse" />
-            
-            {/* C. 顶部高光反射 (增加立体感，像玻璃球) */}
-            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-
-            {/* D. 图标 (使用白色，保持高对比度) */}
-            <IconAISparkle className="w-10 h-10 text-white relative z-20 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" />
-          </Button>
-          
-          {/* 3. 悬浮提示红点 (可选，用于提示新功能) */}
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#C82E31] border-2 border-white rounded-full z-20 animate-pulse" />
-        </div>
+        <MobileAiButton 
+          onClick={handleAiAnalyzeClick}
+          aiSectionRef={aiSectionRef}
+        />
       )}
-      
-      <style jsx global>{`
-        /* AI按钮动画样式 */
-        @keyframes mobile-ai-border-glow {
-          0%, 100% {
-            box-shadow: 0 0 20px rgba(200, 46, 49, 0.3),
-                        0 0 40px rgba(200, 46, 49, 0.2),
-                        0 0 60px rgba(200, 46, 49, 0.1);
-          }
-          50% {
-            box-shadow: 0 0 30px rgba(200, 46, 49, 0.5),
-                        0 0 60px rgba(200, 46, 49, 0.3),
-                        0 0 90px rgba(200, 46, 49, 0.2);
-          }
-        }
-        
-        @keyframes mobile-ai-inner-pulse {
-          0%, 100% {
-            background: radial-gradient(circle at center, rgba(200, 46, 49, 0.3) 0%, transparent 70%);
-            opacity: 0.6;
-          }
-          50% {
-            background: radial-gradient(circle at center, rgba(200, 46, 49, 0.5) 0%, transparent 70%);
-            opacity: 0.8;
-          }
-        }
-        
-        .mobile-ai-border {
-          position: absolute;
-          inset: -4px;
-          border-radius: 50%;
-          background: transparent;
-          animation: mobile-ai-border-glow 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-        
-        .mobile-ai-inner-pulse {
-          animation: mobile-ai-inner-pulse 2s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }

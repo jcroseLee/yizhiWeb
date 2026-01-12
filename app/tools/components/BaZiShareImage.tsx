@@ -262,13 +262,13 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
       <style dangerouslySetInnerHTML={{ __html: songStyles }} />
       
       {/* 整体容器 */}
-      <div className="w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-10 shadow-2xl overflow-hidden rounded-lg">
+      <div className="w-full max-w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg">
         
         {/* --- 装饰：文武边框 --- */}
         <div className="border-wenwu"></div>
 
         {/* --- 装饰：背景罗盘 (极致隐形：古铜色 + 极低透明度) --- */}
-        <div className="absolute top-10 right-[-60px] w-[320px] h-[320px] opacity-[0.07] pointer-events-none">
+        <div className="absolute top-10 right-[-60px] w-[240px] h-[240px] sm:w-[320px] sm:h-[320px] opacity-[0.07] pointer-events-none">
              <svg viewBox="0 0 100 100" className="w-full h-full text-[#8B6D48]">
                  <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="0.3" />
                  <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" strokeWidth="0.2" strokeDasharray="1 3" />
@@ -283,8 +283,8 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
         </div>
 
         {/* ================= 1. 顶部 Header ================= */}
-        <div className="relative z-10 pt-12 px-8 flex justify-between items-start">
-            <Logo width={100} height={24} className="text-[#1A1A1A] opacity-90" />
+        <div className="relative z-10 pt-6 sm:pt-12 px-4 sm:px-8 flex justify-between items-start">
+            <Logo width={90} height={22} className="sm:w-[100px] sm:h-[24px] text-[#1A1A1A] opacity-90" />
             
             {/* 编号：亚腰葫芦印 */}
             <div className="relative mt-2 mr-2">
@@ -296,7 +296,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
         </div>
 
         {/* ================= 2. 核心名帖区域 ================= */}
-        <div className="mt-6 mb-8 relative z-10 flex flex-col items-center justify-center min-h-[160px]">
+        <div className="mt-4 sm:mt-6 mb-6 sm:mb-8 relative z-10 flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px]">
             
             <div className="ink-zen-circle"></div>
 
@@ -308,7 +308,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                     </div>
                 </div>
 
-                <h1 className="text-[48px] font-kai text-[#1A1A1A] tracking-widest drop-shadow-sm leading-none">
+                <h1 className="text-[36px] sm:text-[48px] font-kai text-[#1A1A1A] tracking-widest drop-shadow-sm leading-none">
                     {userName}
                 </h1>
 
@@ -321,19 +321,19 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
             </div>
 
             {/* 隐私日期：年柱 + 生肖 */}
-            <div className="flex items-center gap-3 z-10 mt-3 opacity-70">
-                <div className="h-px w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
-                <div className="text-[14px] text-[#555] font-song tracking-[0.2em] font-bold">
+            <div className="flex items-center gap-2 sm:gap-3 z-10 mt-2 sm:mt-3 opacity-70">
+                <div className="h-px w-4 sm:w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
+                <div className="text-[12px] sm:text-[14px] text-[#555] font-song tracking-[0.2em] font-bold">
                     {yearInfo}
                 </div>
-                <div className="h-px w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
+                <div className="h-px w-4 sm:w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
             </div>
         </div>
 
         {/* ================= 3. 四柱展示区 ================= */}
-        <div className="px-8 mt-2 relative z-10">
+        <div className="px-4 sm:px-8 mt-2 relative z-10">
              {pillarsData.length === 4 ? (
-                 <div className="flex justify-between items-center h-44">
+                 <div className="flex justify-between items-center h-36 sm:h-44 gap-2 sm:gap-0">
                      {pillarsData.map((p, i) => (
                          <div key={i} className="flex flex-col items-center w-[22%] relative group">
                              {/* 标签 */}
@@ -343,7 +343,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                              
                              {/* 玉牌 */}
                              <div className={cn(
-                                 "w-full h-32 rounded-lg border flex flex-col items-center justify-center gap-2 relative overflow-hidden transition-all duration-500",
+                                 "w-full h-28 sm:h-32 rounded-lg border flex flex-col items-center justify-center gap-1.5 sm:gap-2 relative overflow-hidden transition-all duration-500",
                                  p.isHidden 
                                     ? "sealed-pillar border-[#DCD6CC]" 
                                     : "jade-tablet border-[#EAE6DD]",
@@ -351,11 +351,11 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                              )}>
                                  
                                  <div className={cn(
-                                     "flex flex-col items-center gap-4",
+                                     "flex flex-col items-center gap-2 sm:gap-4",
                                      p.isHidden ? "opacity-20 blur-[3px] scale-90 grayscale" : "opacity-100"
                                  )}>
-                                     <span className={cn("text-3xl font-kai", p.color)}>{p.gan}</span>
-                                     <span className={cn("text-3xl font-kai", p.color)}>{p.zhi}</span>
+                                     <span className={cn("text-2xl sm:text-3xl font-kai", p.color)}>{p.gan}</span>
+                                     <span className={cn("text-2xl sm:text-3xl font-kai", p.color)}>{p.zhi}</span>
                                  </div>
 
                                  {/* 天机印 */}
@@ -380,13 +380,13 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
 
         {/* ================= 4. 批断内容区 ================= */}
         {aiContent && (
-            <div className="px-10 mt-6 flex-1 relative z-10 flex flex-col items-center">
+            <div className="px-6 sm:px-10 mt-4 sm:mt-6 flex-1 relative z-10 flex flex-col items-center">
                 {/* 装饰短线 */}
                 <div className="w-8 h-[2px] bg-[#BA3D38]/10 mb-4 rounded-full"></div>
                 
                 {/* 文本内容 (去Emoji, 首字高亮) */}
                 <div className="relative w-full">
-                    <p className="text-[13px] text-[#444] leading-[2.2] font-song text-justify tracking-wide opacity-90 h-[96px] overflow-hidden mask-image-b-fade first-letter:text-2xl first-letter:font-kai first-letter:float-left first-letter:mr-1 first-letter:text-[#BA3D38]">
+                    <p className="text-[12px] sm:text-[13px] text-[#444] leading-[2.2] font-song text-justify tracking-wide opacity-90 h-[96px] overflow-hidden mask-image-b-fade first-letter:text-xl sm:first-letter:text-2xl first-letter:font-kai first-letter:float-left first-letter:mr-1 first-letter:text-[#BA3D38]">
                         {aiContent}
                     </p>
                 </div>
@@ -410,7 +410,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                 </svg>
             </div>
 
-            <div className="px-8 pb-8 pt-4 flex items-end justify-between relative">
+            <div className="px-4 sm:px-8 pb-6 sm:pb-8 pt-3 sm:pt-4 flex items-end justify-between relative">
                 <div className="flex flex-col gap-1.5">
                     <div className="text-[#BA3D38] font-kai text-sm tracking-[0.3em]">知命·顺势</div>
                     <div className="text-[8px] text-[#999] font-song scale-90 origin-left opacity-60 uppercase tracking-widest">

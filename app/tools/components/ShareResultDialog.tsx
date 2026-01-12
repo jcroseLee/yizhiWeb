@@ -106,13 +106,13 @@ export function ShareResultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="paper-texture bg-[#FAF9F6] max-w-[95vw] max-h-[95vh]">
+      <DialogContent className="paper-texture bg-[#FAF9F6] max-w-[95vw] sm:max-w-[90vw] max-h-[95vh] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>分享结果图</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">分享结果图</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col items-center py-4">
-          <ScrollArea className="w-full max-h-[80vh] overflow-y-auto">
-            <div ref={shareImageRef} className="w-full flex justify-center">
+        <div className="flex flex-col items-center py-2 sm:py-4">
+          <ScrollArea className="w-full max-h-[75vh] sm:max-h-[80vh] overflow-y-auto">
+            <div ref={shareImageRef} className="w-full flex justify-center px-2 sm:px-0">
               {canGenerateBaziShareImage ? (
                 <ShareImageCard
                   result={baziResult}
@@ -136,7 +136,7 @@ export function ShareResultDialog({
           <Button
             onClick={handleDownloadImage}
             disabled={downloading}
-            className="w-full bg-[#C82E31] hover:bg-[#A61B1F] text-white mt-4"
+            className="w-full bg-[#C82E31] hover:bg-[#A61B1F] text-white mt-3 sm:mt-4 text-sm sm:text-base"
           >
             {downloading ? '生成中...' : '下载图片'}
           </Button>

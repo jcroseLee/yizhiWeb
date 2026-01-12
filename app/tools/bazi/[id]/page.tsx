@@ -6,7 +6,8 @@ import {
   PenLine,
   RotateCcw,
   Sparkles,
-  X
+  X,
+  Zap
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -15,6 +16,14 @@ import ReactMarkdown from 'react-markdown'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/lib/components/ui/dialog'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
@@ -590,9 +599,33 @@ function ResultPageContent() {
   }, [calculatedData, payload, name, persistAiResult])
 
   const handleScrollToResult = useCallback(() => {
+    // 如果元素已经存在，立即滚动
     if (aiSectionRef.current) {
-      aiSectionRef.current.scrollIntoView({ behavior: 'smooth' })
+      requestAnimationFrame(() => {
+        aiSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+      return
     }
+    
+    // 如果元素不存在，等待它出现（最多尝试15次，每次间隔150ms）
+    let attempts = 0
+    const maxAttempts = 15
+    
+    const tryScroll = () => {
+      if (aiSectionRef.current) {
+        requestAnimationFrame(() => {
+          aiSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+        return
+      }
+      attempts++
+      if (attempts < maxAttempts) {
+        setTimeout(tryScroll, 150)
+      }
+    }
+    
+    // 延迟一点时间后开始尝试，给 React 时间更新 DOM
+    setTimeout(tryScroll, 100)
   }, [])
 
   const handleAiAnalyzeClick = useCallback(async () => {
@@ -656,34 +689,12 @@ function ResultPageContent() {
 
     if (!isAuthor) {
       // 非作者也可以分析，但结果不会保存
-      startAiAnalysis()
-      handleScrollToResult()
+      setShowAiNotOwnerConfirm(true)
       return
     }
 
-    // 检查余额并开始分析
-    const growth = await getUserGrowth()
-    const balance = growth?.yiCoins
-    if (typeof balance !== 'number') {
-      toast({
-        title: '无法使用 AI 分析',
-        description: '无法获取易币余额，请稍后重试',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    if (balance < 50) {
-      toast({
-        title: '易币余额不足',
-        description: '当前易币不足 50，无法使用 AI 分析',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    startAiAnalysis()
-    handleScrollToResult()
+    // 显示确认弹窗，而不是直接开始分析
+    setShowAiCostConfirm(true)
   }, [
     aiResult,
     isSaved,
@@ -1392,6 +1403,7 @@ function ResultPageContent() {
             loading={nameLoading || questionLoading}
             onSave={() => saveRecordToCloud(true)}
             noteSectionRef={noteSectionRef}
+            aiSectionRef={aiSectionRef}
             canViewPrivateNotes={canViewPrivateNotes}
             onShare={handleShareImage}
             onPublish={handlePublish}
@@ -1415,6 +1427,101 @@ function ResultPageContent() {
           aiResult={aiResult}
         />
       )}
+
+      {/* AI 分析确认弹窗 */}
+      <Dialog open={showAiCostConfirm} onOpenChange={setShowAiCostConfirm}>
+        <DialogContent className="bg-white rounded-xl">
+          <div className="flex flex-col items-center text-center pt-4">
+            <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-4">
+              <Zap className="w-6 h-6 text-orange-500 fill-current" />
+            </div>
+            <DialogTitle className="mb-2">确认 AI 分析</DialogTitle>
+            <DialogDescription>
+              本次操作将扣除{" "}
+              <span className="font-bold text-[#C82E31] text-base">50</span>{" "}
+              易币
+              <br />
+              用于调用大模型进行深度推理。
+            </DialogDescription>
+          </div>
+          <DialogFooter className="mt-4 flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowAiCostConfirm(false)}
+              disabled={aiBalanceChecking}
+              className="rounded-full w-full sm:w-auto px-8 order-2 sm:order-1"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleConfirmAiAnalyze}
+              className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full w-full sm:w-auto px-8 order-1 sm:order-2"
+              disabled={aiBalanceChecking}
+            >
+              {aiBalanceChecking ? "查询余额..." : "确认支付"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI 保存确认弹窗 */}
+      <Dialog open={showAiSaveConfirm} onOpenChange={setShowAiSaveConfirm}>
+        <DialogContent className="bg-white rounded-xl sm:rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>需要先保存到云端</DialogTitle>
+            <DialogDescription>
+              使用该功能前，需要先将本次排盘保存到云端。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAiSaveConfirm(false)}
+              disabled={saving}
+              className="rounded-full w-full sm:w-auto order-2 sm:order-1"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleConfirmSaveForAi}
+              disabled={saving}
+              className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full w-full sm:w-auto order-1 sm:order-2"
+            >
+              {saving ? "保存中..." : "保存到云端"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI 非作者确认弹窗 */}
+      <Dialog
+        open={showAiNotOwnerConfirm}
+        onOpenChange={setShowAiNotOwnerConfirm}
+      >
+        <DialogContent className="bg-white rounded-xl">
+          <DialogHeader>
+            <DialogTitle>非作者提示</DialogTitle>
+            <DialogDescription>
+              你不是该排盘作者，AI 分析结果将仅在当前设备临时显示。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAiNotOwnerConfirm(false)}
+              className="rounded-full w-full sm:w-auto order-2 sm:order-1"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleConfirmAiNotOwner}
+              className="bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full w-full sm:w-auto order-1 sm:order-2"
+            >
+              继续分析
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

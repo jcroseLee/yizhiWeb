@@ -305,10 +305,10 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
       <style dangerouslySetInnerHTML={{ __html: liuyaoStyles }} />
       
       {/* 画布容器 */}
-      <div className="w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-10 shadow-2xl overflow-hidden rounded-lg border border-[#E8E4D8]">
+      <div className="w-full max-w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg border border-[#E8E4D8]">
         
         {/* 背景罗盘装饰 */}
-        <div className="absolute top-[-40px] right-[-60px] w-64 h-64 bg-compass-fade z-0 rotate-12">
+        <div className="absolute top-[-40px] right-[-60px] w-48 h-48 sm:w-64 sm:h-64 bg-compass-fade z-0 rotate-12">
              <svg viewBox="0 0 100 100" className="w-full h-full text-[#2C2C2C]">
                  <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="0.5" />
                  <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="4 2" />
@@ -317,10 +317,10 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* 顶部 Header */}
-        <div className="relative z-10 pt-10 px-8 flex justify-between items-start">
+        <div className="relative z-10 pt-6 sm:pt-10 px-4 sm:px-8 flex justify-between items-start">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center">
-                     <Logo width={120} height={32} className="text-[#1A1A1A]" />
+                     <Logo width={100} height={28} className="sm:w-[120px] sm:h-[32px] text-[#1A1A1A]" />
                 </div>
                 <span className="text-[9px] text-[#888] tracking-[0.2em] uppercase pl-1 opacity-70">
                     Liuyao Divination
@@ -348,7 +348,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* 装饰分割线 */}
-        <div className="px-8 mt-2 relative z-10">
+        <div className="px-4 sm:px-8 mt-2 relative z-10">
             <div className="divider-decorative">
                 <div className="divider-line"></div>
                 <div className="divider-dot"></div>
@@ -357,9 +357,9 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* --- 所测之事 --- */}
-        <div className="px-8 mt-3 relative z-10">
+        <div className="px-4 sm:px-8 mt-3 relative z-10">
             <div className="pl-2 py-1 mb-1">
-                <h2 className="text-xl font-kai text-[#1A1A1A] leading-relaxed line-clamp-2">
+                <h2 className="text-lg sm:text-xl font-kai text-[#1A1A1A] leading-relaxed line-clamp-2">
                     {displayData.question}
                 </h2>
             </div>
@@ -370,8 +370,8 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* --- 卦象展示区 (内容保持不变) --- */}
-        <div className="px-8 mt-6 relative z-10">
-            <div className="bg-white/40 border border-[#E0Dcd0] rounded-lg p-6 relative overflow-hidden shadow-sm backdrop-blur-sm">
+        <div className="px-4 sm:px-8 mt-4 sm:mt-6 relative z-10">
+            <div className="bg-white/40 border border-[#E0Dcd0] rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm backdrop-blur-sm">
                 <div className="watermark-text">{displayData.benGua.name.slice(-1)}</div>
                 
                 <div className="flex justify-between items-center mb-6 border-b border-[#E0Dcd0]/60 pb-2">
@@ -407,7 +407,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                                 <div className="w-8 text-[10px] text-[#888] font-song text-left opacity-80 pt-0.5">
                                     {line.beast || ''}
                                 </div>
-                                <div className="flex-1 mx-3 max-w-[140px] relative">
+                                <div className="flex-1 mx-2 sm:mx-3 max-w-[140px] relative">
                                     <YaoLine isYang={line.yinYang === 1} isMoving={line.moving} />
                                     {line.moving && (
                                         <span className="absolute right-[-14px] top-1/2 transform -translate-y-1/2 text-[#BA3D38] text-xs font-bold leading-none">
@@ -446,8 +446,8 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* --- 解卦区域 --- */}
-        <div className="px-6 mt-6 flex-1 relative z-10 flex flex-col">
-            <div className="bg-white/50 border border-[#E8E4D8] rounded-lg p-5 shadow-sm flex-1 backdrop-blur-[2px] relative overflow-hidden">
+        <div className="px-4 sm:px-6 mt-4 sm:mt-6 flex-1 relative z-10 flex flex-col">
+            <div className="bg-white/50 border border-[#E8E4D8] rounded-lg p-4 sm:p-5 shadow-sm flex-1 backdrop-blur-[2px] relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-3">
                      <Sparkles className="w-3.5 h-3.5 text-[#BA3D38]" />
                      <span className="text-xs font-bold text-[#555] tracking-[0.2em]">天机预言</span>
@@ -481,7 +481,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         </div>
 
         {/* 底部 Footer */}
-        <div className="mt-auto px-8 pb-8 pt-6 relative z-10">
+        <div className="mt-auto px-4 sm:px-8 pb-6 sm:pb-8 pt-4 sm:pt-6 relative z-10">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#E0Dcd0] to-transparent"></div>
 
             <div className="flex items-end justify-between pt-5">

@@ -83,11 +83,11 @@ export function SiZhuCard() {
   }
 
   return (
-    <div className="bg-white border border-stone-200/80 rounded-sm p-5 relative overflow-hidden shadow-sm group hover:shadow-md transition-shadow">
+    <div className="bg-white border border-stone-200/80 rounded-sm p-4 xl:p-5 relative overflow-hidden shadow-sm group hover:shadow-md transition-shadow">
       <div className="absolute top-0 left-0 w-full h-1 bg-[#C82E31]/10"></div>
       
       {/* 日期信息 */}
-      <div className="mb-4 border-b border-stone-100 pb-3 space-y-1.5">
+      <div className="mb-3 xl:mb-4 border-b border-stone-100 pb-2 xl:pb-3 space-y-1.5">
         <div className="flex justify-between items-baseline">
           <span className="text-xs text-stone-400 font-sans">公历</span>
           <span className="text-sm font-bold text-stone-700 font-mono tracking-wide">
@@ -103,7 +103,7 @@ export function SiZhuCard() {
       </div>
       
       {/* 四柱展示 */}
-      <div className="grid grid-cols-4 gap-3 text-center mb-4">
+      <div className="grid grid-cols-4 gap-3 text-center mb-3 xl:mb-4">
         {ganZhiData.stems.map((stem, index) => {
           const branch = ganZhiData.branches[index]
           const labels = ['年柱', '月柱', '日柱', '时柱']
@@ -113,11 +113,11 @@ export function SiZhuCard() {
               <span className="text-[12px] text-stone-400 tracking-widest font-sans">{labels[index]}</span>
               <div className="flex flex-col gap-1.5">
                 {/* 天干 */}
-                <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-sm shadow-sm ${getToneClass(stem.tone)}`}>
+                <div className={`w-8 h-8 xl:w-9 xl:h-9 rounded-full border flex items-center justify-center font-bold text-sm shadow-sm ${getToneClass(stem.tone)}`}>
                   {stem.char}
                 </div>
                 {/* 地支 */}
-                <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-sm shadow-sm ${getToneClass(branch.tone)}`}>
+                <div className={`w-8 h-8 xl:w-9 xl:h-9 rounded-full border flex items-center justify-center font-bold text-sm shadow-sm ${getToneClass(branch.tone)}`}>
                   {branch.char}
                 </div>
               </div>

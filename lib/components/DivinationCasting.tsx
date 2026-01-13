@@ -181,7 +181,7 @@ const CalligraphyLine = ({ type, isChanging }: { type: LineType; isChanging: boo
   const isYang = type === '少阳' || type === '老阳'
   
   return (
-    <div className="relative w-32 h-8 flex items-center justify-center">
+    <div className="relative w-28 sm:w-32 h-7 sm:h-8 flex items-center justify-center">
       <svg width="100%" height="100%" viewBox="0 0 140 20" className="drop-shadow-sm">
         {isYang ? (
           <path d="M10 10 Q 70 8, 130 10" stroke="#2C3E50" strokeWidth="6" strokeLinecap="round" fill="none" />
@@ -393,11 +393,11 @@ export default function DivinationCasting({
   
   if (divinationMethod === 2 && showManualUI) {
     return (
-      <div className="w-full max-w-lg mx-auto bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-sm border border-stone-100 animate-in fade-in slide-in-from-bottom-4">
-        <h3 className="text-center font-serif text-stone-600 mb-6 font-bold">请逐一指定六爻状态</h3>
-        <div className="flex flex-col-reverse gap-4 mb-8">
+      <div className="w-full max-w-lg mx-auto bg-white/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-sm border border-stone-100 animate-in fade-in slide-in-from-bottom-4">
+        <h3 className="text-center font-serif text-stone-600 mb-4 sm:mb-6 font-bold text-sm sm:text-base">请逐一指定六爻状态</h3>
+        <div className="flex flex-col-reverse gap-3 sm:gap-4 mb-4 sm:mb-8">
           {manualSelection.map((val, idx) => (
-            <div key={idx} className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-stone-50 transition-colors">
+            <div key={idx} className="flex items-center justify-between gap-3 sm:gap-4 p-2 rounded-lg hover:bg-stone-50 transition-colors">
               <div className="flex items-center gap-3">
                  <span className="text-xs font-bold text-stone-400 font-serif w-8 text-right">
                     {LINE_POSITIONS[idx]}
@@ -431,14 +431,14 @@ export default function DivinationCasting({
     <div className="w-full flex flex-col items-center">
       
       {/* 铜钱展示区 */}
-      <div className="relative h-32 w-full flex justify-center items-center gap-6 mb-8" style={{ perspective: '800px' }}>
+      <div className="relative h-36 sm:h-40 w-full flex justify-center items-center gap-4 sm:gap-6 mb-3 sm:mb-8" style={{ perspective: '800px' }}>
         {coinRotations.map((rotation, idx) => (
           <motion.div
             key={`coin-${idx}`}
             // 关键优化：控制 Y 轴位移和旋转的曲线，使其完全同步
             animate={{
               rotateY: rotation,
-              y: isAnimating ? [0, -150, 0] : 0, // 去掉回弹，只有 [起 -> 落]
+              y: isAnimating ? [0, -150, 0] : 0,
               scale: isAnimating ? [1, 1.4, 1] : 1
             }}
             transition={{ 
@@ -447,7 +447,7 @@ export default function DivinationCasting({
               // 错开每个铜钱的起跳时间
               delay: idx * 0.1 
             }}
-            className="relative w-20 h-20 rounded-full"
+            className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full"
             style={{ 
               transformStyle: 'preserve-3d',
               boxShadow: '0 10px 15px -3px rgba(28, 25, 23, 0.1), 0 4px 6px -2px rgba(28, 25, 23, 0.05)',
@@ -487,7 +487,7 @@ export default function DivinationCasting({
       </div>
 
       {/* 卦象生成区 (从下往上堆叠) */}
-      <div className="w-full max-w-xs min-h-[280px] flex flex-col-reverse justify-start items-center gap-2 mb-8 bg-stone-50/50 rounded-xl p-4 border border-stone-100">
+      <div className="w-full max-w-xs min-h-[160px] sm:min-h-[280px] flex flex-col-reverse justify-start items-center gap-2 mb-3 sm:mb-8 bg-stone-50/50 rounded-xl p-2.5 sm:p-4 border border-stone-100">
         <AnimatePresence initial={false}>
            {displayLines.map((type, idx) => (
              <motion.div
@@ -495,7 +495,7 @@ export default function DivinationCasting({
                initial={{ opacity: 0, y: 10, scale: 0.95 }}
                animate={{ opacity: 1, y: 0, scale: 1 }}
                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-               className="flex items-center w-full justify-between px-4 py-1"
+               className="flex items-center w-full justify-between px-3 sm:px-4 py-0.5 sm:py-1"
              >
                <span className="text-xs text-stone-400 font-serif w-8 text-right">{LINE_POSITIONS[idx]}</span>
                <CalligraphyLine type={type} isChanging={LINE_CONFIG[type].isChanging} />
@@ -505,7 +505,7 @@ export default function DivinationCasting({
         </AnimatePresence>
         
         {lines.length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-stone-300 text-sm font-serif italic">
+          <div className="flex-1 flex items-center justify-center text-stone-300 text-xs sm:text-sm font-serif italic">
              虚位以待，静候天机
           </div>
         )}
@@ -522,7 +522,7 @@ export default function DivinationCasting({
                    setShowManualUI(true)
                  }
                }}
-               className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-12 shadow-lg shadow-red-900/20"
+               className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-10 sm:px-12 shadow-lg shadow-red-900/20 h-12 sm:h-14 text-base sm:text-lg"
             >
                开始手工排盘
             </Button>
@@ -537,7 +537,7 @@ export default function DivinationCasting({
                    performCast()
                  }
                }}
-               className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-12 shadow-lg shadow-red-900/20"
+               className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-10 sm:px-12 shadow-lg shadow-red-900/20 h-12 sm:h-14 text-base sm:text-lg"
             >
                启动自动演算
             </Button>
@@ -553,14 +553,14 @@ export default function DivinationCasting({
                  }
                  performCast()
               }}
-              className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-12 h-14 text-lg shadow-lg shadow-red-900/20 transition-transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="bg-[#C82E31] hover:bg-[#A61B1F] text-white font-serif px-10 sm:px-12 h-12 sm:h-14 text-base sm:text-lg shadow-lg shadow-red-900/20 transition-transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {lines.length === 0 ? '掷第一爻' : `掷${LINE_POSITIONS[lines.length]}`}
             </Button>
          )}
          
          {lines.length > 0 && lines.length < 6 && (
-            <p className="mt-4 text-stone-500 text-xs font-serif animate-pulse h-4 text-center">
+            <p className="mt-3 sm:mt-4 text-stone-500 text-xs font-serif animate-pulse h-4 text-center">
                {isAnimating ? '...' : '请继续掷下一爻'}
             </p>
          )}

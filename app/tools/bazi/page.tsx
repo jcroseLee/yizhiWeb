@@ -30,6 +30,81 @@ interface StoredBaZiResultWithId {
   createdAt: string
 }
 
+interface BaZiFormContentProps {
+  date: Date | undefined
+  setDate: (value: Date | undefined) => void
+  gender: 'male' | 'female'
+  setGender: (value: 'male' | 'female') => void
+  name: string
+  setName: (value: string) => void
+  hour: string
+  setHour: (value: string) => void
+  minute: string
+  setMinute: (value: string) => void
+  city: string
+  setCity: (value: string) => void
+  solarTimeCorrection: boolean
+  setSolarTimeCorrection: (value: boolean) => void
+  earlyZiHour: boolean
+  setEarlyZiHour: (value: boolean) => void
+  nameError: boolean
+  loading: boolean
+  onCalculate: () => void
+}
+
+function BaZiFormContent({
+  date,
+  setDate,
+  gender,
+  setGender,
+  name,
+  setName,
+  hour,
+  setHour,
+  minute,
+  setMinute,
+  city,
+  setCity,
+  solarTimeCorrection,
+  setSolarTimeCorrection,
+  earlyZiHour,
+  setEarlyZiHour,
+  nameError,
+  loading,
+  onCalculate,
+}: BaZiFormContentProps) {
+  return (
+    <div className="space-y-6">
+      <BaZiForm
+        date={date}
+        setDate={setDate}
+        gender={gender}
+        setGender={setGender}
+        name={name}
+        setName={setName}
+        hour={hour}
+        setHour={setHour}
+        minute={minute}
+        setMinute={setMinute}
+        city={city}
+        setCity={setCity}
+        solarTimeCorrection={solarTimeCorrection}
+        setSolarTimeCorrection={setSolarTimeCorrection}
+        earlyZiHour={earlyZiHour}
+        setEarlyZiHour={setEarlyZiHour}
+        nameError={nameError}
+      />
+      <Button
+        className="w-full h-12 bg-[#C82E31] hover:bg-[#B02629] text-white text-lg font-bold shadow-lg shadow-red-900/20 rounded-xl transition-all active:scale-95 mt-4"
+        onClick={onCalculate}
+        disabled={loading}
+      >
+        {loading ? "正在推演..." : "开始排盘"}
+      </Button>
+    </div>
+  )
+}
+
 const styles = `
   /* ... (原有样式保持不变) ... */
   .font-ganzhi { font-family: "Noto Serif SC", "Songti SC", serif; }
@@ -164,41 +239,6 @@ export default function BaZiPage() {
     }
   }
 
-  // 抽离表单内容，方便复用
-  const FormContent = () => (
-    <div className="space-y-6">
-       <BaZiForm 
-          date={date} 
-          setDate={setDate} 
-          gender={gender} 
-          setGender={setGender}
-          name={name}
-          setName={(value) => {
-            setName(value)
-            if (nameError && value.trim() !== '') setNameError(false)
-          }}
-          hour={hour}
-          setHour={setHour}
-          minute={minute}
-          setMinute={setMinute}
-          city={city}
-          setCity={setCity}
-          solarTimeCorrection={solarTimeCorrection}
-          setSolarTimeCorrection={setSolarTimeCorrection}
-          earlyZiHour={earlyZiHour}
-          setEarlyZiHour={setEarlyZiHour}
-          nameError={nameError}
-        />
-        <Button 
-            className="w-full h-12 bg-[#C82E31] hover:bg-[#B02629] text-white text-lg font-bold shadow-lg shadow-red-900/20 rounded-xl transition-all active:scale-95 mt-4"
-            onClick={handleCalculate}
-            disabled={loading}
-        >
-            {loading ? "正在推演..." : "开始排盘"}
-        </Button>
-    </div>
-  )
-
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
@@ -235,18 +275,41 @@ export default function BaZiPage() {
                       </Button>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="h-[85vh] rounded-t-[20px] px-0 bg-[#f5f5f7]">
-                      <SheetHeader className="px-6 mb-4">
-                          <SheetTitle className="text-left font-serif text-xl font-bold flex items-center gap-2 text-stone-800">
-                              <Settings2 className="w-5 h-5 text-[#C82E31]" /> 录入契文
-                          </SheetTitle>
-                      </SheetHeader>
-                      <ScrollArea className="h-full px-6 pb-6">
-                          <FormContent />
+                  <SheetHeader className="px-6 mb-4">
+                      <SheetTitle className="text-left font-serif text-xl font-bold flex items-center gap-2 text-stone-800">
+                          <Settings2 className="w-5 h-5 text-[#C82E31]" /> 录入契文
+                      </SheetTitle>
+                  </SheetHeader>
+                  <ScrollArea className="h-full px-6 pb-6">
+                          <BaZiFormContent
+                            date={date}
+                            setDate={setDate}
+                            gender={gender}
+                            setGender={setGender}
+                            name={name}
+                            setName={(value) => {
+                              setName(value)
+                              if (nameError && value.trim() !== '') setNameError(false)
+                            }}
+                            hour={hour}
+                            setHour={setHour}
+                            minute={minute}
+                            setMinute={setMinute}
+                            city={city}
+                            setCity={setCity}
+                            solarTimeCorrection={solarTimeCorrection}
+                            setSolarTimeCorrection={setSolarTimeCorrection}
+                            earlyZiHour={earlyZiHour}
+                            setEarlyZiHour={setEarlyZiHour}
+                            nameError={nameError}
+                            loading={loading}
+                            onCalculate={handleCalculate}
+                          />
                           <div className="h-20" /> {/* 底部垫高 */}
-                      </ScrollArea>
-                  </SheetContent>
-              </Sheet>
-          </div>
+                  </ScrollArea>
+              </SheetContent>
+          </Sheet>
+      </div>
         </main>
 
         {/* 右侧边栏 - 参数设置 (仅 PC 端显示) */}

@@ -44,12 +44,12 @@ export default function DivinationForm({
 
   return (
     <>
-      <div className="space-y-8 font-serif">
+      <div className="space-y-6 xl:space-y-8 font-serif">
         {/* 1. 四柱信息卡片 */}
         <SiZhuCard />
 
         {/* 2. 表单区域 */}
-        <div className="space-y-6 pl-1">
+        <div className="space-y-5 xl:space-y-6 pl-1">
           
           {/* 事项 */}
           <div className="space-y-3 group">
@@ -65,7 +65,7 @@ export default function DivinationForm({
                 onChange={(e) => onQuestionChange(e.target.value)}
                 onFocus={() => setIsQuestionFocused(true)}
                 onBlur={() => setTimeout(() => setIsQuestionFocused(false), 200)}
-                className={`bg-transparent border-0 border-b rounded-none px-0 py-2 min-h-[80px] resize-none text-base text-stone-700 placeholder:text-stone-300 placeholder:font-light focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:bg-stone-50/50 transition-colors ${
+                className={`bg-transparent border-0 border-b rounded-none px-0 py-2 min-h-[64px] xl:min-h-[80px] resize-none text-base text-stone-700 placeholder:text-stone-300 placeholder:font-light focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:bg-stone-50/50 transition-colors ${
                   questionError 
                     ? 'border-solid border-red-500 focus:border-red-500' 
                     : 'border-dashed border-stone-300 focus:border-[#C82E31]'

@@ -2,7 +2,7 @@
 
 import { Feather, History, Scroll, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 // UI Components
 import DivinationCasting from '@/lib/components/DivinationCasting'
@@ -154,6 +154,10 @@ const styles = `
   .react-datepicker__navigation:hover *::before {
     border-color: #C82E31;
   }
+
+  #app-scroll-container {
+    overflow: hidden !important;
+  }
 `
 
 // 类型定义
@@ -195,6 +199,12 @@ export default function ToolsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [lastResultId, setLastResultId] = useState<string | null>(null)
 
+  const mainViewportRef = useRef<HTMLDivElement>(null)
+  const mainScaleTargetRef = useRef<HTMLDivElement>(null)
+  const sidebarViewportRef = useRef<HTMLDivElement>(null)
+  const sidebarScaleTargetRef = useRef<HTMLDivElement>(null)
+  const [mainScale, setMainScale] = useState(1)
+  const [sidebarScale, setSidebarScale] = useState(1)
 
   // 时间自动更新
   useEffect(() => {
@@ -343,138 +353,206 @@ export default function ToolsPage() {
     }
   }
 
+  useLayoutEffect(() => {
+    const mainViewport = mainViewportRef.current
+    const mainTarget = mainScaleTargetRef.current
+    const sidebarViewport = sidebarViewportRef.current
+    const sidebarTarget = sidebarScaleTargetRef.current
+    if (!mainViewport || !mainTarget) return
+
+    const computeMainScale = () => {
+      const availableWidth = mainViewport.clientWidth
+      const availableHeight = mainViewport.clientHeight
+      const contentWidth = mainTarget.offsetWidth
+      const contentHeight = mainTarget.offsetHeight
+      if (!availableWidth || !availableHeight || !contentWidth || !contentHeight) return
+
+      const padding = 16
+      const scaleByWidth = (availableWidth - padding) / contentWidth
+      const scaleByHeight = (availableHeight - padding) / contentHeight
+      const next = Math.min(1, Math.max(0.1, Math.min(scaleByWidth, scaleByHeight)))
+      setMainScale(prev => (Math.abs(prev - next) < 0.01 ? prev : next))
+    }
+
+    const computeSidebarScale = () => {
+      if (!sidebarViewport || !sidebarTarget) return
+      const availableHeight = sidebarViewport.clientHeight
+      const contentHeight = sidebarTarget.offsetHeight
+      if (!availableHeight || !contentHeight) return
+
+      const padding = 16
+      const next = Math.min(1, Math.max(0.1, (availableHeight - padding) / contentHeight))
+      setSidebarScale(prev => (Math.abs(prev - next) < 0.01 ? prev : next))
+    }
+
+    computeMainScale()
+    computeSidebarScale()
+
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        computeMainScale()
+        computeSidebarScale()
+      })
+      ro.observe(mainViewport)
+      ro.observe(mainTarget)
+      if (sidebarViewport) ro.observe(sidebarViewport)
+      if (sidebarTarget) ro.observe(sidebarTarget)
+    }
+
+    const handleResize = () => {
+      computeMainScale()
+      computeSidebarScale()
+    }
+    window.addEventListener('resize', handleResize)
+    window.visualViewport?.addEventListener('resize', handleResize)
+
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', handleResize)
+      window.visualViewport?.removeEventListener('resize', handleResize)
+    }
+  }, [isCasting, isComplete, divinationMethod, questionError])
+
   return (
     <>
       <style jsx global>{styles}</style>
-      <div className="h-full flex relative bg-[#f5f5f7] paper-texture">
-        
-        {/* 左侧主内容区 - 摇卦台 */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col">
-          
-          {/* 背景装饰：更具象的罗盘/太极底纹 */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
-            {/* 外圈罗盘刻度 (示意) - 扩大范围 */}
-            <svg width="950" height="950" viewBox="0 0 950 950" className="opacity-[0.05] animate-[spin_60s_linear_infinite]">
-              <circle cx="475" cy="475" r="356.25" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-              <circle cx="475" cy="475" r="415.625" fill="none" stroke="currentColor" strokeWidth="1" />
-              {Array.from({ length: 12 }).map((_, i) => (
-                <line 
-                  key={i} 
-                  x1="475" y1="118.75" x2="475" y2="142.5" 
-                  transform={`rotate(${i * 30} 475 475)`} 
-                  stroke="currentColor" 
-                  strokeWidth="2"
-                />
-              ))}
-            </svg>
+      <div className="h-full relative bg-[#f5f5f7] paper-texture overflow-hidden">
+        <aside
+          ref={sidebarViewportRef}
+          className="hidden lg:flex absolute right-0 top-0 bottom-0 w-80 overflow-hidden bg-white/90 border-l border-stone-200/60 shadow-[ -1px_0_2px_rgba(0,0,0,0.02)] z-20 backdrop-blur-sm flex-col"
+        >
+          <div
+            className="w-full"
+            style={{
+              transform: sidebarScale === 1 ? undefined : `scale(${sidebarScale})`,
+              transformOrigin: 'top center',
+            }}
+          >
+            <div ref={sidebarScaleTargetRef} className="p-6">
+              <h2 className="text-lg font-serif font-bold text-stone-800 mb-6 flex items-center gap-2 select-none">
+                <Scroll className="w-5 h-5 text-[#C82E31]" />
+                <span>录入契文</span>
+              </h2>
+              <DivinationForm
+                question={question}
+                onQuestionChange={handleQuestionChange}
+                divinationTime={divinationTime}
+                onDateChange={handleDateChange}
+                divinationMethod={divinationMethod}
+                onDivinationMethodChange={setDivinationMethod}
+                questionError={questionError}
+              />
+            </div>
           </div>
+        </aside>
 
-          <div className="min-h-full flex flex-col items-center justify-start lg:justify-center pt-24 pb-12 px-4 lg:p-8 relative z-10">
-            <div className="w-full max-w-xl space-y-12">
-              
-              {/* 头部提示 */}
-              {!isCasting && !isComplete && (
-                <div className="text-center space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-stone-100 mb-2">
-                    {/* 草龟壳图标 SVG - 模拟三棱特征 */}
-                    <TurtleIcon className="w-8 h-8" />
-                  </div>
-                  <h1 className="text-3xl font-serif font-bold text-stone-800 tracking-widest">
-                    诚心问道
-                  </h1>
-                  <p className="text-stone-500 text-sm font-serif">
-                    &ldquo;凡占，必诚必敬。右侧录入事项，静心点击下方。&rdquo;
-                  </p>
+        <div
+          ref={mainViewportRef}
+          className="absolute left-0 top-0 bottom-0 right-0 lg:right-80 overflow-hidden"
+        >
+          <div
+            className="absolute left-1/2 top-1/2 transition-transform duration-150"
+            style={{
+              transform: mainScale === 1 ? 'translate(-50%, -50%)' : `translate(-50%, -50%) scale(${mainScale})`,
+              transformOrigin: 'center center',
+            }}
+          >
+            <div ref={mainScaleTargetRef} className="w-[min(56rem,calc(100vw-24px))]">
+              <main className="overflow-visible overflow-x-hidden relative flex flex-col py-16 sm:py-20 lg:py-24">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
+                  <svg width="950" height="950" viewBox="0 0 950 950" className="opacity-[0.05] animate-[spin_60s_linear_infinite]">
+                    <circle cx="475" cy="475" r="356.25" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
+                    <circle cx="475" cy="475" r="415.625" fill="none" stroke="currentColor" strokeWidth="1" />
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <line
+                        key={i}
+                        x1="475" y1="118.75" x2="475" y2="142.5"
+                        transform={`rotate(${i * 30} 475 475)`}
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    ))}
+                  </svg>
                 </div>
-              )}
 
-              {/* 移动端主界面输入框 (仅在未摇卦时显示) */}
-              {!isCasting && !isComplete && (
-                <div className="lg:hidden w-full animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-                  <div className="relative">
-                    <textarea
-                      ref={questionInputRef}
-                      value={question}
-                      onChange={(e) => handleQuestionChange(e.target.value)}
-                      placeholder="所占何事？在此处输入..."
-                      className={`w-full bg-white/40 backdrop-blur-sm border-0 border-b-2 rounded-t-lg px-4 py-4 text-lg min-h-[80px] resize-none text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:outline-none transition-all ${
-                        questionError 
-                          ? 'border-red-400 bg-red-50/20' 
-                          : 'border-stone-200 focus:border-[#C82E31] focus:bg-white/60'
-                      }`}
-                    />
-                    {/* 错误提示角标 */}
-                    {questionError && (
-                      <div className="absolute right-2 top-2 text-red-500 animate-pulse">
-                        <Feather className="w-4 h-4" />
+                <div className="flex flex-col items-center justify-center px-3 sm:px-4 py-2 lg:py-6 lg:px-6 relative z-10">
+                  <div className="w-full max-w-xl space-y-6 lg:space-y-8">
+                    {!isCasting && !isComplete && (
+                      <div className="text-center space-y-2 lg:space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="inline-flex items-center justify-center w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-stone-100 mb-1 lg:mb-2">
+                          <TurtleIcon className="w-6 h-6 lg:w-8 lg:h-8" />
+                        </div>
+                        <h1 className="text-2xl lg:text-3xl font-serif font-bold text-stone-800 tracking-widest">
+                          诚心问道
+                        </h1>
+                        <p className="text-stone-500 text-xs lg:text-sm font-serif">
+                          &ldquo;凡占，必诚必敬。右侧录入事项，静心点击下方。&rdquo;
+                        </p>
+                      </div>
+                    )}
+
+                    {!isCasting && !isComplete && (
+                      <div className="lg:hidden w-full animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                        <div className="relative">
+                          <textarea
+                            ref={questionInputRef}
+                            value={question}
+                            onChange={(e) => handleQuestionChange(e.target.value)}
+                            placeholder="所占何事？在此处输入..."
+                            className={`w-full bg-white/40 backdrop-blur-sm border-0 border-b-2 rounded-t-lg px-4 py-3 text-base min-h-[64px] resize-none text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:outline-none transition-all ${
+                              questionError
+                                ? 'border-red-400 bg-red-50/20'
+                                : 'border-stone-200 focus:border-[#C82E31] focus:bg-white/60'
+                            }`}
+                          />
+                          {questionError && (
+                            <div className="absolute right-2 top-2 text-red-500 animate-pulse">
+                              <Feather className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      {isCasting && (
+                        <div className="absolute inset-0 bg-[#C82E31]/5 blur-3xl rounded-full animate-pulse"></div>
+                      )}
+
+                      <div className="bg-white/60 backdrop-blur-sm rounded-full p-4 sm:p-6 lg:p-16 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative z-10 transition-all duration-500">
+                        <DivinationCasting
+                          key={resetKey}
+                          divinationMethod={methodToNumber(divinationMethod)}
+                          onCastComplete={handleCastComplete}
+                          onStartCasting={startCasting}
+                        />
+                      </div>
+                    </div>
+
+                    {isComplete && lines.length === 6 && (
+                      <div className="flex flex-col items-center justify-center pt-4 lg:pt-8 space-y-4 lg:space-y-6 animate-in zoom-in-95 duration-500">
+                        <Button
+                          onClick={handleViewResult}
+                          className="h-12 lg:h-14 px-10 lg:px-12 text-base lg:text-lg font-serif tracking-widest bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-lg shadow-red-900/20 border-2 border-white ring-4 ring-[#C82E31]/10 transition-all hover:scale-105 active:scale-95"
+                        >
+                          查看排盘
+                        </Button>
+                        <button
+                          onClick={handleGoBack}
+                          className="flex items-center gap-2 text-sm text-stone-400 hover:text-stone-600 transition-colors font-serif group px-4 py-2 rounded-full hover:bg-stone-100"
+                        >
+                          <History className="w-4 h-4 group-hover:-rotate-180 transition-transform duration-500" />
+                          重新起卦
+                        </button>
                       </div>
                     )}
                   </div>
                 </div>
-              )}
-
-              {/* 核心摇卦组件容器：增加垫子/托盘的感觉 */}
-              <div className="relative">
-                {/* 光晕效果 */}
-                {isCasting && (
-                  <div className="absolute inset-0 bg-[#C82E31]/5 blur-3xl rounded-full animate-pulse"></div>
-                )}
-                
-                <div className="bg-white/60 backdrop-blur-sm rounded-full p-8 lg:p-16 border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative z-10 transition-all duration-500">
-                  <DivinationCasting
-                    key={resetKey}
-                    divinationMethod={methodToNumber(divinationMethod)}
-                    onCastComplete={handleCastComplete}
-                    onStartCasting={startCasting}
-                  />
-                </div>
-              </div>
-
-              {/* 结果操作区 */}
-              {isComplete && lines.length === 6 && (
-                <div className="flex flex-col items-center justify-center pt-8 space-y-6 animate-in zoom-in-95 duration-500">
-                  <Button
-                    onClick={handleViewResult}
-                    className="h-14 px-12 text-lg font-serif tracking-widest bg-[#C82E31] hover:bg-[#A61B1F] text-white rounded-full shadow-lg shadow-red-900/20 border-2 border-white ring-4 ring-[#C82E31]/10 transition-all hover:scale-105 active:scale-95"
-                  >
-                    查看排盘
-                  </Button>
-                  <button
-                    onClick={handleGoBack}
-                    className="flex items-center gap-2 text-sm text-stone-400 hover:text-stone-600 transition-colors font-serif group px-4 py-2 rounded-full hover:bg-stone-100"
-                  >
-                    <History className="w-4 h-4 group-hover:-rotate-180 transition-transform duration-500" />
-                    重新起卦
-                  </button>
-                </div>
-              )}
+              </main>
             </div>
           </div>
-          
-          {/* 底部版权/提示 */}
-          <div className="text-center pb-4 opacity-30 text-[10px] text-stone-500 font-serif">
-            易知 · 实证易学平台
-          </div>
-        </main>
-
-        {/* 右侧边栏 - 参数设置 */}
-        <aside className="hidden lg:block w-80 shrink-0 h-full overflow-y-auto bg-white/90 border-l border-stone-200/60 shadow-[ -1px_0_2px_rgba(0,0,0,0.02)] relative z-20 backdrop-blur-sm">
-          <div className="p-8 min-h-full">
-            <h2 className="text-lg font-serif font-bold text-stone-800 mb-8 flex items-center gap-2 select-none">
-              <Scroll className="w-5 h-5 text-[#C82E31]" />
-              <span>录入契文</span>
-            </h2>
-            <DivinationForm
-              question={question}
-              onQuestionChange={handleQuestionChange}
-              divinationTime={divinationTime}
-              onDateChange={handleDateChange}
-              divinationMethod={divinationMethod}
-              onDivinationMethodChange={setDivinationMethod}
-              questionError={questionError}
-            />
-          </div>
-        </aside>
+        </div>
 
         {/* 移动端设置抽屉 */}
         <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>

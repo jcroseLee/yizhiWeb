@@ -31,7 +31,18 @@ export function logError(message: string, error: any): void {
   }
   
   // 处理对象 - 只记录非空属性
-  if (typeof error === 'object') {
+  if (typeof error === 'object' && error !== null) {
+    // 快速检查：如果是空对象，直接进入警告流程
+    const errorKeys = Object.keys(error)
+    if (errorKeys.length === 0) {
+      console.warn(message + ' (收到空错误对象)', {
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        suggestion: '这可能是数据库连接问题或 RPC 函数不存在。请检查：1) 数据库连接是否正常 2) 相关数据库函数是否存在',
+      })
+      return
+    }
+    
     const errorInfo: Record<string, any> = {}
     
     // 收集所有可能的错误字段（包括 Supabase 错误字段）
@@ -98,9 +109,18 @@ export function logError(message: string, error: any): void {
       }
     }
     
+    // 过滤掉 undefined、null 和空字符串值，只保留有意义的错误信息
+    const filteredErrorInfo: Record<string, any> = {}
+    for (const [key, value] of Object.entries(errorInfo)) {
+      if (value !== undefined && value !== null && value !== '' && 
+          !(typeof value === 'object' && Object.keys(value).length === 0)) {
+        filteredErrorInfo[key] = value
+      }
+    }
+    
     // 只有当有实际内容时才记录
-    if (Object.keys(errorInfo).length > 0) {
-      console.error(message, errorInfo)
+    if (Object.keys(filteredErrorInfo).length > 0) {
+      console.error(message, filteredErrorInfo)
     } else {
       // 如果是完全空的对象，尝试记录原始对象的 stringify 结果
       try {

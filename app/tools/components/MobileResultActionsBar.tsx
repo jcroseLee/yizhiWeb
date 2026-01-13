@@ -94,27 +94,27 @@ export function MobileResultActionsBar({
   const isDisabled = (isSaved && !hasUnsavedChanges) || saving || loading
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] flex items-center gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-      <div className="flex items-center gap-4 flex-1 justify-between pr-4">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 px-[clamp(0.75rem,2vw,1rem)] py-[clamp(0.625rem,1.5vw,0.75rem)] pb-[calc(env(safe-area-inset-bottom)+clamp(0.625rem,1.5vw,0.75rem))] flex items-center gap-[clamp(0.5rem,2vw,1rem)] shadow-[0_-0.25rem_1.25rem_rgba(0,0,0,0.05)]">
+      <div className="flex items-center gap-[clamp(0.5rem,2vw,1rem)] flex-1 justify-between pr-[clamp(0.5rem,2vw,1rem)]">
         {/* 重排按钮 */}
         <Button 
           onClick={() => router.push(reroutePath)} 
           variant="ghost"
-          className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
+          className="flex flex-col items-center gap-[clamp(0.0625rem,0.2vw,0.125rem)] text-stone-500 active:scale-95 transition-transform h-auto p-0"
         >
-          <RotateCcw className="w-5 h-5" />
-          <span className="text-[10px] font-medium">重排</span>
+          <RotateCcw className="w-[clamp(1rem,4vw,1.25rem)] h-[clamp(1rem,4vw,1.25rem)]" />
+          <span className="text-[clamp(0.5rem,2.5vw,0.625rem)] font-medium leading-tight">重排</span>
         </Button>
 
         {/* 保存按钮 */}
         <Button 
           onClick={onSave} 
           variant="ghost"
-          className={`flex flex-col items-center gap-0.5 active:scale-95 transition-transform h-auto p-0 ${isSaved && !hasUnsavedChanges ? 'text-green-600' : 'text-stone-500'}`}
+          className={`flex flex-col items-center gap-[clamp(0.0625rem,0.2vw,0.125rem)] active:scale-95 transition-transform h-auto p-0 ${isSaved && !hasUnsavedChanges ? 'text-green-600' : 'text-stone-500'}`}
           disabled={isDisabled}
         >
-          <Save className="w-5 h-5" />
-          <span className="text-[10px] font-medium">{isSaved && !hasUnsavedChanges ? '已存' : '保存'}</span>
+          <Save className="w-[clamp(1rem,4vw,1.25rem)] h-[clamp(1rem,4vw,1.25rem)]" />
+          <span className="text-[clamp(0.5rem,2.5vw,0.625rem)] font-medium leading-tight">{isSaved && !hasUnsavedChanges ? '已存' : '保存'}</span>
         </Button>
 
         {/* 笔记按钮 */}
@@ -122,10 +122,10 @@ export function MobileResultActionsBar({
           <Button 
             onClick={handleScrollToNotes} 
             variant="ghost"
-            className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
+            className="flex flex-col items-center gap-[clamp(0.0625rem,0.2vw,0.125rem)] text-stone-500 active:scale-95 transition-transform h-auto p-0"
           >
-            <BookOpen className="w-5 h-5" />
-            <span className="text-[10px] font-medium">笔记</span>
+            <BookOpen className="w-[clamp(1rem,4vw,1.25rem)] h-[clamp(1rem,4vw,1.25rem)]" />
+            <span className="text-[clamp(0.5rem,2.5vw,0.625rem)] font-medium leading-tight">笔记</span>
           </Button>
         )}
 
@@ -134,11 +134,11 @@ export function MobileResultActionsBar({
           <Button 
             onClick={onPublish} 
             variant="ghost"
-            className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0" 
+            className="flex flex-col items-center gap-[clamp(0.0625rem,0.2vw,0.125rem)] text-stone-500 active:scale-95 transition-transform h-auto p-0" 
             disabled={saving}
           >
-            <Send className="w-5 h-5" />
-            <span className="text-[10px] font-medium">发布</span>
+            <Send className="w-[clamp(1rem,4vw,1.25rem)] h-[clamp(1rem,4vw,1.25rem)]" />
+            <span className="text-[clamp(0.5rem,2.5vw,0.625rem)] font-medium leading-tight">发布</span>
           </Button>
         )}
 
@@ -146,10 +146,10 @@ export function MobileResultActionsBar({
         <Button 
           onClick={handleShare} 
           variant="ghost"
-          className="flex flex-col items-center gap-0.5 text-stone-500 active:scale-95 transition-transform h-auto p-0"
+          className="flex flex-col items-center gap-[clamp(0.0625rem,0.2vw,0.125rem)] text-stone-500 active:scale-95 transition-transform h-auto p-0"
         >
-          <Share2 className="w-5 h-5" />
-          <span className="text-[10px] font-medium">分享</span>
+          <Share2 className="w-[clamp(1rem,4vw,1.25rem)] h-[clamp(1rem,4vw,1.25rem)]" />
+          <span className="text-[clamp(0.5rem,2.5vw,0.625rem)] font-medium leading-tight">分享</span>
         </Button>
       </div>
 

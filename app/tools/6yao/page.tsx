@@ -158,6 +158,10 @@ const styles = `
   #app-scroll-container {
     overflow: hidden !important;
   }
+
+  html, body {
+    overflow: hidden !important;
+  }
 `
 
 // 类型定义
@@ -458,7 +462,7 @@ export default function ToolsPage() {
               transformOrigin: 'center center',
             }}
           >
-            <div ref={mainScaleTargetRef} className="w-[min(56rem,calc(100vw-24px))]">
+            <div ref={mainScaleTargetRef} className="w-[min(56rem,100vw)]">
               <main className="overflow-visible overflow-x-hidden relative flex flex-col py-16 sm:py-20 lg:py-24">
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
                   <svg width="950" height="950" viewBox="0 0 950 950" className="opacity-[0.05] animate-[spin_60s_linear_infinite]">

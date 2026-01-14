@@ -69,8 +69,22 @@ export async function getNotifications(
     const { data, error } = await query
 
     if (error) {
-      logError('Error fetching notifications:', error)
-      throw error
+      // 检查错误对象是否有实际内容
+      const hasErrorContent = error && (
+        error.message || 
+        error.code || 
+        error.details || 
+        error.hint ||
+        (typeof error === 'object' && Object.keys(error).length > 0)
+      )
+      
+      if (hasErrorContent) {
+        logError('Error fetching notifications:', error)
+        throw error
+      } else {
+        // 如果是空错误对象，只记录警告，不抛出异常
+        console.warn('Received empty error object from notifications query, treating as no error')
+      }
     }
 
     if (!data || data.length === 0) {

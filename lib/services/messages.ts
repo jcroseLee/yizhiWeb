@@ -310,10 +310,66 @@ export async function sendMessage(
       .single()
 
     if (error) {
-      logError('Error sending message:', error)
+      logError('Error sending message:', {
+        senderId: user.id,
+        receiverId,
+        messageType,
+        hasMetadata: !!metadata,
+        metadataKeys: metadata ? Object.keys(metadata) : undefined,
+        fullError: error,
+      })
       // 提供更详细的错误信息
-      const errorMessage = error.message || error.details || JSON.stringify(error) || '发送消息失败'
-      throw new Error(`发送消息失败: ${errorMessage}`)
+      const getStringField = (obj: unknown, field: string): string | undefined => {
+        if (!obj || typeof obj !== 'object') return undefined
+        try {
+          const value = (obj as Record<string, unknown>)[field]
+          return typeof value === 'string' ? value : undefined
+        } catch {
+          return undefined
+        }
+      }
+
+      let errorMessage: string | undefined = getStringField(error, 'message')
+      if (!errorMessage) errorMessage = getStringField(error, 'details')
+      if (!errorMessage) errorMessage = getStringField(error, 'hint')
+      
+      // 如果错误对象是空的，提供更具体的错误信息
+      if (!errorMessage) {
+        let errorString: string | null = null
+        try {
+          const seen = new WeakSet<object>()
+          errorString = JSON.stringify(error, (_k, v: unknown) => {
+            if (typeof v === 'object' && v !== null) {
+              if (seen.has(v)) return '[Circular]'
+              seen.add(v)
+            }
+            if (typeof v === 'bigint') return v.toString()
+            if (typeof v === 'function') {
+              const fnNameRaw = (v as { name?: unknown }).name
+              const fnName = typeof fnNameRaw === 'string' ? fnNameRaw : ''
+              return `[Function${fnName ? `: ${fnName}` : ''}]`
+            }
+            if (typeof v === 'symbol') return v.toString()
+            return v
+          })
+        } catch {
+          errorString = null
+        }
+
+        if (!errorString || errorString === '{}' || errorString === 'null') {
+          const keys =
+            error && typeof error === 'object' ? Object.getOwnPropertyNames(error) : []
+          if (keys.length > 0) {
+            errorMessage = `错误对象无可用消息字段（字段: ${keys.join(', ')}）`
+          } else {
+            errorMessage = '数据库返回了空错误对象，可能是数据库连接问题或表结构问题'
+          }
+        } else {
+          errorMessage = errorString
+        }
+      }
+      
+      throw new Error(`发送消息失败: ${errorMessage || '未知错误'}`)
     }
 
     if (!data) {
@@ -515,4 +571,3 @@ export function subscribeToConversations(callback: () => void) {
     supabase.removeChannel(channel)
   }
 }
-

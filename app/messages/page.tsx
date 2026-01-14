@@ -1,55 +1,57 @@
 'use client'
 
+import { EmojiPicker } from '@/lib/components/EmojiPicker'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from '@/lib/components/ui/dropdown-menu'
 import { Input } from '@/lib/components/ui/input'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import { Separator } from '@/lib/components/ui/separator'
 import { Textarea } from '@/lib/components/ui/textarea'
+import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { getPost, type Comment as CommentType, type Post } from '@/lib/services/community'
 import {
-  getConversations,
-  getMessages,
-  markMessagesAsRead,
-  sendMessage,
-  setConversationSetting,
-  subscribeToConversations,
-  subscribeToMessages,
-  type Conversation as ConversationType,
-  type Message as MessageType
+    getConversations,
+    getMessages,
+    markMessagesAsRead,
+    sendMessage,
+    setConversationSetting,
+    subscribeToConversations,
+    subscribeToMessages,
+    type Conversation as ConversationType,
+    type Message as MessageType
 } from '@/lib/services/messages'
 import {
-  getNotifications,
-  markNotificationAsRead,
-  subscribeToNotifications,
-  type Notification as NotificationType
+    getNotifications,
+    markNotificationAsRead,
+    subscribeToNotifications,
+    type Notification as NotificationType
 } from '@/lib/services/notifications'
 import { getUserProfileById } from '@/lib/services/profile'
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
 import { cn } from '@/lib/utils/cn'
+import { logError } from '@/lib/utils/errorLogger'
 import {
-  ArrowLeft,
-  Bell,
-  CheckCheck,
-  Heart,
-  Image as ImageIcon,
-  MoreHorizontal,
-  Pin,
-  PinOff,
-  Search,
-  Smile,
-  ThumbsUp,
-  User,
-  Volume2,
-  VolumeX
+    ArrowLeft,
+    Bell,
+    CheckCheck,
+    Heart,
+    Image as ImageIcon,
+    MoreHorizontal,
+    Pin,
+    PinOff,
+    Search,
+    ThumbsUp,
+    User,
+    Volume2,
+    VolumeX
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -65,44 +67,28 @@ const styles = `
   .chat-bubble-me {
     background: linear-gradient(135deg, #1c1917 0%, #292524 100%);
     color: white;
-    border-radius: 18px 18px 4px 18px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 1.125rem 1.125rem 0.25rem 1.125rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.1);
   }
   
   .chat-bubble-other {
     background-color: white;
     color: #1c1917;
-    border-radius: 18px 18px 18px 4px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    border: 1px solid #f0f0f0;
+    border-radius: 1.125rem 1.125rem 1.125rem 0.25rem;
+    box-shadow: 0 0.0625rem 0.125rem rgba(0,0,0,0.05);
+    border: 0.0625rem solid #f0f0f0;
   }
 
   /* 列表项激活态 */
   .chat-item-active {
     background-color: #ffffff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    border-left: 3px solid #C82E31;
-  }
-  
-  /* 移动端视图切换动画 */
-  .mobile-slide-enter {
-    transform: translateX(100%);
-  }
-  .mobile-slide-enter-active {
-    transform: translateX(0);
-    transition: transform 0.3s ease-in-out;
-  }
-  .mobile-slide-exit {
-    transform: translateX(0);
-  }
-  .mobile-slide-exit-active {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
+    box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.04);
+    border-left: 0.1875rem solid #C82E31;
   }
 
-  .custom-scroll::-webkit-scrollbar { width: 4px; }
+  .custom-scroll::-webkit-scrollbar { width: 0.25rem; }
   .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-  .custom-scroll::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 10px; }
+  .custom-scroll::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 0.625rem; }
 `
 
 // --- 辅助函数 (保持不变) ---
@@ -188,7 +174,7 @@ const NotificationCard = ({
               {notify.type === 'follow' && '关注了你'}
             </span>
           </div>
-          <span className="text-[10px] text-stone-400 shrink-0">
+          <span className="text-[0.625rem] text-stone-400 shrink-0">
             {formatTime(notify.created_at)}
           </span>
         </div>
@@ -219,6 +205,7 @@ const NotificationCard = ({
 function MessagesPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
   const [user, setUser] = useState<{ id: string } | null>(null)
   
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
@@ -229,6 +216,8 @@ function MessagesPageContent() {
   const [inputText, setInputText] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [conversations, setConversations] = useState<ConversationType[]>([])
   const [messages, setMessages] = useState<MessageType[]>([])
@@ -343,7 +332,8 @@ function MessagesPageContent() {
         }
       }
     } catch (error) { 
-      console.error(error)
+      // 使用统一的错误日志函数，避免记录空错误对象
+      logError('Failed to load notifications:', error)
     } finally {
       setNotificationsLoading(false)
     }
@@ -430,9 +420,126 @@ function MessagesPageContent() {
 
   const handleBackToList = () => {
     setShowMobileChat(false)
-    // 可选：是否要在返回时清除当前选中状态？保持选中可能体验更好
-    // setActiveChatId(null) 
   }
+
+  // 上传图片函数
+  const uploadImage = useCallback(async (file: File): Promise<string> => {
+    const user = await getCurrentUser()
+    if (!user) {
+      throw new Error('请先登录')
+    }
+
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      // 如果没有 Supabase，使用 base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string
+          resolve(base64)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+
+    try {
+      // 验证文件类型
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('不支持的文件类型，请上传 JPEG、PNG、WebP 或 GIF 格式的图片')
+      }
+
+      // 验证文件大小（5MB）
+      const maxSize = 5 * 1024 * 1024
+      if (file.size > maxSize) {
+        throw new Error('文件大小不能超过 5MB')
+      }
+
+      // 生成文件名：userId/messages/timestamp.extension
+      const fileExt = file.name.split('.').pop() || 'jpg'
+      const fileName = `${user.id}/messages/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+
+      // 上传文件到 posts bucket（如果不存在则使用 avatars）
+      const { error } = await supabase.storage
+        .from('posts')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (error) {
+        // 如果 posts bucket 不存在或没有权限，尝试使用 avatars bucket
+        const { error: fallbackError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (fallbackError) {
+          if (fallbackError.message?.includes('Bucket not found') || fallbackError.message?.includes('bucket')) {
+            throw new Error('存储桶未创建。请在 Supabase Dashboard 中创建 "posts" 和 "avatars" 存储桶，或运行数据库迁移。')
+          }
+          throw fallbackError
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName)
+
+        return urlData.publicUrl
+      }
+
+      // 获取公开 URL
+      const { data: urlData } = supabase.storage
+        .from('posts')
+        .getPublicUrl(fileName)
+
+      return urlData.publicUrl
+    } catch (error: unknown) {
+      console.error('Error uploading image:', error)
+      const errorMessage = error instanceof Error ? error.message : '上传失败'
+      throw new Error(errorMessage)
+    }
+  }, [])
+
+  // 处理图片选择
+  const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0 || !activeChatId || activeChatType !== 'private') return
+
+    const file = files[0]
+    setUploadingImage(true)
+    try {
+      const imageUrl = await uploadImage(file)
+      // 发送图片消息
+      // 注意：message_type 必须是 'chat' 或 'system' 以符合数据库约束
+      // 图片类型通过 metadata.type = 'image' 来标识
+      const msg = await sendMessage(activeChatId, '[图片]', 'chat', { type: 'image', image_url: imageUrl })
+      setMessages(prev => [...prev, msg])
+      setTimeout(loadConversations, 300)
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    } catch (error) {
+      console.error('上传图片失败:', error)
+      toast({
+        title: '上传失败',
+        description: error instanceof Error ? error.message : '上传图片失败',
+        variant: 'destructive'
+      })
+    } finally {
+      setUploadingImage(false)
+      // 重置文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }, [activeChatId, activeChatType, uploadImage, loadConversations])
+
+  // 处理表情选择
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    setInputText(prev => prev + emoji)
+  }, [])
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !activeChatId || activeChatType !== 'private' || sending) return
@@ -562,7 +669,7 @@ function MessagesPageContent() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <span className="text-sm font-bold text-stone-800">{title}</span>
-                        <span className="text-[10px] text-stone-400">{formatTime(msg.created_at)}</span>
+                        <span className="text-[0.625rem] text-stone-400">{formatTime(msg.created_at)}</span>
                       </div>
                       <p className="text-sm text-stone-600 mt-1">{msg.content}</p>
                     </div>
@@ -602,17 +709,36 @@ function MessagesPageContent() {
             {messages.map((msg, index) => {
               const isMe = msg.sender_id === user?.id
               const showTime = index === 0 || new Date(msg.created_at).getTime() - new Date(messages[index-1].created_at).getTime() > 5 * 60 * 1000
+              
+              // 判断是否为图片消息：兼容旧数据 (message_type='image') 和新数据 (metadata.type='image')
+              const metadata = msg.metadata as Record<string, unknown> | null
+              const isImageMessage = msg.message_type === 'image' || (metadata?.type === 'image') || (metadata?.image_url && msg.content === '[图片]')
+              const imageUrl = isImageMessage && metadata ? metadata['image_url'] as string : undefined
+
               return (
                 <div key={msg.id}>
-                  {showTime && <div className="flex justify-center my-4"><span className="text-[10px] text-stone-400 bg-stone-200/50 px-2 py-0.5 rounded-full">{formatMessageTime(msg.created_at)}</span></div>}
+                  {showTime && <div className="flex justify-center my-4"><span className="text-[0.625rem] text-stone-400 bg-stone-200/50 px-2 py-0.5 rounded-full">{formatMessageTime(msg.created_at)}</span></div>}
                   <div className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} mb-2`}>
                     <Avatar className="w-8 h-8 md:w-9 md:h-9 border border-stone-100 shadow-sm shrink-0">
                       <AvatarImage src={msg.sender?.avatar_url || undefined} />
                       <AvatarFallback className={`text-xs ${isMe ? 'bg-stone-800 text-white' : 'bg-white text-stone-600'}`}>{isMe ? '我' : msg.sender?.nickname?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
-                      <div className={`px-4 py-2.5 text-sm leading-relaxed ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'}`}>{msg.content}</div>
-                      {isMe && <div className="flex items-center gap-1 mt-1 mr-1 opacity-60"><span className="text-[10px] text-stone-400">{msg.is_read ? '已读' : '送达'}</span>{msg.is_read && <CheckCheck className="w-3 h-3 text-[#C82E31]" />}</div>}
+                      {isImageMessage && imageUrl ? (
+                        <div className={`px-2 py-2 ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'} rounded-lg`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={imageUrl} 
+                            alt="图片" 
+                            className="max-w-[200px] max-h-[300px] rounded-lg object-cover cursor-pointer"
+                            loading="lazy"
+                            onClick={() => window.open(imageUrl, '_blank')}
+                          />
+                        </div>
+                      ) : (
+                        <div className={`px-4 py-2.5 text-sm leading-relaxed ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'}`}>{msg.content}</div>
+                      )}
+                      {isMe && <div className="flex items-center gap-1 mt-1 mr-1 opacity-60"><span className="text-[0.625rem] text-stone-400">{msg.is_read ? '已读' : '送达'}</span>{msg.is_read && <CheckCheck className="w-3 h-3 text-[#C82E31]" />}</div>}
                     </div>
                   </div>
                 </div>
@@ -628,19 +754,32 @@ function MessagesPageContent() {
              <Textarea 
                 value={inputText} onChange={e => setInputText(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage() } }}
-                className="flex-1 border-none shadow-none resize-none p-3 min-h-[40px] max-h-[120px] text-sm custom-scroll bg-transparent focus-visible:ring-0" 
+                className="flex-1 border-none shadow-none resize-none p-3 min-h-[2.5rem] max-h-[7.5rem] text-sm custom-scroll bg-transparent focus-visible:ring-0" 
                 placeholder="发送消息..." 
                 disabled={sending}
                 rows={1}
             />
             <div className="flex justify-between items-center px-2 pb-2">
                 <div className="flex items-center gap-3 text-stone-400">
-                    <Smile className="w-5 h-5 cursor-pointer hover:text-stone-600 transition-colors" />
-                    <ImageIcon className="w-5 h-5 cursor-pointer hover:text-stone-600 transition-colors" />
+                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <ImageIcon 
+                      className="w-5 h-5 cursor-pointer hover:text-stone-600 transition-colors" 
+                      onClick={() => fileInputRef.current?.click()}
+                    />
+                    {uploadingImage && (
+                      <span className="text-xs text-stone-500">上传中...</span>
+                    )}
                 </div>
                 <Button 
                     onClick={handleSendMessage} 
-                    disabled={sending || !inputText.trim()} 
+                    disabled={sending || uploadingImage || !inputText.trim()} 
                     size="sm" 
                     className="h-7 px-4 bg-[#1c1917] hover:bg-[#333] text-white text-xs rounded-full transition-all"
                 >
@@ -654,7 +793,17 @@ function MessagesPageContent() {
   }
 
   // --- 移动端视图控制 ---
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
   const showList = !isMobile || !showMobileChat
   const showDetail = !isMobile || showMobileChat
 
@@ -662,7 +811,7 @@ function MessagesPageContent() {
     <>
       <style jsx global>{styles}</style>
       
-      <div className="h-[calc(100vh-64px)] max-md:h-[calc(100dvh-56px)] w-full paper-texture font-sans text-stone-800 flex justify-center p-0 md:p-6 lg:p-8">
+      <div className="absolute inset-0 paper-texture font-sans text-stone-800 flex justify-center p-0 md:p-6 lg:p-8 overflow-hidden">
         <Card className="w-full max-w-6xl h-full flex overflow-hidden border-stone-200 shadow-2xl bg-white/50 backdrop-blur-sm rounded-none md:rounded-2xl border-0 md:border">
           
           {/* 左侧列表 (移动端：showList时显示) */}
@@ -689,7 +838,7 @@ function MessagesPageContent() {
                 >
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white relative bg-gradient-to-br from-amber-400 to-orange-500 shadow-sm shrink-0">
                     <Heart size={20} fill="currentColor" className="opacity-90" />
-                    {unreadSocialCount > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-[#FA5151] rounded-full text-[10px] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{unreadSocialCount > 99 ? '99+' : unreadSocialCount}</span>}
+                    {unreadSocialCount > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] bg-[#FA5151] rounded-full text-[0.625rem] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{unreadSocialCount > 99 ? '99+' : unreadSocialCount}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center mb-0.5">
@@ -707,7 +856,7 @@ function MessagesPageContent() {
                 >
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white relative bg-gradient-to-br from-blue-400 to-indigo-500 shadow-sm shrink-0">
                     <Bell size={20} fill="currentColor" className="opacity-90" />
-                    {unreadSystemCount > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-[#FA5151] rounded-full text-[10px] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{unreadSystemCount > 99 ? '99+' : unreadSystemCount}</span>}
+                    {unreadSystemCount > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] bg-[#FA5151] rounded-full text-[0.625rem] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{unreadSystemCount > 99 ? '99+' : unreadSystemCount}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center mb-0.5">
@@ -732,13 +881,13 @@ function MessagesPageContent() {
                           <AvatarImage src={chat.other_user?.avatar_url || undefined} />
                           <AvatarFallback className="bg-stone-200 text-stone-500">{chat.other_user?.nickname?.[0]}</AvatarFallback>
                       </Avatar>
-                      {chat.unread_count > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-[#FA5151] text-white rounded-full text-[10px] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{chat.unread_count}</span>}
+                      {chat.unread_count > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[1.125rem] h-[1.125rem] bg-[#FA5151] text-white rounded-full text-[0.625rem] flex items-center justify-center border-2 border-[#F9F9F9] px-1">{chat.unread_count}</span>}
                       {chat.is_pinned && <div className="absolute -bottom-1 -left-1 bg-stone-100 rounded-full p-0.5 border border-white"><Pin className="w-2.5 h-2.5 text-stone-400" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline mb-0.5">
                           <span className="text-sm font-bold text-stone-800 truncate">{chat.other_user?.nickname}</span>
-                          <span className="text-[10px] text-stone-400">{formatTime(chat.last_message_created_at)}</span>
+                          <span className="text-[0.625rem] text-stone-400">{formatTime(chat.last_message_created_at)}</span>
                       </div>
                       <p className="text-xs text-stone-500 truncate">{chat.last_message_content || '图片'}</p>
                     </div>

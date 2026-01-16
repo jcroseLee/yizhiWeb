@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/ta
 import { RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId } from '@/lib/constants/divination'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
+import { trackEvent } from '@/lib/analytics'
 import { getCurrentUser } from '@/lib/services/auth'
 import { deleteDraft, deletePost, getUserDrafts, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
@@ -285,7 +286,14 @@ function ProfilePageContent() {
       const result = await checkIn()
       if (result.success) {
         setHasCheckedIn(true); const [growthData, transactions] = await Promise.all([getUserGrowth(), getCoinTransactions(100)])
-        if (growthData) setGrowth({ level: growthData.level, titleName: growthData.titleName, yiCoins: growthData.yiCoins, exp: growthData.exp, reputation: growthData.reputation })
+        const prevLevel = growth?.level ?? null
+        if (growthData) {
+          setGrowth({ level: growthData.level, titleName: growthData.titleName, yiCoins: growthData.yiCoins, exp: growthData.exp, reputation: growthData.reputation })
+          trackEvent('user_checkin', { consecutive_days: growthData.consecutiveCheckinDays })
+          if (typeof prevLevel === 'number' && growthData.level > prevLevel) {
+            trackEvent('user_level_up', { new_level: growthData.level, title_name: growthData.titleName })
+          }
+        }
         setCoinTransactions(transactions); toast({ title: result.message })
       } else { toast({ title: '签到失败', description: result.message, variant: 'destructive' }) }
     } catch { toast({ title: '签到失败', variant: 'destructive' }) } finally { setCheckingIn(false) }

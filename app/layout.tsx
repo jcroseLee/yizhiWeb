@@ -1,4 +1,5 @@
 import ConditionalLayout from "@/lib/components/ConditionalLayout";
+import { AnalyticsProvider } from "@/lib/components/AnalyticsProvider";
 import { ToastProviderWrapper } from "@/lib/components/ToastProviderWrapper";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="zh-CN" className="h-full">
       <body className="antialiased min-h-screen h-full relative overflow-x-hidden">
         <ToastProviderWrapper>
+          <AnalyticsProvider />
           {/* 背景遮罩层，确保内容可读性（新中式宣纸效果） */}
           <div className="fixed inset-0 -z-10 bg-white pointer-events-none" />
           

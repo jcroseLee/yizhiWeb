@@ -1,3 +1,4 @@
+import { trackEvent } from '@/lib/analytics'
 import { logError } from '../utils/errorLogger'
 import { getCurrentUser } from './auth'
 import { getSupabaseClient } from './supabaseClient'
@@ -1215,6 +1216,11 @@ export async function togglePostLike(postId: string): Promise<boolean> {
       console.error('Error unliking post:', JSON.stringify(error, null, 2))
       throw error
     }
+    trackEvent('post_interaction', {
+      action_type: 'unlike',
+      target_id: postId,
+      target_type: 'post',
+    })
     return false
   } else {
     // 点赞
@@ -1228,6 +1234,11 @@ export async function togglePostLike(postId: string): Promise<boolean> {
     if (error) {
       // Handle race condition: if already liked (unique violation), consider it a success
       if (error.code === '23505') {
+        trackEvent('post_interaction', {
+          action_type: 'like',
+          target_id: postId,
+          target_type: 'post',
+        })
         return true
       }
       console.error('Error liking post:', JSON.stringify(error, null, 2))
@@ -1243,6 +1254,11 @@ export async function togglePostLike(postId: string): Promise<boolean> {
       console.error('Failed to add exp for post like:', error)
     }
 
+    trackEvent('post_interaction', {
+      action_type: 'like',
+      target_id: postId,
+      target_type: 'post',
+    })
     return true
   }
 }
@@ -1281,6 +1297,11 @@ export async function togglePostFavorite(postId: string): Promise<boolean> {
       console.error('Error unfavoriting post:', error)
       throw error
     }
+    trackEvent('post_interaction', {
+      action_type: 'unfavorite',
+      target_id: postId,
+      target_type: 'post',
+    })
     return false
   } else {
     // 收藏
@@ -1294,12 +1315,22 @@ export async function togglePostFavorite(postId: string): Promise<boolean> {
     if (error) {
       // Handle race condition: if already favorited (unique violation), consider it a success
       if (error.code === '23505') {
+        trackEvent('post_interaction', {
+          action_type: 'favorite',
+          target_id: postId,
+          target_type: 'post',
+        })
         return true
       }
       console.error('Error favoriting post:', JSON.stringify(error, null, 2))
       throw error
     }
 
+    trackEvent('post_interaction', {
+      action_type: 'favorite',
+      target_id: postId,
+      target_type: 'post',
+    })
     return true
   }
 }
@@ -1545,6 +1576,12 @@ export async function createComment(
     console.error('Failed to add exp for comment creation:', error)
   }
 
+  trackEvent('post_interaction', {
+    action_type: 'comment',
+    target_id: input.post_id,
+    comment_id: data.id,
+  })
+
   return {
     ...data,
     author,
@@ -1625,6 +1662,11 @@ export async function toggleCommentLike(commentId: string): Promise<boolean> {
       console.error('Error unliking comment:', error)
       throw error
     }
+    trackEvent('post_interaction', {
+      action_type: 'unlike',
+      target_id: commentId,
+      target_type: 'comment',
+    })
     return false
   } else {
     // 点赞
@@ -1638,6 +1680,11 @@ export async function toggleCommentLike(commentId: string): Promise<boolean> {
     if (error) {
       // Handle race condition: if already liked (unique violation), consider it a success
       if (error.code === '23505') {
+        trackEvent('post_interaction', {
+          action_type: 'like',
+          target_id: commentId,
+          target_type: 'comment',
+        })
         return true
       }
       console.error('Error liking comment:', JSON.stringify(error, null, 2))
@@ -1656,6 +1703,11 @@ export async function toggleCommentLike(commentId: string): Promise<boolean> {
       }
     }
 
+    trackEvent('post_interaction', {
+      action_type: 'like',
+      target_id: commentId,
+      target_type: 'comment',
+    })
     return true
   }
 }

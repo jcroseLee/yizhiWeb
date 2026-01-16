@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       pendingReports,
       newCasesToday,
       trendPosts,
+      analytics,
     ] = await Promise.all([
       ctx.supabase.from('profiles').select('*', { count: 'exact', head: true }),
       ctx.supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
@@ -64,6 +65,7 @@ export async function GET(req: NextRequest) {
       ctx.supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ctx.supabase.from('case_metadata').select('*', { count: 'exact', head: true }).gte('archived_at', todayStart),
       ctx.supabase.from('posts').select('created_at, user_id').gte('created_at', trendStart).limit(50000),
+      ctx.supabase.rpc('cms_analytics_dashboard', { days: 7 }),
     ])
 
     const responses = [
@@ -76,10 +78,13 @@ export async function GET(req: NextRequest) {
       pendingReports,
       newCasesToday,
       trendPosts,
+      analytics,
     ]
     for (const r of responses) {
       if ((r as any).error) {
-        return NextResponse.json({ error: (r as any).error.message }, { headers: { ...corsHeaders }, status: 500 })
+        const error = (r as any).error
+        if (r === analytics) break
+        return NextResponse.json({ error: error.message }, { headers: { ...corsHeaders }, status: 500 })
       }
     }
 
@@ -123,6 +128,7 @@ export async function GET(req: NextRequest) {
           new_cases_today: newCasesToday.count || 0,
           pending_reports: pendingReports.count || 0,
         },
+        analytics: (analytics as any).error ? null : (analytics as any).data,
         trend,
       },
       { headers: { ...corsHeaders }, status: 200 }
@@ -134,4 +140,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-

@@ -2,53 +2,56 @@
 
 import { toPng } from 'html-to-image'
 import {
-  ArrowLeft,
-  ArrowRight,
-  Calendar,
-  Check,
-  ChevronDown, ChevronUp,
-  CloudFog,
-  Loader2,
-  Moon,
-  PenLine,
-  RefreshCw,
-  RotateCcw,
-  Sparkles,
-  Sun,
-  X,
-  Zap
+    ArrowLeft,
+    ArrowRight,
+    Calendar,
+    Check,
+    ChevronDown, ChevronUp,
+    CloudFog,
+    Loader2,
+    Moon,
+    PenLine,
+    RefreshCw,
+    RotateCcw,
+    Sparkles,
+    Sun,
+    ThumbsDown,
+    ThumbsUp,
+    X,
+    Zap
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
+import { trackEvent } from '@/lib/analytics'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import {
-  LINE_LABELS,
-  RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
+    LINE_LABELS,
+    RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
-  addDivinationNote,
-  getDivinationNotes,
-  getDivinationRecordById,
-  saveDivinationRecord,
-  updateDivinationNote,
-  updateDivinationQuestion,
-  type DivinationNote
+    addDivinationNote,
+    getDivinationNotes,
+    getDivinationRecordById,
+    saveDivinationRecord,
+    updateDivinationNote,
+    updateDivinationQuestion,
+    type DivinationNote
 } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
 import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
@@ -177,12 +180,15 @@ function ResultPageContent() {
   const [aiStreamContent, setAiStreamContent] = useState('')
   const [isAiStreaming, setIsAiStreaming] = useState(false)
   const [aiStreamError, setAiStreamError] = useState<Error | null>(null)
+  const [aiFeedback, setAiFeedback] = useState<'good' | 'bad' | null>(null)
+  const [submittingAiFeedback, setSubmittingAiFeedback] = useState(false)
   const aiAbortControllerRef = useRef<AbortController | null>(null)
   const aiIdempotencyKeyRef = useRef<string | null>(null)
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
   const shareImageRef = useRef<HTMLDivElement>(null)
+  const resultViewTrackedRef = useRef<string | null>(null)
   
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
@@ -553,11 +559,40 @@ function ResultPageContent() {
     setAiResultAt(new Date().toISOString());
   }, [recordIdForAi]);
 
+  const submitAiFeedback = useCallback(async (rating: 'good' | 'bad') => {
+    if (submittingAiFeedback) return
+    setSubmittingAiFeedback(true)
+    try {
+      const session = await getSession()
+      const token = session?.access_token
+      if (!token) return
+      const recordId = recordIdForAi || normalizedResultId
+      setAiFeedback(rating)
+      trackEvent('ai_feedback', { rating, record_id: recordId, divination_type: 'liuyao' })
+      await fetch('/api/ai/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          rating,
+          record_id: recordId,
+          divination_type: 'liuyao',
+        }),
+      })
+    } finally {
+      setSubmittingAiFeedback(false)
+    }
+  }, [recordIdForAi, normalizedResultId, submittingAiFeedback])
+
   const startAiAnalysis = useCallback(async () => {
     if (!calculatedData) {
         console.warn('Cannot analyze: guaData is missing');
         return;
     }
+
+    const startedAt = Date.now()
 
     // Abort previous request if any
     aiAbortControllerRef.current?.abort();
@@ -636,6 +671,12 @@ function ResultPageContent() {
       // Analysis complete
       setIsAiStreaming(false);
       persistAiResult(accumulatedContent);
+      trackEvent('ai_response_complete', {
+        latency: Date.now() - startedAt,
+        token_usage: null,
+        content_length: accumulatedContent.length,
+        divination_type: 'liuyao',
+      })
       
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -645,6 +686,10 @@ function ResultPageContent() {
       console.error('AI Analysis Error:', err);
       setAiStreamError(err);
       setIsAiStreaming(false);
+      trackEvent('ai_analysis_error', {
+        error: err instanceof Error ? err.message : String(err),
+        divination_type: 'liuyao',
+      })
     }
   }, [calculatedData, question, persistAiResult]);
 
@@ -655,6 +700,7 @@ function ResultPageContent() {
       handleLoginRedirect()
       return
     }
+    trackEvent('ai_analysis_click', { source: 'mobile_bar', divination_type: 'liuyao' })
 
     if (aiResult) {
       if (isSaved && !isAuthor) {
@@ -694,6 +740,7 @@ function ResultPageContent() {
     handleLoginRedirect,
     handleScrollToResult,
     startAiAnalysis,
+    trackEvent,
   ])
 
   const handleConfirmSaveForAi = async () => {
@@ -782,7 +829,12 @@ function ResultPageContent() {
 
     // 打开对话框
     setShareDialogOpen(true)
-  }, [calculatedData, payload, toast])
+    trackEvent('tool_result_share', {
+      share_channel: 'share_dialog',
+      has_ai_content: !!aiResult,
+      type: 'liuyao',
+    })
+  }, [calculatedData, payload, toast, aiResult])
 
   const handleDownloadAndShareImage = useCallback(async () => {
     if (!shareImageRef.current || !calculatedData) return
@@ -812,6 +864,11 @@ function ResultPageContent() {
             files: [file],
           })
           toast({ title: '分享成功', description: '图片已分享' })
+          trackEvent('tool_result_share', {
+            share_channel: 'native_share',
+            has_ai_content: !!aiResult,
+            type: 'liuyao',
+          })
           setShareDialogOpen(false)
           return
         } catch (shareError: any) {
@@ -834,6 +891,11 @@ function ResultPageContent() {
         title: '下载成功',
         description: '分享图已保存到本地',
       })
+      trackEvent('tool_result_share', {
+        share_channel: 'download',
+        has_ai_content: !!aiResult,
+        type: 'liuyao',
+      })
       setShareDialogOpen(false)
     } catch (error) {
       console.error('Failed to generate share image:', error)
@@ -845,7 +907,19 @@ function ResultPageContent() {
     } finally {
       setDownloading(false)
     }
-  }, [question, calculatedData, toast])
+  }, [question, calculatedData, toast, aiResult])
+
+  useEffect(() => {
+    if (!payload || !calculatedData) return
+    const key = normalizedResultId
+    if (resultViewTrackedRef.current === key) return
+    resultViewTrackedRef.current = key
+    trackEvent('tool_result_view', {
+      type: 'liuyao',
+      from,
+      has_ai_result: !!aiResult,
+    })
+  }, [payload, calculatedData, normalizedResultId, aiResult, from])
 
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-400">加载中...</div>
@@ -1155,6 +1229,34 @@ function ResultPageContent() {
                    ) : (
                      <div className="prose prose-stone max-w-none font-serif text-stone-800 prose-headings:text-[#C82E31] prose-strong:text-[#C82E31]">
                        <ReactMarkdown>{isAiStreaming ? aiStreamContent : aiResult}</ReactMarkdown>
+                     </div>
+                   )}
+
+                   {!isAiStreaming && aiResult && !aiStreamError && (
+                     <div className="mt-5 flex items-center justify-between gap-3 border-t border-stone-100 pt-4">
+                       <div className="text-xs text-stone-500">这次 AI 详批有帮助吗？</div>
+                       <div className="flex items-center gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           disabled={submittingAiFeedback}
+                           className={aiFeedback === 'good' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-stone-200'}
+                           onClick={() => submitAiFeedback('good')}
+                         >
+                           <ThumbsUp className="w-4 h-4 mr-1" />
+                           有用
+                         </Button>
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           disabled={submittingAiFeedback}
+                           className={aiFeedback === 'bad' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-stone-200'}
+                           onClick={() => submitAiFeedback('bad')}
+                         >
+                           <ThumbsDown className="w-4 h-4 mr-1" />
+                           无用
+                         </Button>
+                       </div>
                      </div>
                    )}
 

@@ -13,6 +13,7 @@ export default function ConditionalLayout({
   const pathname = usePathname()
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password'
   const isHomePage = pathname === '/'
+  const isReaderPage = pathname.startsWith('/library/reader/')
 
   if (isAuthPage || isHomePage) {
     return <>{children}</>
@@ -49,7 +50,7 @@ export default function ConditionalLayout({
         <main className="flex-1 overflow-hidden relative z-0 h-full paper-texture">
           <div
             id="app-scroll-container"
-            className="h-full overflow-y-auto overflow-x-hidden"
+            className={`h-full overflow-x-hidden ${isReaderPage ? 'overflow-hidden' : 'overflow-y-auto'}`}
           >
             {children}
           </div>
@@ -58,4 +59,3 @@ export default function ConditionalLayout({
     </>
   )
 }
-

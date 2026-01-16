@@ -1,13 +1,14 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/lib/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/lib/components/ui/dialog";
 import { useToast } from "@/lib/hooks/use-toast";
 import { getCurrentUser } from "@/lib/services/auth";
@@ -139,6 +140,12 @@ export function AiAnalysisCard({
       onLoginRedirect();
       return;
     }
+    const growth = await getUserGrowth().catch(() => null)
+    trackEvent("ai_analysis_click", {
+      source: "result_page",
+      divination_type: divinationType,
+      user_balance: growth?.yiCoins ?? null,
+    });
     if (aiResult) {
       if (isSaved && !isAuthor)
         toast({
@@ -158,7 +165,7 @@ export function AiAnalysisCard({
       return;
     }
     setShowAiCostConfirm(true);
-  }, [aiResult, isAuthor, isSaved, toast, onLoginRedirect, onScrollToResult]);
+  }, [aiResult, isAuthor, isSaved, toast, onLoginRedirect, onScrollToResult, divinationType]);
 
   const handleConfirmSaveForAi = useCallback(async () => {
     const action = pendingSaveAction;
@@ -184,6 +191,15 @@ export function AiAnalysisCard({
     setShowAiCostConfirm(true);
   }, []);
 
+  const handleCancelAiPay = useCallback(() => {
+    setShowAiCostConfirm(false);
+    trackEvent("ai_pay_cancel", {
+      reason: "user_cancel",
+      cost: 50,
+      divination_type: divinationType,
+    });
+  }, [divinationType]);
+
   const handleConfirmAiAnalyze = useCallback(async () => {
     setAiBalanceChecking(true);
     try {
@@ -197,6 +213,11 @@ export function AiAnalysisCard({
         setShowAiCostConfirm(false);
         setPendingSaveAction("ai");
         setShowAiSaveConfirm(true);
+        trackEvent("ai_pay_cancel", {
+          reason: "not_saved",
+          cost: 50,
+          divination_type: divinationType,
+        });
         return;
       }
       const growth = await getUserGrowth();
@@ -207,6 +228,11 @@ export function AiAnalysisCard({
           description: "无法获取易币余额",
           variant: "destructive",
         });
+        trackEvent("ai_pay_cancel", {
+          reason: "balance_unknown",
+          cost: 50,
+          divination_type: divinationType,
+        });
         return;
       }
       if (balance < 50) {
@@ -216,22 +242,39 @@ export function AiAnalysisCard({
           description: "当前易币不足 50",
           variant: "destructive",
         });
+        trackEvent("ai_pay_cancel", {
+          reason: "balance_insufficient",
+          cost: 50,
+          user_balance: balance,
+          divination_type: divinationType,
+        });
         return;
       }
       setShowAiCostConfirm(false);
+      trackEvent("ai_pay_confirm", {
+        cost: 50,
+        is_reanalyze: false,
+        user_balance: balance,
+        divination_type: divinationType,
+      });
       onStartAnalysis();
       if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
     } finally {
       setAiBalanceChecking(false);
     }
-  }, [isSaved, onLoginRedirect, onStartAnalysis, onScrollToResult, toast]);
+  }, [isSaved, onLoginRedirect, onStartAnalysis, onScrollToResult, toast, divinationType]);
 
   const handleConfirmReanalyze = useCallback(() => {
     setShowReanalyzeConfirm(false);
     if (onResetIdempotencyKey) onResetIdempotencyKey();
+    trackEvent("ai_pay_confirm", {
+      cost: 50,
+      is_reanalyze: true,
+      divination_type: divinationType,
+    });
     onStartAnalysis();
     if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
-  }, [onResetIdempotencyKey, onStartAnalysis, onScrollToResult]);
+  }, [onResetIdempotencyKey, onStartAnalysis, onScrollToResult, divinationType]);
 
   const handleReanalyzeClick = useCallback(() => {
     setShowReanalyzeConfirm(true);
@@ -377,7 +420,7 @@ export function AiAnalysisCard({
           <DialogFooter className="mt-4 sm:justify-center">
             <Button
               variant="outline"
-              onClick={() => setShowAiCostConfirm(false)}
+              onClick={handleCancelAiPay}
               disabled={aiBalanceChecking}
               className="rounded-full w-full sm:w-auto px-8"
             >

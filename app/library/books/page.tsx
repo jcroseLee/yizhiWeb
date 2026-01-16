@@ -7,12 +7,10 @@ import {
   LayoutGrid,
   MoreHorizontal,
   Search,
-  SortAsc,
-  Upload,
-  X
+  SortAsc
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
@@ -27,9 +25,11 @@ import {
 } from '@/lib/components/ui/select'
 import { Separator } from '@/lib/components/ui/separator'
 import { Skeleton } from '@/lib/components/ui/skeleton'
+import { trackEvent } from '@/lib/analytics'
 import { getCurrentUser } from '@/lib/services/auth'
 import { createClient } from '@/lib/supabase/client'
 import { BookCover } from '../components/BookCover'
+import { BookUploadCard } from '../components/BookUploadCard'
 
 // --- 样式补丁 ---
 const styles = `
@@ -100,14 +100,11 @@ const DYNASTIES = ['先秦', '汉唐', '宋元', '明清', '民国', '现代']
 export default function AllBooksPage() {
   const router = useRouter()
   const [activeCategory, setActiveCategory] = useState('全部藏书')
+  const [activeDynasty, setActiveDynasty] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [books, setBooks] = useState<DisplayBook[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadSuccess, setUploadSuccess] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // --- 数据处理逻辑 (保持不变) ---
   const normalizeCategory = (raw: string | null | undefined) => {
@@ -266,70 +263,55 @@ export default function AllBooksPage() {
     router.push(`/library/reader/${encodeURIComponent(bookId)}`)
   }
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleFileSelect = async (file: File) => {
     const isPdf = file.type === 'application/pdf'
     const isImage = file.type.startsWith('image/')
     if (!isPdf && !isImage) {
-      setUploadError('格式不支持')
-      return
+      throw new Error('格式不支持')
     }
     if (file.size > 100 * 1024 * 1024) {
-      setUploadError('文件过大 (>100MB)')
+      throw new Error('文件过大 (>100MB)')
+    }
+
+    const user = await getCurrentUser()
+    if (!user) {
+      router.push('/login')
       return
     }
-    setUploadError(null)
-    setUploadSuccess(false)
-    setUploading(true)
-    try {
-      const user = await getCurrentUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      const supabase = createClient()
-      if (!supabase) throw new Error('Client Error')
+    const supabase = createClient()
+    if (!supabase) throw new Error('Client Error')
 
-      const resourceId = crypto.randomUUID()
-      const fileExt = file.name.split('.').pop() || (isPdf ? 'pdf' : 'jpg')
-      const fileName = `${resourceId}.${fileExt}`
-      const storagePath = `${user.id}/${resourceId}/${fileName}`
+    const resourceId = crypto.randomUUID()
+    const fileExt = file.name.split('.').pop() || (isPdf ? 'pdf' : 'jpg')
+    const fileName = `${resourceId}.${fileExt}`
+    const storagePath = `${user.id}/${resourceId}/${fileName}`
 
-      const { error: uploadError } = await supabase.storage
-        .from('user_resources')
-        .upload(storagePath, file, { cacheControl: '3600', upsert: false })
+    const { error: uploadError } = await supabase.storage
+      .from('user_resources')
+      .upload(storagePath, file, { cacheControl: '3600', upsert: false })
 
-      if (uploadError) throw uploadError
+    if (uploadError) throw uploadError
 
-      const { data: urlData } = supabase.storage.from('user_resources').getPublicUrl(storagePath)
+    const { data: urlData } = supabase.storage.from('user_resources').getPublicUrl(storagePath)
 
-      const { error: dbError } = await supabase.from('user_resources').insert({
-          user_id: user.id,
-          file_name: file.name,
-          file_type: isPdf ? 'pdf' : 'image',
-          file_size: file.size,
-          file_url: urlData.publicUrl,
-          storage_path: storagePath,
-          status: 'pending'
-      })
-      
-      if (dbError) throw dbError
-
-      setUploadSuccess(true)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setTimeout(() => setUploadSuccess(false), 3000)
-    } catch (error: any) {
-      setUploadError('上传失败')
-    } finally {
-      setUploading(false)
-    }
+    const { error: dbError } = await supabase.from('user_resources').insert({
+      user_id: user.id,
+      file_name: file.name,
+      file_type: isPdf ? 'pdf' : 'image',
+      file_size: file.size,
+      file_url: urlData.publicUrl,
+      storage_path: storagePath,
+      status: 'pending'
+    })
+    
+    if (dbError) throw dbError
   }
 
   const filteredBooks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return books.filter((b) => {
       if (activeCategory !== '全部藏书' && b.categoryLabel !== activeCategory) return false
+      if (activeDynasty && b.dynasty !== activeDynasty) return false
       if (!q) return true
       return (
         b.title.toLowerCase().includes(q) ||
@@ -337,15 +319,23 @@ export default function AllBooksPage() {
         b.dynasty.toLowerCase().includes(q)
       )
     })
-  }, [books, searchQuery, activeCategory])
+  }, [books, searchQuery, activeCategory, activeDynasty])
+
+  useEffect(() => {
+    const keyword = searchQuery.trim()
+    if (!keyword) return
+    const t = window.setTimeout(() => {
+      trackEvent('library_search', { keyword, has_result: filteredBooks.length > 0 })
+    }, 500)
+    return () => window.clearTimeout(t)
+  }, [searchQuery, filteredBooks.length])
 
   const handleUploadClick = async () => {
     const user = await getCurrentUser()
     if (!user) {
-        router.push('/login?redirect=/library/books')
-        return
+      router.push('/login?redirect=/library/books')
+      return
     }
-    fileInputRef.current?.click()
   }
 
   return (
@@ -356,7 +346,7 @@ export default function AllBooksPage() {
         主容器：h-screen 确保占满屏幕高度，不可滚动。
         flex-col 布局将 Header 固定在顶部。
       */}
-      <div className="flex flex-col h-screen overflow-hidden paper-texture text-stone-800">
+      <div className="flex flex-col h-[calc(100vh-5.5rem)] overflow-x-hidden overflow-y-hidden paper-texture text-stone-800">
         
         {/* --- Header: 固定高度，不随页面滚动 --- */}
         <div className="flex-none px-6 lg:px-8 py-4 border-b border-stone-200/50 bg-[#F9F7F2]/90 backdrop-blur-md z-50">
@@ -454,15 +444,23 @@ export default function AllBooksPage() {
                     <History className="w-3 h-3" /> 年代检索
                   </h3>
                   <div className="flex flex-wrap gap-1.5 px-1">
-                    {DYNASTIES.map((dynasty) => (
-                      <Badge
-                        key={dynasty}
-                        variant="outline"
-                        className="cursor-pointer bg-white/40 border-stone-200/60 text-stone-500 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white transition-all font-serif text-[11px] px-2 py-0.5 font-normal"
-                      >
-                        {dynasty}
-                      </Badge>
-                    ))}
+                    {DYNASTIES.map((dynasty) => {
+                      const isActive = activeDynasty === dynasty
+                      return (
+                        <Badge
+                          key={dynasty}
+                          variant="outline"
+                          onClick={() => setActiveDynasty(isActive ? null : dynasty)}
+                          className={`cursor-pointer transition-all font-serif text-[11px] px-2 py-0.5 font-normal ${
+                            isActive
+                              ? 'bg-[#C82E31] border-[#C82E31] text-white hover:bg-[#A02528]'
+                              : 'bg-white/40 border-stone-200/60 text-stone-500 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white'
+                          }`}
+                        >
+                          {dynasty}
+                        </Badge>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -501,6 +499,14 @@ export default function AllBooksPage() {
                   */}
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-x-8 gap-y-10">
                     
+                    {/* Upload Card - Placed before books list */}
+                    {!loading && (
+                      <BookUploadCard
+                        onFileSelect={handleFileSelect}
+                        onUploadClick={handleUploadClick}
+                      />
+                    )}
+
                     {loading ? (
                       Array.from({ length: 12 }).map((_, i) => (
                         <div key={i} className="flex flex-col items-center">
@@ -586,89 +592,6 @@ export default function AllBooksPage() {
                         </div>
                       </div>
                     ))}
-
-                    {/* Upload Card - Resized to match Grid */}
-                    {!loading && (
-                      <div className="relative flex flex-col items-center">
-                         <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                          disabled={uploading}
-                        />
-                        <div
-                          onClick={handleUploadClick}
-                          className={`w-full aspect-[2/3] rounded-[4px] border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
-                            uploading
-                              ? 'border-stone-300 bg-stone-100'
-                              : uploadSuccess
-                              ? 'border-green-300 bg-green-50'
-                              : uploadError
-                              ? 'border-red-300 bg-red-50'
-                              : 'border-[#C5A065]/30 hover:border-[#C5A065] hover:bg-[#C5A065]/5 bg-white/30'
-                          }`}
-                        >
-                           {/* Hover Ripple */}
-                           {!uploading && !uploadSuccess && !uploadError && (
-                               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none flex items-center justify-center">
-                                   <div className="w-16 h-16 rounded-full border border-[#C5A065]/10 animate-ping" />
-                               </div>
-                           )}
-
-                          <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-all duration-300 shadow-sm ${
-                              uploading
-                                ? 'bg-stone-200 text-stone-500'
-                                : uploadSuccess
-                                ? 'bg-green-100 text-green-600'
-                                : uploadError
-                                ? 'bg-red-100 text-red-600'
-                                : 'bg-white border border-[#C5A065]/20 text-[#C5A065] group-hover:scale-110 group-hover:shadow-md'
-                            }`}
-                          >
-                            {uploading ? (
-                              <Upload className="w-4 h-4 animate-pulse" />
-                            ) : uploadSuccess ? (
-                              <CheckCircle2 className="w-4 h-4" />
-                            ) : uploadError ? (
-                              <X className="w-4 h-4" />
-                            ) : (
-                              <Upload className="w-4 h-4" />
-                            )}
-                          </div>
-                          
-                          <div className="text-center px-2 space-y-0.5 relative z-10">
-                              {uploading ? (
-                                <span className="block text-xs text-stone-400">处理中...</span>
-                              ) : uploadSuccess ? (
-                                <span className="block text-xs text-green-600">成功</span>
-                              ) : uploadError ? (
-                                <span className="block text-[10px] text-red-500 line-clamp-1">失败</span>
-                              ) : (
-                                <>
-                                  <span className="block text-xs font-bold font-serif text-stone-700 group-hover:text-[#C5A065] transition-colors">申请收录</span>
-                                  <span className="block text-[9px] text-stone-600 uppercase tracking-wider group-hover:text-[#C5A065]/60">上传 PDF / 图片</span>
-                                </>
-                              )}
-                          </div>
-                        </div>
-                        {uploadError && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute top-1 right-1 h-5 w-5 p-0 hover:bg-red-100 rounded-full"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setUploadError(null)
-                            }}
-                          >
-                            <X className="w-3 h-3 text-red-500" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
                   </div>
                   
                   {!loading && loadError && (

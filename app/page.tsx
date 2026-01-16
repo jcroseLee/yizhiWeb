@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
+import { trackEvent } from '@/lib/analytics'
 import { getSession, onAuthStateChange, signOut } from '@/lib/services/auth'
 import { getUserProfile, type UserProfile } from '@/lib/services/profile'
 import type { Session } from '@supabase/supabase-js'
@@ -634,7 +635,12 @@ function LandingPageContent() {
 
                     <div className="md:col-span-6 lg:col-span-5 flex flex-col gap-8">
                       {/* Feature 2: Library */}
-                      <Link href="/library" className="flex-1 parallax-card relative group cursor-pointer block" style={{ transform: `translateY(${getParallaxY(-0.08)}px)` }}>
+                      <Link
+                        href="/library"
+                        className="flex-1 parallax-card relative group cursor-pointer block"
+                        style={{ transform: `translateY(${getParallaxY(-0.08)}px)` }}
+                        onClick={() => trackEvent('library_entry_click', { source: 'home_features' })}
+                      >
                           <div className="book-layer book-layer-2 bg-stone-100" />
                           <div className="book-layer book-layer-1 bg-stone-50" />
                           <Card className="h-full bg-[#FAF9F6] border-none shadow-xl rounded-[2.5rem] relative overflow-hidden z-10">

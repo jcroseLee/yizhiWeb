@@ -2,6 +2,7 @@
 
 import { calculateRelationships, type BaZiPillar, type Relationship } from '@/lib/utils/bazi'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { trackEvent } from '@/lib/analytics'
 
 interface BaZiRelationshipsProps {
   pillars: BaZiPillar[]
@@ -13,6 +14,16 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
   const [containerWidth, setContainerWidth] = useState(800) 
   const [isMobile, setIsMobile] = useState(false)
   const [hoveredRelIndex, setHoveredRelIndex] = useState<number | null>(null)
+
+  useEffect(() => {
+    const startedAt = Date.now()
+    return () => {
+      trackEvent('tool_view_relationship', {
+        view_duration: Date.now() - startedAt,
+        type: 'bazi',
+      })
+    }
+  }, [])
 
   // 2. 响应式监听
   useEffect(() => {

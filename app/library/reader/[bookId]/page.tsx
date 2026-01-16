@@ -1,5 +1,6 @@
 'use client'
 
+import { trackEvent } from '@/lib/analytics'
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
 import {
@@ -20,402 +21,75 @@ import {
   Highlighter,
   Loader2,
   Menu,
+  PanelRight,
   Search,
   Settings,
-  Share2
+  Share2,
+  X
 } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-// -----------------------------------------------------------------------------
-// 样式补丁：复用全局风格
-// -----------------------------------------------------------------------------
+// ... (Styles and Constants remain unchanged, omitted for brevity to focus on layout) ...
 const styles = `
+  /* ... (原有样式代码保持不变) ... */
   .paper-texture {
     background-color: #fdfbf7;
     background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
   }
-  
-  /* 垂直排版标题 */
-  .vertical-rl {
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    letter-spacing: 0.2em;
-  }
-
-  /* 选中文本高亮颜色 */
-  ::selection {
-    background: rgba(200, 46, 49, 0.15);
-    color: #1c1917;
-  }
-
-  /* 注释样式 */
-  .annotation-block {
-    background: linear-gradient(to right, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.03));
-    border-left: 3px solid #f59e0b;
-    padding-left: 1.5rem;
-    padding-right: 1rem;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
-    margin: 1.5rem 0;
-    border-radius: 0 0.375rem 0.375rem 0;
-    position: relative;
-  }
-
-  .annotation-block::before {
-    content: "註";
-    position: absolute;
-    left: 0.5rem;
-    top: 0.75rem;
-    font-size: 0.875rem;
-    font-weight: bold;
-    color: #d97706;
-    background: rgba(251, 191, 36, 0.2);
-    width: 1.5rem;
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.25rem;
-  }
-
-  .annotation-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #92400e;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
-    display: block;
-  }
-
-  .annotation-text {
-    color: #78350f;
-    line-height: 1.8;
-    font-size: 0.95em;
-  }
-
-  /* Markdown内容样式 - 优化古籍阅读体验 */
-  .markdown-content-wrapper {
-    font-family: 'Noto Serif SC', 'Songti SC', serif;
-    color: #2c3e50;
-    line-height: 1.85;
-    letter-spacing: 0.01em;
-  }
-
-  .markdown-content {
-    word-wrap: break-word;
-    word-break: break-word;
-    max-width: 100%;
-  }
-
-  /* 段落样式 - 优化间距和行高 */
-  .markdown-content p {
-    margin-bottom: 1.5rem;
-    line-height: 1.9;
-    text-align: justify;
-    text-justify: inter-ideograph;
-    color: #2c3e50;
-    font-size: 1em;
-  }
-
-  .markdown-content p:last-child {
-    margin-bottom: 0;
-  }
-
-  /* 章节标题样式 - 增强视觉层次 */
-  .markdown-content h1 {
-    font-size: 1.75em;
-    font-weight: 700;
-    color: #1a252f;
-    margin-top: 2.5rem;
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid rgba(200, 46, 49, 0.15);
-    line-height: 1.4;
-    letter-spacing: 0.02em;
-  }
-
-  .markdown-content h2 {
-    font-size: 1.5em;
-    font-weight: 650;
-    color: #1a252f;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(200, 46, 49, 0.1);
-    line-height: 1.4;
-    letter-spacing: 0.02em;
-  }
-
-  .markdown-content h3 {
-    font-size: 1.3em;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    padding-left: 0.75rem;
-    border-left: 3px solid rgba(200, 46, 49, 0.3);
-    line-height: 1.5;
-    letter-spacing: 0.015em;
-    background: linear-gradient(to right, rgba(200, 46, 49, 0.03), transparent);
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    padding-right: 0.5rem;
-  }
-
-  .markdown-content h4 {
-    font-size: 1.15em;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-top: 1.75rem;
-    margin-bottom: 0.875rem;
-    line-height: 1.5;
-  }
-
-  .markdown-content h5,
-  .markdown-content h6 {
-    font-size: 1.05em;
-    font-weight: 600;
-    color: #3d4a5c;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    line-height: 1.5;
-  }
-
-  /* 第一个标题不需要上边距 */
-  .markdown-content h1:first-child,
-  .markdown-content h2:first-child,
-  .markdown-content h3:first-child,
-  .markdown-content h4:first-child,
-  .markdown-content h5:first-child,
-  .markdown-content h6:first-child {
-    margin-top: 0;
-  }
-
-  /* 列表样式 */
-  .markdown-content ul,
-  .markdown-content ol {
-    margin-top: 0.75rem;
-    margin-bottom: 1.25rem;
-    padding-left: 1.75rem;
-    line-height: 1.85;
-  }
-
-  .markdown-content li {
-    margin-bottom: 0.5rem;
-    color: #2c3e50;
-  }
-
-  .markdown-content li::marker {
-    color: rgb(148, 163, 184); /* slate-400 */
-  }
-
-  /* 引用/注解样式 - 新中式风格（amber 色系） */
-  .markdown-content blockquote {
-    margin-top: 1.25rem;
-    margin-bottom: 1.25rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
-    border-left: 4px solid rgba(245, 158, 11, 0.5); /* amber-500/50 */
-    background-color: rgb(255, 251, 235); /* amber-50 */
-    border-radius: 0 0.375rem 0.375rem 0;
-    font-style: normal; /* 不斜体 */
-    color: rgb(71, 85, 105); /* slate-600 */
-    line-height: 1.8;
-  }
-
-  /* 代码样式 - 用于显示符号（如 X、O、'、"），使用 serif 字体 */
-  .markdown-content code {
-    font-family: 'Noto Serif SC', 'Songti SC', serif; /* serif 字体 */
-    background: rgb(241, 245, 249); /* slate-100 */
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    font-size: 0.9em;
-    color: rgb(30, 41, 59); /* slate-800 */
-  }
-  
-  /* 移除代码块前后的引号 */
-  .markdown-content code::before,
-  .markdown-content code::after {
-    content: none;
-  }
-
-  .markdown-content pre {
-    margin-top: 1.25rem;
-    margin-bottom: 1.25rem;
-    padding: 1rem;
-    background: rgba(44, 62, 80, 0.05);
-    border-radius: 0.375rem;
-    overflow-x: auto;
-    border: 1px solid rgba(200, 46, 49, 0.1);
-  }
-
-  .markdown-content pre code {
-    background: transparent;
-    padding: 0;
-    color: #2c3e50;
-  }
-
-  /* 强调样式 - 新中式强调色（用于术语高亮） */
-  .markdown-content strong {
-    font-weight: 900; /* font-black */
-    color: rgb(180, 83, 9); /* amber-700 */
-    letter-spacing: 0.01em;
-  }
-
-  .markdown-content em {
-    font-style: italic;
-    color: #3d4a5c;
-  }
-
-  /* 引号内的术语样式 - 突出显示特殊术语 */
-  .markdown-content q {
-    font-style: normal;
-    color: #c0392b;
-    background: rgba(200, 46, 49, 0.06);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.2rem;
-    font-weight: 500;
-    quotes: '"' '"' "'" "'";
-  }
-
-  /* 优化字体渲染，提升中文引号等特殊字符的显示效果 */
-  .markdown-content p {
-    font-feature-settings: "kern" 1, "liga" 1;
-    text-rendering: optimizeLegibility;
-  }
-
-  /* 处理中文引号内的内容 - 使用正则匹配类名 */
-  .markdown-content p {
-    position: relative;
-  }
-  
-  /* 移动端响应式优化 */
+  .vertical-rl { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.2em; }
+  ::selection { background: rgba(200, 46, 49, 0.15); color: #1c1917; }
+  .annotation-block { background: linear-gradient(to right, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.03)); border-left: 3px solid #f59e0b; padding-left: 1.5rem; padding-right: 1rem; padding-top: 0.75rem; padding-bottom: 0.75rem; margin: 1.5rem 0; border-radius: 0 0.375rem 0.375rem 0; position: relative; }
+  .annotation-block::before { content: "註"; position: absolute; left: 0.5rem; top: 0.75rem; font-size: 0.875rem; font-weight: bold; color: #d97706; background: rgba(251, 191, 36, 0.2); width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; border-radius: 0.25rem; }
+  .annotation-label { font-size: 0.75rem; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block; }
+  .annotation-text { color: #78350f; line-height: 1.8; font-size: 0.95em; }
+  .markdown-content-wrapper { font-family: 'Noto Serif SC', 'Songti SC', serif; color: #2c3e50; line-height: 1.85; letter-spacing: 0.01em; }
+  .markdown-content { word-wrap: break-word; word-break: break-word; max-width: 100%; }
+  .markdown-content p, .markdown-content .md-p { margin-bottom: 1.5rem; line-height: 1.9; text-align: justify; text-justify: inter-ideograph; color: #2c3e50; font-size: 1em; position: relative; font-feature-settings: "kern" 1, "liga" 1; text-rendering: optimizeLegibility; }
+  .markdown-content p:last-child, .markdown-content .md-p:last-child { margin-bottom: 0; }
+  .markdown-content h1 { font-size: 1.75em; font-weight: 700; color: #1a252f; margin-top: 2.5rem; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(200, 46, 49, 0.15); line-height: 1.4; letter-spacing: 0.02em; }
+  .markdown-content h2 { font-size: 1.5em; font-weight: 650; color: #1a252f; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(200, 46, 49, 0.1); line-height: 1.4; letter-spacing: 0.02em; }
+  .markdown-content h3 { font-size: 1.3em; font-weight: 600; color: #2c3e50; margin-top: 2rem; margin-bottom: 1rem; padding-left: 0.75rem; border-left: 3px solid rgba(200, 46, 49, 0.3); line-height: 1.5; letter-spacing: 0.015em; background: linear-gradient(to right, rgba(200, 46, 49, 0.03), transparent); padding-top: 0.5rem; padding-bottom: 0.5rem; padding-right: 0.5rem; }
+  .markdown-content h4 { font-size: 1.15em; font-weight: 600; color: #2c3e50; margin-top: 1.75rem; margin-bottom: 0.875rem; line-height: 1.5; }
+  .markdown-content h5, .markdown-content h6 { font-size: 1.05em; font-weight: 600; color: #3d4a5c; margin-top: 1.5rem; margin-bottom: 0.75rem; line-height: 1.5; }
+  .markdown-content h1:first-child, .markdown-content h2:first-child, .markdown-content h3:first-child, .markdown-content h4:first-child, .markdown-content h5:first-child, .markdown-content h6:first-child { margin-top: 0; }
+  .markdown-content ul, .markdown-content ol { margin-top: 0.75rem; margin-bottom: 1.25rem; padding-left: 1.75rem; line-height: 1.85; }
+  .markdown-content li { margin-bottom: 0.5rem; color: #2c3e50; }
+  .markdown-content li::marker { color: rgb(148, 163, 184); }
+  .markdown-content blockquote { margin-top: 1.25rem; margin-bottom: 1.25rem; padding-left: 1rem; padding-right: 1rem; padding-top: 0.25rem; padding-bottom: 0.25rem; border-left: 4px solid rgba(245, 158, 11, 0.5); background-color: rgb(255, 251, 235); border-radius: 0 0.375rem 0.375rem 0; font-style: normal; color: rgb(71, 85, 105); line-height: 1.8; }
+  .markdown-content code { font-family: 'Noto Serif SC', 'Songti SC', serif; background: rgb(241, 245, 249); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.9em; color: rgb(30, 41, 59); }
+  .markdown-content code::before, .markdown-content code::after { content: none; }
+  .markdown-content pre { margin-top: 1.25rem; margin-bottom: 1.25rem; padding: 1rem; background: rgba(44, 62, 80, 0.05); border-radius: 0.375rem; overflow-x: auto; border: 1px solid rgba(200, 46, 49, 0.1); }
+  .markdown-content pre code { background: transparent; padding: 0; color: #2c3e50; }
+  .markdown-content strong { font-weight: 900; color: rgb(180, 83, 9); letter-spacing: 0.01em; }
+  .markdown-content em { font-style: italic; color: #3d4a5c; }
+  .markdown-content q { font-style: normal; color: #c0392b; background: rgba(200, 46, 49, 0.06); padding: 0.125rem 0.25rem; border-radius: 0.2rem; font-weight: 500; quotes: '"' '"' "'" "'"; }
   @media (max-width: 768px) {
-    .markdown-content-wrapper {
-      font-size: 0.95em;
-      line-height: 1.8;
-    }
-    
-    .markdown-content p {
-      margin-bottom: 1.25rem;
-      line-height: 1.85;
-      text-align: left; /* 移动端左对齐更易读 */
-    }
-    
-    .markdown-content h1 {
-      font-size: 1.5em;
-      margin-top: 2rem;
-      margin-bottom: 1rem;
-    }
-    
-    .markdown-content h2 {
-      font-size: 1.35em;
-      margin-top: 1.75rem;
-      margin-bottom: 0.875rem;
-    }
-    
-    .markdown-content h3 {
-      font-size: 1.2em;
-      margin-top: 1.75rem;
-      margin-bottom: 0.875rem;
-      padding-left: 0.5rem;
-    }
-    
-    .markdown-content h4 {
-      font-size: 1.1em;
-      margin-top: 1.5rem;
-      margin-bottom: 0.75rem;
-    }
-    
-    .markdown-content ul,
-    .markdown-content ol {
-      padding-left: 1.5rem;
-      margin-top: 0.625rem;
-      margin-bottom: 1rem;
-    }
-    
-    .markdown-content blockquote {
-      padding-left: 1rem;
-      margin-top: 1rem;
-      margin-bottom: 1rem;
-    }
+    .markdown-content-wrapper { font-size: 0.95em; line-height: 1.8; }
+    .markdown-content p, .markdown-content .md-p { margin-bottom: 1.25rem; line-height: 1.85; text-align: left; }
+    .markdown-content h1 { font-size: 1.5em; margin-top: 2rem; margin-bottom: 1rem; }
+    .markdown-content h2 { font-size: 1.35em; margin-top: 1.75rem; margin-bottom: 0.875rem; }
+    .markdown-content h3 { font-size: 1.2em; margin-top: 1.75rem; margin-bottom: 0.875rem; padding-left: 0.5rem; }
+    .markdown-content h4 { font-size: 1.1em; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+    .markdown-content ul, .markdown-content ol { padding-left: 1.5rem; margin-top: 0.625rem; margin-bottom: 1rem; }
+    .markdown-content blockquote { padding-left: 1rem; margin-top: 1rem; margin-bottom: 1rem; }
+    .annotation-block { margin: 1rem 0; padding-left: 1rem; padding-right: 0.75rem; }
   }
-  
-  /* 超小屏幕优化 */
   @media (max-width: 375px) {
-    .markdown-content-wrapper {
-      font-size: 0.9em;
-    }
-    
-    .markdown-content h1 {
-      font-size: 1.35em;
-    }
-    
-    .markdown-content h2 {
-      font-size: 1.25em;
-    }
-    
-    .markdown-content h3 {
-      font-size: 1.15em;
-    }
+    .markdown-content-wrapper { font-size: 0.9em; }
+    .markdown-content h1 { font-size: 1.35em; }
+    .markdown-content h2 { font-size: 1.25em; }
+    .markdown-content h3 { font-size: 1.15em; }
   }
-
-  /* 链接样式 */
-  .markdown-content a {
-    color: #c0392b;
-    text-decoration: underline;
-    text-decoration-color: rgba(200, 46, 49, 0.3);
-    transition: all 0.2s ease;
-  }
-
-  .markdown-content a:hover {
-    color: #a93226;
-    text-decoration-color: rgba(200, 46, 49, 0.6);
-  }
-
-  /* 分隔线 */
-  .markdown-content hr {
-    margin: 2rem 0;
-    border: none;
-    border-top: 1px solid rgba(200, 46, 49, 0.15);
-    background: none;
-  }
-
-  /* 表格样式 */
-  .markdown-content table {
-    width: 100%;
-    margin: 1.25rem 0;
-    border-collapse: collapse;
-    border: 1px solid rgba(200, 46, 49, 0.15);
-  }
-
-  .markdown-content th,
-  .markdown-content td {
-    padding: 0.75rem;
-    border: 1px solid rgba(200, 46, 49, 0.1);
-    text-align: left;
-  }
-
-  .markdown-content th {
-    background: rgba(200, 46, 49, 0.08);
-    font-weight: 600;
-    color: #1a252f;
-  }
-
-  /* 图片样式 */
-  .markdown-content img {
-    max-width: 100%;
-    height: auto;
-    margin: 1.5rem 0;
-    border-radius: 0.375rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
+  .markdown-content a { color: #c0392b; text-decoration: underline; text-decoration-color: rgba(200, 46, 49, 0.3); transition: all 0.2s ease; }
+  .markdown-content a:hover { color: #a93226; text-decoration-color: rgba(200, 46, 49, 0.6); }
+  .markdown-content hr { margin: 2rem 0; border: none; border-top: 1px solid rgba(200, 46, 49, 0.15); background: none; }
+  .markdown-content table { width: 100%; margin: 1.25rem 0; border-collapse: collapse; border: 1px solid rgba(200, 46, 49, 0.15); }
+  .markdown-content th, .markdown-content td { padding: 0.75rem; border: 1px solid rgba(200, 46, 49, 0.1); text-align: left; }
+  .markdown-content th { background: rgba(200, 46, 49, 0.08); font-weight: 600; color: #1a252f; }
+  .markdown-content img { max-width: 100%; height: auto; margin: 1.5rem 0; border-radius: 0.375rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 `
 
 const RELATED_CASES = [
@@ -533,6 +207,7 @@ export default function BookReaderPage() {
 
   const [fontSize, setFontSize] = useState([18])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileRightSidebarOpen, setMobileRightSidebarOpen] = useState(false) 
   const [book, setBook] = useState<LibraryBookRow | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -545,11 +220,29 @@ export default function BookReaderPage() {
   const [imageLoading, setImageLoading] = useState<Record<number, boolean>>({})
   const [chapters, setChapters] = useState<BookContentRow[]>([])
   const [chaptersLoading, setChaptersLoading] = useState(false)
-  const [currentTocItemIndex, setCurrentTocItemIndex] = useState<number | null>(null) // 当前目录项索引，用于标题显示和目录高亮
-  const [currentPageIndex, setCurrentPageIndex] = useState<number>(0) // 当前页码（在同一目录项内）
+  const [currentTocItemIndex, setCurrentTocItemIndex] = useState<number | null>(null)
+  const [currentPageIndex, setCurrentPageIndex] = useState<number>(0)
   const [userId, setUserId] = useState<string | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<{ viewMode: 'slices' | 'text'; pageIndex: number } | null>(null)
   const restoreAppliedRef = useRef(false)
+  const readStartAtRef = useRef<number | null>(null)
+  const activeTitleRef = useRef<string>('')
+  
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+    
+    const handleResize = () => {
+      if (window.innerWidth >= 1280) {
+        setMobileRightSidebarOpen(false)
+      }
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const bookDescription = book?.description ?? null
   const bookPdfUrl = book?.pdf_url ? String(book.pdf_url) : null
   const bookSourceUrl = book?.source_url ? String(book.source_url) : null
@@ -640,7 +333,7 @@ export default function BookReaderPage() {
         const bookQuery = supabase
           .from('library_books')
           .select('id, title, author, dynasty, category, status, cover_url, description, content_text, pdf_url, source_type, source_url, source_payload, slice_enabled')
-          .in('status', ['reviewed', 'published'])  // 允许访问已审核和已发布的书籍
+          .in('status', ['reviewed', 'published']) 
 
         let bookRow: unknown = null
         let bookError: unknown = null
@@ -676,8 +369,8 @@ export default function BookReaderPage() {
         const bookTyped = bookRow as unknown as LibraryBookRow
         setBook(bookTyped)
         setActiveIndex(0)
-        setCurrentTocItemIndex(null) // 重置当前目录项索引
-        setCurrentPageIndex(0) // 重置页码
+        setCurrentTocItemIndex(null) 
+        setCurrentPageIndex(0) 
       } catch (e: unknown) {
         setError(getErrorMessage(e, '加载失败'))
       } finally {
@@ -695,7 +388,6 @@ export default function BookReaderPage() {
     setImageLoading({})
   }, [book?.id])
 
-  // 加载章节数据
   useEffect(() => {
     const loadChapters = async () => {
       if (!book?.id) {
@@ -741,7 +433,6 @@ export default function BookReaderPage() {
         const pages: SlicePage[] = rawPages
           .map((p) => {
             if (!isRecord(p)) return null
-            // 兼容 "no" 和 "page" 字段（向后兼容）
             const no = typeof p.no === 'number' ? p.no : (typeof p.page === 'number' ? p.page : null)
             const url = typeof p.url === 'string' ? p.url.trim() : ''
             if (!no || !url) return null
@@ -800,18 +491,16 @@ export default function BookReaderPage() {
   useEffect(() => {
     if (viewMode === 'text') {
       setActiveIndex(0)
-      setCurrentTocItemIndex(null) // 重置当前目录项索引
-      setCurrentPageIndex(0) // 重置页码
+      setCurrentTocItemIndex(null) 
+      setCurrentPageIndex(0) 
     } else {
-      // 切片模式：重置目录项索引
       setCurrentTocItemIndex(null)
-      setCurrentPageIndex(0) // 重置页码
+      setCurrentPageIndex(0) 
     }
   }, [viewMode])
 
-  // Markdown组件配置 - 用于OCR输出的样式化渲染
   const MarkdownComponents = useMemo(() => ({
-    // 标题样式 - 支持字号缩放，新中式风格
+    // ... (Markdown components omitted for brevity, keeping same styling)
     h1: ({node, ...props}: any) => (
       <h1 className="font-serif font-bold text-slate-900 mb-6 mt-8 tracking-widest" style={{ fontSize: `${fontSize[0] * 1.4}px`, lineHeight: '1.4' }} {...props} />
     ),
@@ -830,37 +519,41 @@ export default function BookReaderPage() {
     h6: ({node, ...props}: any) => (
       <h6 className="font-serif font-bold text-[#34495e] mb-2 mt-4" style={{ fontSize: `${fontSize[0] * 0.95}px`, lineHeight: '1.5' }} {...props} />
     ),
-    // 段落样式 - 支持字号设置，保持段落间距，优化可读性（新中式宽松行高）
-    p: ({node, ...props}: any) => (
-      <p className="leading-loose text-slate-700 mb-6 text-justify font-serif" style={{ fontSize: `${fontSize[0]}px`, lineHeight: '1.9', letterSpacing: '0.01em' }} {...props} />
-    ),
-    // 粗体样式 - 新中式强调色（用于术语高亮）
+    p: ({node, children, ...props}: any) => {
+      return (
+        <div className="md-p leading-loose text-slate-700 mb-6 text-justify font-serif" style={{ fontSize: `${fontSize[0]}px`, lineHeight: '1.9', letterSpacing: '0.01em' }} {...props}>
+          {children}
+        </div>
+      )
+    },
     strong: ({node, ...props}: any) => (
       <strong className="font-black text-amber-700" style={{ fontSize: 'inherit', fontWeight: 900 }} {...props} />
     ),
-    // 斜体样式
     em: ({node, ...props}: any) => (
       <em className="italic text-stone-600" style={{ fontSize: 'inherit', fontStyle: 'italic' }} {...props} />
     ),
-    // 引用/注解样式 - 新中式风格（amber 色系，用于括号内的解释性文字）
     blockquote: ({node, ...props}: any) => (
       <blockquote className="border-l-4 border-amber-500/50 bg-amber-50 px-4 py-1 my-6 rounded-r not-italic text-slate-600 font-serif" style={{ fontSize: `${fontSize[0] * 0.95}px`, lineHeight: '1.8' }} {...props} />
     ),
-    // 行内代码和代码块 - 用于显示符号（如 X、O、'、"）
     code: ({node, inline, className, children, ...props}: any) => {
-      return inline ? (
-        <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-serif before:content-none after:content-none" style={{ fontSize: `${fontSize[0] * 0.9}px` }} {...props}>
-          {children}
-        </code>
-      ) : (
-        <pre className="bg-[#2c3e50] text-stone-100 p-4 rounded-lg overflow-x-auto my-6 font-mono shadow-inner" style={{ fontSize: `${fontSize[0] * 0.85}px`, lineHeight: '1.6' }} {...props}>
-          <code className={className} {...props}>
+      if (inline) {
+        return (
+          <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-serif before:content-none after:content-none" style={{ fontSize: `${fontSize[0] * 0.9}px` }} {...props}>
             {children}
           </code>
-        </pre>
-      )
+        )
+      } else {
+        return (
+          <div className="my-6">
+            <pre className="bg-[#2c3e50] text-stone-100 p-4 rounded-lg overflow-x-auto font-mono shadow-inner" style={{ fontSize: `${fontSize[0] * 0.85}px`, lineHeight: '1.6' }} {...props}>
+              <code className={className} {...props}>
+                {children}
+              </code>
+            </pre>
+          </div>
+        )
+      }
     },
-    // 列表样式 - 优化标记颜色
     ul: ({node, ...props}: any) => (
       <ul className="list-disc list-outside ml-6 mb-6 space-y-2 text-[#2c3e50] font-serif marker:text-slate-400" style={{ fontSize: `${fontSize[0]}px` }} {...props} />
     ),
@@ -870,15 +563,12 @@ export default function BookReaderPage() {
     li: ({node, ...props}: any) => (
       <li className="leading-relaxed" style={{ fontSize: 'inherit', lineHeight: '1.8' }} {...props} />
     ),
-    // 链接样式
     a: ({node, ...props}: any) => (
       <a className="text-[#c0392b] hover:text-[#a93226] underline underline-offset-4 decoration-stone-300 transition-colors" style={{ fontSize: 'inherit' }} {...props} />
     ),
-    // 水平分割线
     hr: ({node, ...props}: any) => (
       <hr className="my-8 border-stone-200" {...props} />
     ),
-    // 表格样式
     table: ({node, ...props}: any) => (
       <div className="overflow-x-auto my-6 rounded-lg border border-stone-200">
         <table className="w-full text-sm text-left text-stone-600 font-serif" style={{ fontSize: `${fontSize[0] * 0.9}px` }} {...props} />
@@ -901,7 +591,6 @@ export default function BookReaderPage() {
     ),
   }), [fontSize])
 
-  // 解析OCR输出的Markdown格式，提取目录和正文
   const parseOcrContent = (content: string | null) => {
     if (!content) return { toc: [], mainText: '' }
 
@@ -916,7 +605,6 @@ export default function BookReaderPage() {
     for (const line of lines) {
       const trimmed = line.trim()
       
-      // 检测目录标记（支持多种格式）
       if (trimmed === '# 目录' || trimmed === '## 目录' || trimmed.match(/^#+\s*目录\s*$/)) {
         inToc = true
         inMainText = false
@@ -924,7 +612,6 @@ export default function BookReaderPage() {
         continue
       }
       
-      // 检测正文标记（支持多种格式）
       if (trimmed === '# 正文' || trimmed === '## 正文' || trimmed.match(/^#+\s*正文\s*$/)) {
         inToc = false
         inMainText = true
@@ -933,24 +620,19 @@ export default function BookReaderPage() {
       }
 
       if (inToc && trimmed.startsWith('- ')) {
-        // 提取目录项，移除 "- " 前缀和可能的方括号
         const tocItem = trimmed.replace(/^-\s*\[?([^\]]+)\]?$/, '$1').trim()
         if (tocItem && tocItem !== '目录') toc.push(tocItem)
       } else if (inMainText) {
-        // 正文内容
         if (trimmed && !trimmed.match(/^#+\s*(目录|正文)\s*$/)) {
           mainTextLines.push(line)
         }
       } else if (!foundTocMarker && !foundMainTextMarker) {
-        // 如果没有明确的标记，将所有内容当作正文
         if (trimmed && !trimmed.match(/^#+\s*(目录|正文)\s*$/)) {
           mainTextLines.push(line)
         }
       }
     }
 
-    // 如果没有找到正文标记，但找到了目录标记，则正文为空（可能正文在下一部分）
-    // 如果没有找到任何标记，则所有内容都是正文
     const mainText = mainTextLines.join('\n').trim()
 
     return {
@@ -960,12 +642,10 @@ export default function BookReaderPage() {
   }
 
   const chapterList = useMemo(() => {
-    // 优先使用从数据库加载的章节数据
     if (chapters.length > 0) {
       return chapters
     }
     
-    // 降级：使用content_text
     const contentText = typeof book?.content_text === 'string' && book.content_text.trim() ? book.content_text : null
     const fallbackContent = contentText || bookDescription
     if (fallbackContent) {
@@ -985,7 +665,6 @@ export default function BookReaderPage() {
     return []
   }, [chapters, book?.content_text, bookDescription])
 
-  // 提取所有章节的目录项
   const allTocItems = useMemo(() => {
     const items: Array<{ title: string; chapterIndex: number; tocIndex: number }> = []
     chapters.forEach((chapter, index) => {
@@ -1017,13 +696,11 @@ export default function BookReaderPage() {
   const activeSlicePage = slicePages[safeActivePageIndex] || null
   const activeSliceTitle = activeSlicePage ? `第${activeSlicePage.no}页` : ''
   
-  // 当前目录项（用于标题显示，只在切换目录项时更新）
   const currentTocItem = currentTocItemIndex !== null && currentTocItemIndex >= 0 && currentTocItemIndex < tocItems.length
     ? tocItems[currentTocItemIndex]
     : null
   const currentTocTitle = currentTocItem?.title || ''
   
-  // 当章节索引变化时，如果没有手动设置的目录项索引，则自动选择该章节的第一个目录项
   useEffect(() => {
     if (tocItems.length === 0) {
       setCurrentTocItemIndex(null)
@@ -1036,7 +713,6 @@ export default function BookReaderPage() {
         setCurrentTocItemIndex(firstTocItemInChapter)
       }
     } else {
-      // 如果当前激活的目录项不在当前章节中，则选择当前章节的第一个目录项
       const currentTocItem = currentTocItemIndex >= 0 && currentTocItemIndex < tocItems.length 
         ? tocItems[currentTocItemIndex] 
         : null
@@ -1049,34 +725,62 @@ export default function BookReaderPage() {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeActiveIndex, chapters])
   
-  // 获取当前激活的目录项（用于过滤内容）
   const activeTocItem = currentTocItemIndex !== null && currentTocItemIndex >= 0 && currentTocItemIndex < tocItems.length
     ? tocItems[currentTocItemIndex]
     : tocItems.find(item => item.chapterIndex === safeActiveIndex)
   const activeTocTitle = activeTocItem?.title || ''
   
-  // 计算当前激活的目录项索引（用于高亮显示）- 统一使用 currentTocItemIndex
   const activeTocIndex = currentTocItemIndex !== null && currentTocItemIndex >= 0 && currentTocItemIndex < tocItems.length
     ? currentTocItemIndex
     : (activeTocTitle 
         ? tocItems.findIndex(item => item.title === activeTocTitle && item.chapterIndex === safeActiveIndex)
         : (tocItems.findIndex(item => item.chapterIndex === safeActiveIndex)))
   
-  // 标题显示逻辑：显示当前目录项标题，不随页面导航变化
-  // 1. 切片模式：显示页码
-  // 2. 文本模式且有目录项：显示当前目录项标题
-  // 3. 文本模式但无目录项：显示章节标题
   const activeTitle = viewMode === 'slices'
     ? activeSliceTitle
     : (tocItems.length > 0 && currentTocTitle ? currentTocTitle : activeChapterTitle || '正文')
+
+  useEffect(() => {
+    activeTitleRef.current = activeTitle
+  }, [activeTitle])
+
+  useEffect(() => {
+    if (!book?.id) return
+    if (readStartAtRef.current === null) readStartAtRef.current = Date.now()
+    return () => {
+      const startedAt = readStartAtRef.current
+      if (startedAt === null) return
+      trackEvent('library_book_read', {
+        book_name: book.title,
+        chapter: activeTitleRef.current,
+        read_duration: Date.now() - startedAt,
+      })
+      readStartAtRef.current = null
+    }
+  }, [book?.id])
+
+  useEffect(() => {
+    if (!book?.id) return
+    const handler = () => {
+      const selection = window.getSelection()?.toString() || ''
+      const trimmed = selection.trim()
+      if (!trimmed) return
+      trackEvent('library_text_copy', {
+        book_name: book.title,
+        chapter: activeTitleRef.current,
+        content_length: trimmed.length,
+      })
+    }
+    document.addEventListener('copy', handler)
+    return () => {
+      document.removeEventListener('copy', handler)
+    }
+  }, [book?.id])
   
-  // 初始化当前目录项索引
   useEffect(() => {
     if (viewMode === 'text' && tocItems.length > 0) {
-      // 文本模式：如果有目录项，初始化当前目录项索引
       if (currentTocItemIndex === null) {
         const firstTocItemInChapter = tocItems.findIndex(item => item.chapterIndex === safeActiveIndex)
         if (firstTocItemInChapter >= 0) {
@@ -1084,41 +788,31 @@ export default function BookReaderPage() {
         }
       }
     } else if (viewMode === 'slices') {
-      // 切片模式：不需要目录项索引
       setCurrentTocItemIndex(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, tocItems.length, safeActiveIndex])
 
-  // 当切换页面时，重置该页的加载状态
   useEffect(() => {
     if (viewMode === 'slices' && activeSlicePage?.no) {
       setImageLoading((prev) => ({ ...prev, [activeSlicePage.no]: true }))
     }
   }, [viewMode, activeSlicePage?.no])
-  // 解析当前章节内容，分离目录和正文
   const { toc: currentToc, mainText: currentMainText } = useMemo(() => {
     return parseOcrContent(activeChapter?.content || null)
   }, [activeChapter?.content])
 
-  // 根据选中的目录项标题过滤正文内容
   const filteredMainText = useMemo(() => {
-    // 如果没有选中的目录项标题，或者当前章节没有目录项，返回全部内容
     if (!currentMainText || !activeTocTitle || allTocItems.length === 0) return currentMainText
     
-    // 获取当前章节的所有目录项
     const chapterTocItems = allTocItems.filter(item => item.chapterIndex === safeActiveIndex)
     const currentTocIndex = chapterTocItems.findIndex(item => item.title === activeTocTitle)
     
-    // 如果找不到对应的目录项，或者该章节只有一个目录项，返回全部内容
     if (currentTocIndex < 0 || chapterTocItems.length <= 1) return currentMainText
     
-    // 在正文中查找当前目录项标题的位置
     const lines = currentMainText.split('\n')
     let startIndex = -1
     let endIndex = lines.length
     
-    // 查找当前标题在正文中的位置（支持多种格式匹配）
     const normalizeTitle = (title: string) => title.trim().replace(/^#+\s+/, '')
     const currentTitleNormalized = normalizeTitle(activeTocTitle)
     
@@ -1126,7 +820,6 @@ export default function BookReaderPage() {
       const line = lines[i].trim()
       const normalizedLine = normalizeTitle(line)
       
-      // 精确匹配或包含匹配（但要求标题长度相近，避免误匹配）
       if (normalizedLine === currentTitleNormalized || 
           (normalizedLine.includes(currentTitleNormalized) && 
            Math.abs(normalizedLine.length - currentTitleNormalized.length) <= 5)) {
@@ -1135,7 +828,6 @@ export default function BookReaderPage() {
       }
     }
     
-    // 如果找到了当前标题，查找下一个标题的位置
     if (startIndex >= 0 && currentTocIndex < chapterTocItems.length - 1) {
       const nextTocTitle = chapterTocItems[currentTocIndex + 1].title
       const nextTitleNormalized = normalizeTitle(nextTocTitle)
@@ -1153,39 +845,32 @@ export default function BookReaderPage() {
       }
     }
     
-    // 如果找到了起始位置，返回过滤后的内容
     if (startIndex >= 0) {
       const filteredLines = lines.slice(startIndex, endIndex)
-      // 移除第一行的标题标记（如果存在），使用不可变方式
       const cleanedLines = filteredLines.length > 0
         ? [filteredLines[0].replace(/^#+\s+/, '').trim(), ...filteredLines.slice(1)]
         : filteredLines
       return cleanedLines.join('\n').trim()
     }
     
-    // 如果没找到，返回全部内容
     return currentMainText
   }, [currentMainText, activeTocTitle, allTocItems, safeActiveIndex])
 
-  // 处理正文段落，识别注释并添加样式
   const parseParagraphs = useMemo(() => {
     return (text: string | null) => {
       if (!text) return []
       const raw = text.replace(/\r\n/g, '\n').trim()
       if (!raw) return []
       
-      // 按双换行分割段落
       const paragraphs = raw
         .split(/\n{2,}/g)
         .map((x) => x.trim())
         .filter(Boolean)
       
       return paragraphs.map((para) => {
-        // 检查是否是注释
         const annotationPattern = /^(註|注|注释|註釋|【注】|【註】|\[注\]|\[註\])\s*[:：]?\s*/
         const isAnnotation = annotationPattern.test(para)
         
-        // 如果段落是标题（以#开头），移除标题标记
         const isTitle = /^#+\s+/.test(para)
         const cleanedPara = isTitle ? para.replace(/^#+\s+/, '') : para
         
@@ -1198,51 +883,6 @@ export default function BookReaderPage() {
   }, [])
 
   const paragraphsPerPage = 10
-
-  const extractTocSectionText = useCallback((
-    chapterMainText: string,
-    chapterTocItems: Array<{ title: string }>,
-    tocIndexInChapter: number
-  ) => {
-    if (chapterTocItems.length <= 1 || tocIndexInChapter < 0) return chapterMainText
-
-    const normalizeHeading = (title: string) => title.trim().replace(/^#+\s+/, '')
-    const lines = chapterMainText.split('\n')
-    const currentTitleNormalized = normalizeHeading(chapterTocItems[tocIndexInChapter].title)
-
-    let startIndex = -1
-    let endIndex = lines.length
-
-    for (let i = 0; i < lines.length; i++) {
-      const normalizedLine = normalizeHeading(lines[i].trim())
-      if (
-        normalizedLine === currentTitleNormalized ||
-        (normalizedLine.includes(currentTitleNormalized) &&
-          Math.abs(normalizedLine.length - currentTitleNormalized.length) <= 5)
-      ) {
-        startIndex = i
-        break
-      }
-    }
-
-    if (startIndex >= 0 && tocIndexInChapter < chapterTocItems.length - 1) {
-      const nextTitleNormalized = normalizeHeading(chapterTocItems[tocIndexInChapter + 1].title)
-      for (let i = startIndex + 1; i < lines.length; i++) {
-        const normalizedLine = normalizeHeading(lines[i].trim())
-        if (
-          normalizedLine === nextTitleNormalized ||
-          (normalizedLine.includes(nextTitleNormalized) &&
-            Math.abs(normalizedLine.length - nextTitleNormalized.length) <= 5)
-        ) {
-          endIndex = i
-          break
-        }
-      }
-    }
-
-    if (startIndex < 0) return chapterMainText
-    return lines.slice(startIndex, endIndex).join('\n')
-  }, [])
 
   const textSegments = useMemo(() => {
     if (viewMode === 'slices') return []
@@ -1317,7 +957,6 @@ export default function BookReaderPage() {
     return parseParagraphs(displayMainText)
   }, [displayMainText, parseParagraphs])
 
-  // 计算整个书籍的总页数
   const totalPages = useMemo(() => {
     if (viewMode === 'slices') {
       return (slicesManifest?.page_count ?? slicePages.length) || 1
@@ -1342,15 +981,11 @@ export default function BookReaderPage() {
     return allContentParagraphs
   }, [allContentParagraphs])
 
-  // 计算是否有上一页/下一页
-  // 文本模式：在同一目录项内翻页，如果当前目录项内没有上一页/下一页，则切换到上一个/下一个目录项
-  // 切片模式：在页面之间导航
   const hasPrev = viewMode === 'slices' 
     ? safeActivePageIndex > 0 
     : currentBookPageIndex > 0
   const hasNext = viewMode === 'slices'
     ? (() => {
-        // 优先使用 page_count，如果不存在则使用 slicePages.length
         const totalSlicePages = slicesManifest?.page_count ?? slicePages.length
         return totalSlicePages > 0 && safeActivePageIndex < totalSlicePages - 1
       })()
@@ -1498,7 +1133,7 @@ export default function BookReaderPage() {
     viewMode,
   ])
 
-  const sliceEnabled = book?.slice_enabled !== false // 默认为true，只有明确设置为false时才关闭
+  const sliceEnabled = book?.slice_enabled !== false 
   const canSlice = sliceEnabled && !!book?.id && !!ocrSourcePdfUrl && !slicesManifestUrl
 
   const handleSlice = async () => {
@@ -1545,6 +1180,80 @@ export default function BookReaderPage() {
     }
   }
 
+  // 渲染右侧内容（提取为变量以便复用）
+  const renderRightSidebarContent = () => (
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b border-stone-200/50 flex items-center justify-between">
+        <div className="relative flex-1 mr-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
+          <input 
+            type="text" 
+            placeholder="文中搜..." 
+            className="w-full bg-white border border-stone-200 rounded-full py-1.5 pl-9 pr-3 text-xs focus:outline-none focus:border-[#C82E31] transition-colors"
+          />
+        </div>
+        {/* 仅在移动端显示关闭按钮 */}
+        <Button variant="ghost" size="icon" className="h-8 w-8 xl:hidden" onClick={() => setMobileRightSidebarOpen(false)}>
+          <X className="w-4 h-4 text-stone-500" />
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1 min-h-0 p-4">
+        <div className="space-y-6">
+          {/* 知识点卡片 */}
+          <div>
+            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Keywords</h3>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary" className="bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer">
+                动爻
+              </Badge>
+              <Badge variant="secondary" className="bg-[#C82E31]/10 text-[#C82E31] hover:bg-[#C82E31]/20 cursor-pointer border-transparent">
+                进神
+              </Badge>
+              <Badge variant="secondary" className="bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer">
+                回头克
+              </Badge>
+            </div>
+          </div>
+
+          <Separator className="bg-stone-100" />
+
+          {/* 关联案例 */}
+          <div>
+            <h3 className="text-xs font-bold text-stone-800 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Bookmark className="w-3 h-3 text-[#C82E31]" />
+              实证案例推荐
+            </h3>
+            <p className="text-[10px] text-stone-400 mb-3">
+              根据当前章节内容，为您推荐以下实战卦例：
+            </p>
+            <div className="space-y-3">
+              {RELATED_CASES.map(caseItem => (
+                <CaseCard key={caseItem.id} data={caseItem} />
+              ))}
+            </div>
+            <Button variant="link" className="text-xs text-stone-400 w-full mt-2 h-auto p-0 hover:text-[#C82E31]">
+              查看更多相关案例 &rarr;
+            </Button>
+          </div>
+
+          <Separator className="bg-stone-100" />
+
+          {/* 读书笔记预览 */}
+          <div>
+            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">My Notes</h3>
+            <div className="bg-[#fff9c4]/30 border border-[#fff9c4] p-3 rounded-lg">
+              <p className="text-xs text-stone-600 font-serif leading-relaxed">
+                “变爻只可生克本位之动爻” —— 这一点非常关键，很多时候容易看错，以为变爻可以去生克世应。
+              </p>
+              <div className="mt-2 text-[10px] text-stone-400 text-right">2023-10-24</div>
+            </div>
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
+  )
+
   if (loading) {
     return (
       <>
@@ -1577,56 +1286,59 @@ export default function BookReaderPage() {
     <>
       <style jsx global>{styles}</style>
       
-      <div className="flex flex-col h-screen paper-texture overflow-hidden text-stone-800">
+      <div className="flex flex-col h-full paper-texture overflow-hidden text-stone-800 relative">
         
-        {/* 1. 顶部导航栏 (沉浸式) */}
-        <header className="flex-none h-14 border-b border-stone-200/60 bg-[#fdfbf7]/90 backdrop-blur-md px-4 flex items-center justify-between z-20">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600" onClick={() => router.push('/library/books')}>
+        {/* 1. 顶部导航栏 */}
+        <header className="flex-none h-14 border-b border-stone-200/60 bg-[#fdfbf7]/90 backdrop-blur-md px-3 md:px-4 flex items-center justify-between z-20 relative">
+          <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
+            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600 flex-shrink-0" onClick={() => router.push('/library/books')}>
               <ChevronLeft className="w-5 h-5" />
             </Button>
             
-            <div className="flex flex-col">
+            <div className="flex flex-col overflow-hidden">
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold font-serif text-stone-800">{book.title}</h1>
-                <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
-                  {normalizeCategory(book.category)}
-                </Badge>
-                <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
-                  {normalizeStatus(book.status)}
-                </Badge>
+                <h1 className="text-sm font-bold font-serif text-stone-800 truncate max-w-[150px] md:max-w-xs">{book.title}</h1>
+                <div className="hidden sm:flex gap-1">
+                  <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                    {normalizeCategory(book.category)}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                    {normalizeStatus(book.status)}
+                  </Badge>
+                </div>
               </div>
-              <span className="text-[10px] text-stone-500">{activeTitle}</span>
+              <span className="text-[10px] text-stone-500 truncate max-w-[200px] md:max-w-md">{activeTitle}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {sliceEnabled && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs text-stone-500 hover:text-stone-800"
+                className="text-xs text-stone-500 hover:text-stone-800 px-2"
                 disabled={viewMode === 'text' ? !slicesManifestUrl : false}
                 onClick={() => setViewMode((m) => (m === 'slices' ? 'text' : 'slices'))}
               >
-                {viewMode === 'slices' ? (isTextPreparing ? '文字（转换中）' : '文字') : '切片'}
+                {viewMode === 'slices' ? (isTextPreparing ? '转文中' : '转文字') : '看切片'}
               </Button>
             )}
             {canSlice && (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 px-3 text-xs border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]"
+                className="hidden sm:flex h-8 px-3 text-xs border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]"
                 disabled={slicesLoading}
                 onClick={handleSlice}
               >
-                {slicesLoading ? '切片中...' : '生成切片'}
+                {slicesLoading ? '切片中' : '生成切片'}
               </Button>
             )}
-            {/* 字体设置 Popover */}
+            
+            {/* 字体设置 */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800">
+                <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800 h-9 w-9">
                   <Settings className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
@@ -1651,22 +1363,57 @@ export default function BookReaderPage() {
               </PopoverContent>
             </Popover>
 
-            <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800">
-              <Highlighter className="w-4 h-4" />
+            {/* 移动端显示的右侧栏开关 */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-stone-500 hover:text-stone-800 h-9 w-9 xl:hidden"
+              onClick={() => setMobileRightSidebarOpen(true)}
+            >
+              <PanelRight className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800">
-              <Share2 className="w-4 h-4" />
-            </Button>
-            <Button className="bg-[#C82E31] hover:bg-[#a61b1f] text-white h-8 px-4 text-xs shadow-sm">
-              做笔记
-            </Button>
+
+            {/* 大屏显示的额外按钮 */}
+            <div className="hidden md:flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800 h-9 w-9">
+                <Highlighter className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-stone-500 hover:text-stone-800 h-9 w-9">
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button className="ml-2 bg-[#C82E31] hover:bg-[#a61b1f] text-white h-8 px-4 text-xs shadow-sm">
+                笔记
+              </Button>
+            </div>
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex overflow-hidden relative">
           
-          {/* 2. 左侧目录 (拟物化侧边条) */}
-          <aside className={`w-64 flex-none border-r border-stone-200/60 bg-[#f9f8f4] flex flex-col transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-64 absolute h-full z-30 shadow-xl'}`}>
+          {/* 
+            移动端左侧栏遮罩层 - 使用 absolute inset-0 
+            使其位于 flex-1 容器内部，从而自然地位于 header 下方
+          */}
+          {sidebarOpen && (
+            <div 
+              className="absolute inset-0 bg-black/20 z-30 md:hidden backdrop-blur-[1px]" 
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* 
+            2. 左侧目录 
+            移动端：absolute inset-y-0 且 left-0，位于 flex-1 容器内
+            PC端：relative
+          */}
+          <aside 
+            className={`
+              flex-none border-r border-stone-200/60 bg-[#f9f8f4] flex flex-col transition-all duration-300 ease-in-out
+              absolute inset-y-0 left-0 z-40 w-64 shadow-xl transform
+              md:relative md:h-auto md:shadow-none md:z-auto
+              ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:-translate-x-64 md:absolute md:h-full md:z-30'}
+            `}
+          >
             <div className="p-4 border-b border-stone-200/50 flex items-center justify-between">
               <span className="font-serif font-bold text-stone-700 flex items-center gap-2">
                 <Menu className="w-4 h-4" /> 目录
@@ -1675,7 +1422,7 @@ export default function BookReaderPage() {
                 <ChevronLeft className="w-3 h-3" />
               </Button>
             </div>
-                <ScrollArea className="flex-1 p-3">
+            <ScrollArea className="flex-1 min-h-0 p-3">
               <div className="space-y-1">
                 {viewMode === 'slices' ? (
                   slicePages.map((p, i) => (
@@ -1690,8 +1437,8 @@ export default function BookReaderPage() {
                       `}
                       onClick={() => {
                         setActiveIndex(i)
-                        // 切片模式下，标题保持当前章节标题不变
-                        // 这里不需要更新 currentChapterIndex，因为切片模式下标题应该保持章节标题
+                        // 移动端点击后自动收起
+                        if (window.innerWidth < 768) setSidebarOpen(false)
                       }}
                     >
                       <div
@@ -1702,14 +1449,13 @@ export default function BookReaderPage() {
                   ))
                 ) : (
                   <>
-                    {/* 只显示目录部分 */}
+                    {/* 目录部分 */}
                     {tocItems.length > 0 ? (
                       <>
                         <div className="px-3 py-3 mb-2 border-b border-stone-200/50">
                           <div className="text-sm font-bold text-stone-700 uppercase tracking-wider">目录</div>
                         </div>
                         {tocItems.map((item, idx) => {
-                          // 只激活与当前显示标题匹配的目录项，避免同一章节的多个目录项同时激活
                           const isActive = idx === activeTocIndex
                           return (
                             <div
@@ -1722,12 +1468,11 @@ export default function BookReaderPage() {
                                 }
                               `}
                               onClick={() => {
-                                // 点击目录项时，跳转到对应章节并设置激活的目录项索引
                                 setActiveIndex(item.chapterIndex)
-                                // 更新当前目录项索引（用于标题显示和目录高亮）
                                 setCurrentTocItemIndex(idx)
-                                // 重置页码
                                 setCurrentPageIndex(0)
+                                // 移动端点击后自动收起
+                                if (window.innerWidth < 768) setSidebarOpen(false)
                               }}
                             >
                               <div className="flex items-center gap-2">
@@ -1768,14 +1513,15 @@ export default function BookReaderPage() {
           )}
 
           {/* 3. 中间正文 (阅读器核心) */}
-          <div className="flex-1 min-w-0 relative bg-transparent flex justify-center">
-            <ScrollArea className="h-full w-full">
-              <div className="max-w-3xl mx-auto px-8 lg:px-16 py-12">
+          <div className="flex-1 min-h-0 min-w-0 relative bg-transparent flex flex-col">
+            <ScrollArea className="flex-1 min-h-0 w-full">
+              {/* 响应式Padding调整：移动端px-4，平板px-8，PC px-16 */}
+              <div className="max-w-3xl mx-auto px-4 md:px-8 lg:px-16 py-8 md:py-12">
                 
                 {/* 章节标题 */}
-                <div className="text-center mb-12 pb-8 border-b border-dashed border-stone-300">
+                <div className="text-center mb-8 md:mb-12 pb-6 md:pb-8 border-b border-dashed border-stone-300">
                   <span className="text-xs text-stone-400 font-serif tracking-widest uppercase mb-2 block">Chapter</span>
-                  <h2 className="text-3xl font-bold font-serif text-stone-900 mb-4">{activeTitle || '正文'}</h2>
+                  <h2 className="text-2xl md:text-3xl font-bold font-serif text-stone-900 mb-4">{activeTitle || '正文'}</h2>
                   <div className="flex items-center justify-center gap-4 text-xs text-stone-500">
                     <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> 原文</span>
                     <span>•</span>
@@ -1859,17 +1605,16 @@ export default function BookReaderPage() {
                     className="prose prose-stone max-w-none font-serif text-stone-800 leading-loose"
                     style={{ fontSize: `${fontSize[0]}px` }}
                   >
-                    {/* 显示正文内容 - 使用ReactMarkdown渲染 */}
+                    {/* 显示正文内容 */}
                     {contentParagraphs.length > 0 ? (
                       <div className="space-y-4 markdown-content-wrapper">
                         {contentParagraphs.map((para, idx) => {
-                          // 检查是否是注释
                           if (para.isAnnotation) {
                             const annotationText = para.text.replace(/^(註|注|注释|註釋|【注】|【註】|\[注\]|\[註\])\s*[:：]?\s*/, '')
                             return (
                               <div
                                 key={idx}
-                                className="annotation-block border-l-4 border-[#8c7b75] bg-[#f5f1e8]/50 px-6 py-4 my-6 rounded-r"
+                                className="annotation-block border-l-4 border-[#8c7b75] bg-[#f5f1e8]/50 px-4 md:px-6 py-4 my-6 rounded-r"
                                 style={{ fontSize: `${fontSize[0] * 0.9}px` }}
                               >
                                 <span className="annotation-label text-[#8c7b75] font-bold text-sm uppercase tracking-wider block mb-2">注释</span>
@@ -1882,9 +1627,6 @@ export default function BookReaderPage() {
                             )
                           }
                           
-                          // 普通段落 - 使用ReactMarkdown渲染以支持markdown格式
-                          // 支持粗体、斜体、标题、列表、链接等markdown语法
-                          // 注意：术语高亮通过 CSS 实现，不需要预处理
                           return (
                             <div key={idx} className="markdown-content">
                               <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]}>
@@ -1910,14 +1652,13 @@ export default function BookReaderPage() {
                 )}
 
                 {/* 底部翻页 */}
-                <div className="flex justify-between items-center mt-16 pt-8 border-t border-stone-200">
+                <div className="flex justify-between items-center mt-12 md:mt-16 pt-8 border-t border-stone-200">
                   <Button
                     variant="ghost"
-                    className="text-stone-500 hover:text-stone-800"
+                    className="text-stone-500 hover:text-stone-800 text-xs md:text-sm"
                     disabled={!hasPrev}
                     onClick={() => {
                       if (viewMode === 'slices') {
-                        // 切片模式：上一页
                         setActiveIndex((x) => Math.max(0, x - 1))
                       } else {
                         navigateToBookPage(currentBookPageIndex - 1)
@@ -1927,8 +1668,7 @@ export default function BookReaderPage() {
                     上一页
                   </Button>
                   
-                  {/* 页码显示 */}
-                  <div className="text-sm text-stone-500 font-serif">
+                  <div className="text-xs md:text-sm text-stone-500 font-serif">
                     {viewMode === 'slices' 
                       ? `(${safeActivePageIndex + 1}/${(slicesManifest?.page_count ?? slicePages.length) || 1}页)`
                       : (() => {
@@ -1940,11 +1680,10 @@ export default function BookReaderPage() {
                   
                   <Button
                     variant="outline"
-                    className="border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31]"
+                    className="border-stone-300 text-stone-700 hover:text-[#C82E31] hover:border-[#C82E31] text-xs md:text-sm"
                     disabled={!hasNext}
                     onClick={() => {
                       if (viewMode === 'slices') {
-                        // 切片模式：下一页
                         const totalSlicePages = slicesManifest?.page_count ?? slicePages.length
                         setActiveIndex((x) => Math.min(Math.max(0, totalSlicePages - 1), x + 1))
                       } else {
@@ -1960,75 +1699,28 @@ export default function BookReaderPage() {
             </ScrollArea>
           </div>
 
-          {/* 4. 右侧助手栏 (实证互联) */}
-          <aside className="w-80 flex-none border-l border-stone-200/60 bg-white/60 hidden xl:flex flex-col">
-            <div className="p-4 border-b border-stone-200/50">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
-                <input 
-                  type="text" 
-                  placeholder="文中搜..." 
-                  className="w-full bg-white border border-stone-200 rounded-full py-1.5 pl-9 pr-3 text-xs focus:outline-none focus:border-[#C82E31] transition-colors"
-                />
-              </div>
-            </div>
-
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-6">
-                
-                {/* 知识点卡片 */}
-                <div>
-                  <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Keywords</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer">
-                      动爻
-                    </Badge>
-                    <Badge variant="secondary" className="bg-[#C82E31]/10 text-[#C82E31] hover:bg-[#C82E31]/20 cursor-pointer border-transparent">
-                      进神
-                    </Badge>
-                    <Badge variant="secondary" className="bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer">
-                      回头克
-                    </Badge>
-                  </div>
-                </div>
-
-                <Separator className="bg-stone-100" />
-
-                {/* 关联案例 (Killer Feature) */}
-                <div>
-                  <h3 className="text-xs font-bold text-stone-800 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <Bookmark className="w-3 h-3 text-[#C82E31]" />
-                    实证案例推荐
-                  </h3>
-                  <p className="text-[10px] text-stone-400 mb-3">
-                    根据当前章节内容，为您推荐以下实战卦例：
-                  </p>
-                  <div className="space-y-3">
-                    {RELATED_CASES.map(caseItem => (
-                      <CaseCard key={caseItem.id} data={caseItem} />
-                    ))}
-                  </div>
-                  <Button variant="link" className="text-xs text-stone-400 w-full mt-2 h-auto p-0 hover:text-[#C82E31]">
-                    查看更多相关案例 &rarr;
-                  </Button>
-                </div>
-
-                <Separator className="bg-stone-100" />
-
-                {/* 读书笔记预览 */}
-                <div>
-                  <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">My Notes</h3>
-                  <div className="bg-[#fff9c4]/30 border border-[#fff9c4] p-3 rounded-lg">
-                    <p className="text-xs text-stone-600 font-serif leading-relaxed">
-                      “变爻只可生克本位之动爻” —— 这一点非常关键，很多时候容易看错，以为变爻可以去生克世应。
-                    </p>
-                    <div className="mt-2 text-[10px] text-stone-400 text-right">2023-10-24</div>
-                  </div>
-                </div>
-
-              </div>
-            </ScrollArea>
+          {/* 4. 右侧助手栏 (响应式：PC端显示，移动端默认隐藏，通过按钮滑出) */}
+          
+          {/* PC 端固定显示 */}
+          <aside className="w-80 flex-none border-l border-stone-200/60 bg-white/60 hidden xl:flex flex-col min-h-0">
+             {renderRightSidebarContent()}
           </aside>
+
+          {/* 
+             移动端/平板端 抽屉显示 
+             使用 absolute inset-0，位于 flex-1 容器内，因此不会覆盖 Header
+          */}
+          {mobileRightSidebarOpen && (
+            <div className="absolute inset-0 z-50 xl:hidden">
+              <div 
+                className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" 
+                onClick={() => setMobileRightSidebarOpen(false)}
+              />
+              <aside className="absolute top-0 right-0 h-full w-80 bg-[#fdfbf7] shadow-xl animate-in slide-in-from-right duration-300">
+                {renderRightSidebarContent()}
+              </aside>
+            </div>
+          )}
 
         </div>
       </div>

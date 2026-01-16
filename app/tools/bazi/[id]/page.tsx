@@ -1,49 +1,52 @@
 'use client'
 
 import {
-  ArrowLeft,
-  Check,
-  PenLine,
-  RotateCcw,
-  Sparkles,
-  X,
-  Zap
+    ArrowLeft,
+    Check,
+    PenLine,
+    RotateCcw,
+    Sparkles,
+    ThumbsDown,
+    ThumbsUp,
+    X,
+    Zap
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
+import { trackEvent } from '@/lib/analytics'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
-  addDivinationNote,
-  deleteDivinationNote,
-  getBaZiRecordById,
-  getDivinationNotes,
-  saveBaZiRecord,
-  updateBaZiName,
-  updateDivinationNote,
-  type DivinationNote
+    addDivinationNote,
+    deleteDivinationNote,
+    getBaZiRecordById,
+    getDivinationNotes,
+    saveBaZiRecord,
+    updateBaZiName,
+    updateDivinationNote,
+    type DivinationNote
 } from '@/lib/services/profile'
 import {
-  getMingGong,
-  getMingGua,
-  getShenGong,
-  getTaiXi,
-  getTaiYuan,
-  type BaZiResult
+    getMingGong,
+    getMingGua,
+    getShenGong,
+    getTaiXi,
+    getTaiYuan,
+    type BaZiResult
 } from '@/lib/utils/bazi'
 import { cn } from '@/lib/utils/cn'
 import { getGanZhiInfo, getKongWangPairForStemBranch, getLunarDateStringWithoutYear } from '@/lib/utils/lunar'
@@ -320,11 +323,14 @@ function ResultPageContent() {
   const [aiStreamContent, setAiStreamContent] = useState('')
   const [isAiStreaming, setIsAiStreaming] = useState(false)
   const [aiStreamError, setAiStreamError] = useState<Error | null>(null)
+  const [aiFeedback, setAiFeedback] = useState<'good' | 'bad' | null>(null)
+  const [submittingAiFeedback, setSubmittingAiFeedback] = useState(false)
   const aiAbortControllerRef = useRef<AbortController | null>(null)
   const aiIdempotencyKeyRef = useRef<string | null>(null)
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
+  const resultViewTrackedRef = useRef<string | null>(null)
   
   // Share dialog state
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
@@ -494,6 +500,20 @@ function ResultPageContent() {
     }
   }, [payload])
 
+  useEffect(() => {
+    if (!payload || !calculatedData) return
+    const key = normalizedResultId
+    if (resultViewTrackedRef.current === key) return
+    resultViewTrackedRef.current = key
+    trackEvent('tool_result_view', {
+      type: 'bazi',
+      gender: payload.gender,
+      is_solar_correction: payload.solarTimeCorrection,
+      has_ai_result: !!aiResult,
+      from,
+    })
+  }, [payload, calculatedData, normalizedResultId, aiResult, from])
+
   const persistAiResult = useCallback(async (result: string) => {
     if (!result.trim()) return
     if (savedOnceRef.current) return
@@ -512,12 +532,40 @@ function ResultPageContent() {
     setAiResultAt(new Date().toISOString())
   }, [recordIdForAi])
 
+  const submitAiFeedback = useCallback(async (rating: 'good' | 'bad') => {
+    if (submittingAiFeedback) return
+    setSubmittingAiFeedback(true)
+    try {
+      const session = await getSession()
+      const token = session?.access_token
+      if (!token) return
+      const recordId = recordIdForAi || normalizedResultId
+      setAiFeedback(rating)
+      trackEvent('ai_feedback', { rating, record_id: recordId, divination_type: 'bazi' })
+      await fetch('/api/ai/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          rating,
+          record_id: recordId,
+          divination_type: 'bazi',
+        }),
+      })
+    } finally {
+      setSubmittingAiFeedback(false)
+    }
+  }, [normalizedResultId, recordIdForAi, submittingAiFeedback])
+
   const startAiAnalysis = useCallback(async () => {
     if (!calculatedData || !payload) {
       console.warn('Cannot analyze: data is missing')
       return
     }
 
+    const startedAt = Date.now()
     aiAbortControllerRef.current?.abort()
     const controller = new AbortController()
     aiAbortControllerRef.current = controller
@@ -587,6 +635,12 @@ function ResultPageContent() {
 
       setIsAiStreaming(false)
       persistAiResult(accumulatedContent)
+      trackEvent('ai_response_complete', {
+        latency: Date.now() - startedAt,
+        token_usage: null,
+        content_length: accumulatedContent.length,
+        divination_type: 'bazi',
+      })
       
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -595,6 +649,10 @@ function ResultPageContent() {
       console.error('AI Analysis Error:', err)
       setAiStreamError(err instanceof Error ? err : new Error(String(err)))
       setIsAiStreaming(false)
+      trackEvent('ai_analysis_error', {
+        error: err instanceof Error ? err.message : String(err),
+        divination_type: 'bazi',
+      })
     }
   }, [calculatedData, payload, name, persistAiResult])
 
@@ -939,7 +997,12 @@ function ResultPageContent() {
       return
     }
     setShareDialogOpen(true)
-  }, [payload, toast])
+    trackEvent('tool_result_share', {
+      share_channel: 'share_dialog',
+      has_ai_content: !!aiResult,
+      type: 'bazi',
+    })
+  }, [payload, toast, aiResult])
 
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) return
@@ -1318,6 +1381,34 @@ function ResultPageContent() {
                         <ReactMarkdown>{isAiStreaming ? aiStreamContent : aiResult}</ReactMarkdown>
                       </div>
                     )}
+                  
+                  {!isAiStreaming && aiResult && !aiStreamError && (
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-stone-100 pt-4">
+                      <div className="text-xs text-stone-500">这次 AI 详批有帮助吗？</div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={submittingAiFeedback}
+                          className={aiFeedback === 'good' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-stone-200'}
+                          onClick={() => submitAiFeedback('good')}
+                        >
+                          <ThumbsUp className="w-4 h-4 mr-1" />
+                          有用
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={submittingAiFeedback}
+                          className={aiFeedback === 'bad' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-stone-200'}
+                          onClick={() => submitAiFeedback('bad')}
+                        >
+                          <ThumbsDown className="w-4 h-4 mr-1" />
+                          无用
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 )}
 

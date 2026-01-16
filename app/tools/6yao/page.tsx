@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 // UI Components
 import DivinationCasting from '@/lib/components/DivinationCasting'
 import { Button } from '@/lib/components/ui/button'
+import { trackEvent } from '@/lib/analytics'
 import {
   Drawer,
   DrawerClose,
@@ -196,6 +197,7 @@ export default function ToolsPage() {
   
   // 摇卦状态
   const [isCasting, setIsCasting] = useState(false)
+  const castStartAtRef = useRef<number | null>(null)
   const [lines, setLines] = useState<string[]>([])
   const [changingFlags, setChangingFlags] = useState<boolean[]>([])
   const [isComplete, setIsComplete] = useState(false)
@@ -281,6 +283,11 @@ export default function ToolsPage() {
         setLastResultId(resultId)
       }
       setIsComplete(true)
+      const startedAt = castStartAtRef.current
+      trackEvent('tool_divination_complete', {
+        type: 'liuyao',
+        duration: typeof startedAt === 'number' ? Date.now() - startedAt : null,
+      })
     } catch (e) {
       console.error('Storage error', e)
     }
@@ -346,6 +353,12 @@ export default function ToolsPage() {
     }
     setQuestionError(false)
     setIsCasting(true)
+    castStartAtRef.current = Date.now()
+    trackEvent('tool_divination_start', {
+      type: 'liuyao',
+      entry_point: 'tools/6yao',
+      divination_method: divinationMethod,
+    })
     return true
   }
 

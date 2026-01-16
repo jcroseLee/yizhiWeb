@@ -1,6 +1,7 @@
-import { getSupabaseClient } from './supabaseClient'
+import { trackEvent } from '@/lib/analytics'
 import { getCurrentUser } from './auth'
 import { addReputation } from './growth'
+import { getSupabaseClient } from './supabaseClient'
 
 /**
  * 验证反馈服务
@@ -40,7 +41,7 @@ export async function verifyComment(
     // 1. 验证用户是否为帖子作者（题主）
     const { data: post, error: postError } = await supabase
       .from('posts')
-      .select('user_id')
+      .select('user_id, created_at')
       .eq('id', postId)
       .single()
 
@@ -115,6 +116,13 @@ export async function verifyComment(
     const message = result === 'accurate'
       ? '已标记为"准"，评论者获得20声望值'
       : '已标记为"不准"'
+
+    trackEvent('case_feedback_update', {
+      accuracy: result === 'accurate' ? '准' : '错',
+      post_id: postId,
+      comment_id: commentId,
+      days_after_post: post?.created_at ? Math.floor((Date.now() - new Date(post.created_at).getTime()) / (1000 * 60 * 60 * 24)) : null,
+    })
 
     return {
       success: true,
@@ -311,4 +319,3 @@ export async function getUserAccuracyStats(): Promise<{
     return { totalVerified: 0, accurateCount: 0, accuracyRate: 0 }
   }
 }
-

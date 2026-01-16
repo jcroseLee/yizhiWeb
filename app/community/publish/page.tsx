@@ -1,5 +1,6 @@
 'use client'
 
+import { trackEvent } from '@/lib/analytics'
 import RichTextEditor from '@/lib/components/RichTextEditor'
 import TagPanel from '@/lib/components/TagPanel'
 import { Button } from '@/lib/components/ui/button'
@@ -419,6 +420,13 @@ function PublishPageContent() {
           await publishDraft(editingPostId)
           post = await updatePost(editingPostId, postData)
           await setPostTags(editingPostId, selectedTags.map((t) => t.id))
+          trackEvent('post_publish', {
+            has_bounty: bounty > 0,
+            amount: bounty > 0 ? bounty : 0,
+            tags: selectedTags.map((t) => t.name),
+            gua_type: method,
+            post_id: editingPostId,
+          })
           toast({ title: '发布成功' })
         } else {
           post = await updatePost(editingPostId, postData)
@@ -428,6 +436,13 @@ function PublishPageContent() {
       } else {
         post = await createPost(postData)
         await setPostTags(post.id, selectedTags.map((t) => t.id))
+        trackEvent('post_publish', {
+          has_bounty: bounty > 0,
+          amount: bounty > 0 ? bounty : 0,
+          tags: selectedTags.map((t) => t.name),
+          gua_type: method,
+          post_id: post.id,
+        })
         toast({ title: '发布成功' })
       }
       router.push(`/community/${post.id}`)
@@ -678,7 +693,11 @@ function PublishPageContent() {
                                 type="number"
                                 min="0"
                                 value={bounty}
-                                onChange={(e) => setBounty(Number(e.target.value))}
+                                onChange={(e) => {
+                                  const next = Number(e.target.value)
+                                  setBounty(next)
+                                  trackEvent('coin_bounty_set', { amount: next })
+                                }}
                                 className="w-20 lg:w-24 pr-8 lg:pr-10 text-right font-bold border-stone-200 focus-visible:ring-amber-500/20 focus-visible:border-amber-500 h-8 lg:h-10 text-sm"
                               />
                               <span className="absolute right-2 lg:right-3 text-xs text-stone-400 font-medium">币</span>

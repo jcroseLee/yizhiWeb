@@ -514,12 +514,28 @@ export async function getTotalUnreadCount(): Promise<number> {
       .eq('is_read', false)
 
     if (error) {
-      logError('Error getting notification unread count:', error)
+      // 如果是网络错误（可能是广告拦截器拦截了 notifications 请求），仅记录警告
+      const isNetworkError = 
+        (error.message && error.message.includes('Failed to fetch')) ||
+        (error.details && error.details.includes('Failed to fetch'))
+
+      if (isNetworkError) {
+        console.warn('Failed to fetch notifications unread count (possible AdBlocker or network issue):', error)
+      } else {
+        logError('Error getting notification unread count:', error)
+      }
       return dmUnreadCount
     }
 
     return dmUnreadCount + (notificationUnreadCount || 0)
   } catch (error) {
+    // 处理可能的网络错误
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('Failed to fetch')) {
+      console.warn('Network error getting total unread count:', error)
+      return 0
+    }
+
     logError('Error getting total unread count:', error)
     return 0
   }

@@ -1,5 +1,6 @@
 'use client'
 
+import { trackEvent } from '@/lib/analytics';
 import { Button } from '@/lib/components/ui/button';
 import { ScrollArea } from '@/lib/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/lib/components/ui/sheet'; // 需要确保引入了 Sheet 组件
@@ -7,7 +8,7 @@ import { calculateBaZi, type BaZiResult } from '@/lib/utils/bazi';
 import { calculateTrueSolarTime } from '@/lib/utils/solarTime';
 import { Edit3, Scroll, Settings2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { BaZiForm } from '../components/BaZiForm';
 import { BaZiInitialState } from '../components/BaZiInitialState';
 
@@ -159,11 +160,30 @@ export default function BaZiPage() {
   
   // 控制移动端 Sheet 开关
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false)
+  const calculateStartAtRef = useRef<number | null>(null)
 
   const hourMap: Record<string, number> = {
     'zi': 23, 'chou': 1, 'yin': 3, 'mao': 5, 'chen': 7, 'si': 9,
     'wu': 11, 'wei': 13, 'shen': 15, 'you': 17, 'xu': 19, 'hai': 21,
   }
+
+  const handleSolarTimeCorrectionToggle = useCallback((value: boolean) => {
+    setSolarTimeCorrection(value)
+    trackEvent('tool_param_toggle', {
+      type: 'bazi',
+      param: 'solar_time_correction',
+      is_enabled: value,
+    })
+  }, [])
+
+  const handleEarlyZiHourToggle = useCallback((value: boolean) => {
+    setEarlyZiHour(value)
+    trackEvent('tool_param_toggle', {
+      type: 'bazi',
+      param: 'early_zi_hour',
+      is_enabled: value,
+    })
+  }, [])
 
   const handleCalculate = () => {
     if (!name || name.trim() === '') {
@@ -177,6 +197,11 @@ export default function BaZiPage() {
     if (!date) return
 
     setLoading(true)
+    calculateStartAtRef.current = Date.now()
+    trackEvent('tool_divination_start', {
+      type: 'bazi',
+      entry_point: 'tools/bazi',
+    })
 
     const calcDate = new Date(date)
     
@@ -231,6 +256,14 @@ export default function BaZiPage() {
         const updatedResults = [payload, ...existingResults].slice(0, 100)
         localStorage.setItem(BAZI_RESULTS_LIST_STORAGE_KEY, JSON.stringify(updatedResults))
         
+        const startedAt = calculateStartAtRef.current
+        trackEvent('tool_divination_complete', {
+          type: 'bazi',
+          duration: typeof startedAt === 'number' ? Date.now() - startedAt : null,
+          is_solar_adjusted: solarTimeCorrection,
+          early_zi_hour: earlyZiHour,
+        })
+
         router.push(`/tools/bazi/${resultId}`)
       }
     } catch (error) {
@@ -298,9 +331,9 @@ export default function BaZiPage() {
                             city={city}
                             setCity={setCity}
                             solarTimeCorrection={solarTimeCorrection}
-                            setSolarTimeCorrection={setSolarTimeCorrection}
+                            setSolarTimeCorrection={handleSolarTimeCorrectionToggle}
                             earlyZiHour={earlyZiHour}
-                            setEarlyZiHour={setEarlyZiHour}
+                            setEarlyZiHour={handleEarlyZiHourToggle}
                             nameError={nameError}
                             loading={loading}
                             onCalculate={handleCalculate}
@@ -328,8 +361,8 @@ export default function BaZiPage() {
               hour={hour} setHour={setHour}
               minute={minute} setMinute={setMinute}
               city={city} setCity={setCity}
-              solarTimeCorrection={solarTimeCorrection} setSolarTimeCorrection={setSolarTimeCorrection}
-              earlyZiHour={earlyZiHour} setEarlyZiHour={setEarlyZiHour}
+              solarTimeCorrection={solarTimeCorrection} setSolarTimeCorrection={handleSolarTimeCorrectionToggle}
+              earlyZiHour={earlyZiHour} setEarlyZiHour={handleEarlyZiHourToggle}
               nameError={nameError}
             />
           </ScrollArea>

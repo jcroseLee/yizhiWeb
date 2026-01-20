@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { getCurrentUser } from './auth';
+import { getCurrentPathWithSearchAndHash, getCurrentUser, redirectToLogin, setLoginIntent } from './auth';
 import { getSupabaseClient } from './supabaseClient';
 
 export async function syncProfileFromAuthUser(
@@ -47,6 +47,8 @@ export interface UserProfile {
   exp?: number
   reputation?: number
   yi_coins?: number
+  coin_paid?: number
+  coin_free?: number
   cash_balance?: number
   title_level?: number
   level?: number
@@ -159,6 +161,14 @@ export async function getUserProfile(): Promise<UserProfile | null> {
         return null
       }
 
+      if (data) {
+        data.coin_paid = data.coin_paid || 0
+        data.coin_free = data.coin_free || 0
+        if (data.yi_coins === undefined || data.yi_coins === null) {
+          data.yi_coins = data.coin_paid + data.coin_free
+        }
+      }
+
       return data
     } catch (error) {
       // 处理意外的错误（非 Supabase 错误）
@@ -268,6 +278,14 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
         return null
       }
 
+      if (data) {
+        data.coin_paid = data.coin_paid || 0
+        data.coin_free = data.coin_free || 0
+        if (data.yi_coins === undefined || data.yi_coins === null) {
+          data.yi_coins = data.coin_paid + data.coin_free
+        }
+      }
+
       return data as UserProfile
     } catch (error) {
       // 捕获意外的错误
@@ -369,6 +387,10 @@ export async function getUserProfileWithGrowth(): Promise<{
         return { profile: null, growth: null }
       }
 
+      const coinPaid = data.coin_paid || 0
+      const coinFree = data.coin_free || 0
+      const totalCoins = (data.yi_coins !== undefined && data.yi_coins !== null) ? data.yi_coins : (coinPaid + coinFree)
+
       const profile: UserProfile = {
         id: data.id,
         nickname: data.nickname,
@@ -378,7 +400,9 @@ export async function getUserProfileWithGrowth(): Promise<{
         created_at: data.created_at,
         exp: data.exp,
         reputation: data.reputation,
-        yi_coins: data.yi_coins,
+        yi_coins: totalCoins,
+        coin_paid: coinPaid,
+        coin_free: coinFree,
         cash_balance: data.cash_balance,
         title_level: data.title_level,
         level: data.level,
@@ -389,7 +413,7 @@ export async function getUserProfileWithGrowth(): Promise<{
       const growth = {
         exp: data.exp || 0,
         reputation: data.reputation || 0,
-        yiCoins: data.yi_coins || 0,
+        yiCoins: totalCoins,
         cashBalance: parseFloat(data.cash_balance || '0'),
         titleLevel: data.title_level || 1,
         lastCheckinDate: data.last_checkin_date,
@@ -773,62 +797,31 @@ export async function isFollowingUser(userId: string): Promise<boolean> {
 export async function toggleFollowUser(userId: string): Promise<boolean> {
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('请先登录')
+    setLoginIntent({ type: 'follow_user', userId, returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
   if (currentUser.id === userId) {
     throw new Error('不能关注自己')
   }
 
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('系统错误')
-  }
+  const res = await fetch(`/api/community/users/${userId}/follow`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'toggle' }),
+  })
 
-  try {
-    // 检查是否已关注
-    const { data: existingFollow } = await supabase
-      .from('user_follows')
-      .select('id')
-      .eq('follower_id', currentUser.id)
-      .eq('following_id', userId)
-      .maybeSingle()
-
-    if (existingFollow) {
-      // 取消关注
-      const { error } = await supabase
-        .from('user_follows')
-        .delete()
-        .eq('follower_id', currentUser.id)
-        .eq('following_id', userId)
-
-      if (error) {
-        console.error('Error unfollowing user:', error)
-        throw error
-      }
-
-      return false
-    } else {
-      // 关注
-      const { error } = await supabase
-        .from('user_follows')
-        .insert({
-          follower_id: currentUser.id,
-          following_id: userId,
-        })
-
-      if (error) {
-        console.error('Error following user:', error)
-        throw error
-      }
-
-      return true
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'follow_user', userId, returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
     }
-  } catch (error: unknown) {
-    console.error('Error toggling follow:', error)
-    const err = error as { message?: string }
-    throw new Error(err.message || '操作失败，请稍后重试')
+    throw new Error(json?.error || '操作失败，请稍后重试')
   }
+
+  return !!json?.following
 }
 
 /**

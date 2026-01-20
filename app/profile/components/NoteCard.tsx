@@ -31,7 +31,7 @@ export const NoteCard = ({ note }: NoteCardProps) => {
           <span className="text-xs text-gray-400 font-mono">
             {new Date(note.created_at).toLocaleDateString('zh-CN')}
           </span>
-          <Badge variant="secondary" className="text-[10px] bg-gray-100 text-gray-500">
+          <Badge variant="secondary" className="text-[0.625rem] bg-gray-100 text-gray-500">
             公开
           </Badge>
         </div>

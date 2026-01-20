@@ -1,8 +1,9 @@
 'use client'
 
+import BaZiThumbnail from '@/app/community/components/BaZiThumbnail'
 import GuaBlock from '@/lib/components/GuaBlock'
-import { Card, CardContent } from '@/lib/components/ui/card'
 import { cn } from '@/lib/utils/cn'
+import { Eye, MessageSquare, Star } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -26,6 +27,12 @@ export interface CaseItem {
   background: string
   tags: string[]
   guaName: string
+  hasBazi?: boolean
+  baziPillars?: Array<{
+    label: string
+    gan: { char: string; wuxing: string }
+    zhi: { char: string; wuxing: string }
+  }>
   author: Author
   feedback: {
     status: 'verified' | 'pending'
@@ -83,7 +90,7 @@ function CaseStamp({ feedback }: { feedback: CaseItem['feedback'] }) {
       <div className={cn(
         "relative flex items-center justify-center",
         "w-20 h-20 sm:w-24 sm:h-24 rounded-full",
-        "border-[3px] border-double",
+        "border-[0.1875rem] border-double",
         config.border,
         config.text,
         "transform -rotate-15",
@@ -95,13 +102,13 @@ function CaseStamp({ feedback }: { feedback: CaseItem['feedback'] }) {
         
         {/* 文本内容 */}
         <div className="flex flex-col items-center justify-center gap-0.5 z-10 relative">
-          <span className="text-[9px] sm:text-[10px] font-serif tracking-widest opacity-80 whitespace-nowrap">
+          <span className="text-[0.5625rem] sm:text-[0.625rem] font-serif tracking-widest opacity-80 whitespace-nowrap">
             易知案例
           </span>
           <span className="text-lg sm:text-xl font-black font-serif tracking-[0.15em] leading-none whitespace-nowrap">
             {config.label}
           </span>
-          <span className="text-[7px] sm:text-[8px] font-sans tracking-tight uppercase opacity-60 whitespace-nowrap">
+          <span className="text-[0.4375rem] sm:text-[0.5rem] font-sans tracking-tight uppercase opacity-60 whitespace-nowrap">
             {config.subLabel}
           </span>
         </div>
@@ -113,84 +120,121 @@ function CaseStamp({ feedback }: { feedback: CaseItem['feedback'] }) {
 export default function CaseCard({ data, className }: CaseCardProps) {
   const router = useRouter()
 
+  // 提取纯文本摘要
+  const cleanBackground = data.background
+    .replace(/<[^>]+>/g, '') // 去除HTML标签
+    .replace(/卦理推演[\s\S]*/, '') // 去除推演部分
+    .trim()
+
   return (
-    <Link href={`/cases/${data.id}`} className={cn('block group', className)}>
-      <Card className="bg-white border border-stone-50 rounded-2xl shadow-sm active:scale-[0.99] transition-all duration-200 hover:shadow-md hover:border-stone-300 cursor-pointer relative overflow-hidden">
-        {/* 印章 */}
-        <CaseStamp feedback={data.feedback} />
+    <Link 
+      href={`/cases/${data.id}`} 
+      className={cn(
+        "block group relative bg-white rounded-xl border border-stone-200/60 overflow-hidden transition-all duration-300",
+        "hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-stone-300",
+        className
+      )}
+    >
+      {/* 印章 */}
+      <CaseStamp feedback={data.feedback} />
+
+      <div className="p-5 sm:p-6 flex gap-6">
         
-        <CardContent className="p-4 lg:p-7">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3 lg:mb-4 pb-2 lg:pb-3 border-b border-stone-100">
-            <div className="flex items-center gap-2 lg:gap-2.5">
-              <div 
-                className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 flex items-center justify-center text-xs lg:text-sm text-stone-700 font-medium shadow-sm overflow-hidden"
-                onClick={(e) => {
-                  if (data.author.id) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    router.push(`/u/${data.author.id}`)
-                  }
-                }}
-              >
-                {data.author.avatar ? <img src={data.author.avatar} alt="" className="w-full h-full object-cover" /> : data.author.name.charAt(0)}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs lg:text-sm">
-                <span className="font-medium text-stone-800">{data.author.name}</span>
-                <span className="text-stone-400">·</span>
-                <span className="text-stone-500 scale-90 lg:scale-100 origin-left">LV.{data.author.level}</span>
-                {data.author.isVerified && (
-                  <>
-                    <span className="text-stone-400 hidden lg:inline">·</span>
-                    <span className="font-medium text-[#C82E31] scale-90 lg:scale-100 origin-left hidden lg:inline">认证卦师</span>
-                    <span className="lg:hidden text-[#C82E31] scale-75 origin-left border border-[#C82E31] px-1 rounded ml-1">V</span>
-                  </>
-                )}
-              </div>
-            </div>
-            {/* Old stamp placeholder was here */}
-          </div>
-
-          {/* Content */}
-          <div className="flex gap-3 lg:gap-5">
-            {/* Left: Gua */}
-            <div className="shrink-0 pt-1">
-              <div className="scale-90 origin-top-left lg:scale-100">
+        {/* 左侧：排盘缩略图 (视觉锚点) - 桌面端显示 */}
+        <div className="shrink-0 hidden sm:block pt-1">
+          <div className="w-[100px] h-[100px] bg-stone-50 rounded-lg border border-stone-100 flex items-center justify-center relative overflow-hidden group-hover:border-stone-200 transition-colors">
+            {/* 放大一点显示，增加视觉冲击力 */}
+            <div className="scale-90 origin-center opacity-90 group-hover:opacity-100 transition-opacity">
+              {data.hasBazi && data.baziPillars ? (
+                <BaZiThumbnail pillars={data.baziPillars} />
+              ) : (
                 <GuaBlock name={data.guaName} lines={data.lines} changingLines={data.changingLines} />
+              )}
+            </div>
+            {/* 类型角标 */}
+            {/* <div className="absolute bottom-0 right-0 px-1.5 py-0.5 bg-stone-100/90 text-[9px] text-stone-500 rounded-tl-md font-mono">
+              {data.hasBazi ? '八字' : '六爻'}
+            </div> */}
+          </div>
+        </div>
+
+        {/* 右侧：内容流 */}
+        <div className="flex-1 min-w-0 flex flex-col relative z-10">
+          
+          {/* Header: User & Time */}
+          <div className="flex items-center justify-between mb-2 text-xs text-stone-400">
+            <div 
+              className="flex items-center gap-2 hover:text-stone-600 transition-colors cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (data.author.id) router.push(`/u/${data.author.id}`)
+              }}
+            >
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-stone-100 border border-stone-200">
+                {data.author.avatar 
+                  ? <img src={data.author.avatar} alt="" className="w-full h-full object-cover" /> 
+                  : <div className="w-full h-full flex items-center justify-center text-[9px]">{data.author.name[0]}</div>
+                }
               </div>
+              <span>{data.author.name}</span>
+            </div>
+            <span>{data.publishTime}</span>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-lg sm:text-xl font-bold font-serif text-stone-900 mb-2 leading-snug group-hover:text-[#C82E31] transition-colors line-clamp-1">
+            {data.question}
+          </h3>
+
+          {/* Excerpt */}
+          <p className="text-sm text-stone-500 leading-relaxed line-clamp-2 mb-4 h-10">
+            {cleanBackground || '暂无背景描述...'}
+          </p>
+
+          {/* Footer: Tags & Stats */}
+          <div className="mt-auto flex items-center justify-between">
+            {/* Tags */}
+            <div className="flex flex-wrap gap-2 overflow-hidden h-6">
+              {data.tags.slice(0, 3).map((tag, idx) => (
+                <span key={idx} className="text-[10px] px-2 py-0.5 bg-stone-50 text-stone-500 rounded-full border border-stone-100 group-hover:border-stone-200 transition-colors">
+                  #{tag}
+                </span>
+              ))}
             </div>
 
-            {/* Right: Text */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg lg:text-2xl font-serif font-bold text-stone-900 mb-2 lg:mb-3 leading-snug line-clamp-2">
-                <span className="text-[#C82E31] mr-1">求测：</span>{data.question}
-              </h3>
-              <p className="text-xs lg:text-sm text-[#666] mb-3 lg:mb-4 line-clamp-2 leading-relaxed">
-                {data.background.includes('卦理推演') 
-                  ? data.background.split('卦理推演')[0] 
-                  : data.background}
-              </p>
-              <div className="flex flex-wrap gap-1.5 lg:gap-2 mb-2 lg:mb-4">
-                {data.tags.map((tag: string, idx: number) => (
-                  <span key={idx} className="text-[10px] lg:text-xs text-[#666] bg-gray-50 px-1.5 py-0.5 lg:px-2 lg:py-0.5 rounded border border-gray-100">
-                    #{tag}
-                  </span>
-                ))}
+            {/* Stats */}
+            <div className="flex items-center gap-4 text-xs text-stone-400 group-hover:text-stone-500 transition-colors">
+              <div className="flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5" />
+                <span>{data.stats.views}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>{data.stats.comments}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Star className="w-3.5 h-3.5" />
+                <span>{data.stats.favorites}</span>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-3 lg:mt-4 pt-2 lg:pt-3 border-t border-stone-100 text-[10px] lg:text-xs text-stone-500">
-            <div className="flex items-center gap-3 lg:gap-5">
-              <span>{data.stats.views} 浏览</span>
-              <span>{data.stats.comments} 断语</span>
-              <span className="hidden lg:inline">{data.stats.favorites} 收藏</span>
+        </div>
+      </div>
+
+      {/* 移动端排盘缩略图 */}
+      <div className="sm:hidden px-5 pb-5">
+         <div className="bg-stone-50 rounded p-2 flex justify-center border border-stone-100">
+            <div className="scale-75 origin-center">
+              {data.hasBazi && data.baziPillars ? (
+                <BaZiThumbnail pillars={data.baziPillars} />
+              ) : (
+                <GuaBlock name={data.guaName} lines={data.lines} changingLines={data.changingLines} />
+              )}
             </div>
-            <span className="text-stone-400">{data.publishTime}</span>
-          </div>
-        </CardContent>
-      </Card>
+         </div>
+      </div>
+      
     </Link>
   )
 }

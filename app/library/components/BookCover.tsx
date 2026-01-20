@@ -50,7 +50,7 @@ export function BookCover({
           className={`${color} w-full h-full rounded-sm border border-stone-200/60 shadow-sm overflow-hidden relative flex flex-col`}
         >
           {/* 左侧装订区 */}
-          <div className="absolute left-0 top-0 bottom-0 w-[14px] bg-black/5 border-r border-black/5 z-10 flex flex-col justify-around py-4 items-center">
+          <div className="absolute left-0 top-0 bottom-0 w-[0.875rem] bg-black/5 border-r border-black/5 z-10 flex flex-col justify-around py-4 items-center">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="w-full h-px bg-stone-400/40" />
             ))}
@@ -61,7 +61,7 @@ export function BookCover({
             <div className="absolute top-2 right-2">
               <Badge
                 variant="secondary"
-                className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none"
+                className="text-[0.625rem] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none"
               >
                 精校
               </Badge>
@@ -115,7 +115,7 @@ export function BookCover({
           </div>
 
           {/* 底部朝代/作者 (封面内) */}
-          <div className="absolute bottom-3 right-3 text-[10px] text-stone-500 font-serif flex flex-col items-end gap-0.5 opacity-60">
+          <div className="absolute bottom-3 right-3 text-[0.625rem] text-stone-500 font-serif flex flex-col items-end gap-0.5 opacity-60">
             <span>{dynasty}</span>
             <span>{author}</span>
           </div>

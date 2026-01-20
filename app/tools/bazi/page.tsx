@@ -122,8 +122,8 @@ const styles = `
   .compass-spin { animation: spin-slow 60s linear infinite; }
 
   @keyframes breathe-glow {
-    0%, 100% { box-shadow: 0 0 20px rgba(200, 46, 49, 0.05); }
-    50% { box-shadow: 0 0 40px rgba(200, 46, 49, 0.15); }
+    0%, 100% { box-shadow: 0 0 1.25rem rgba(200, 46, 49, 0.05); }
+    50% { box-shadow: 0 0 2.5rem rgba(200, 46, 49, 0.15); }
   }
   .active-pillar {
     animation: breathe-glow 4s infinite ease-in-out;
@@ -137,7 +137,7 @@ const styles = `
   }
   
   /* 移动端优化：浑天仪缩放 */
-  @media (max-width: 768px) {
+  @media (max-width: 48rem) {
     .armillary-sphere-container {
         transform: scale(0.7);
         transform-origin: center center;
@@ -276,7 +276,7 @@ export default function BaZiPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
       
-      <div className="h-[calc(100vh-90px)] lg:h-full flex relative bg-[#f5f5f7] paper-texture overflow-hidden">
+      <div className="h-[calc(100vh-5.625rem)] lg:h-full flex relative bg-[#f5f5f7] paper-texture overflow-hidden">
 
         {/* 左侧主内容区 - 排盘展示 */}
         <main className="flex-1 w-full h-full relative flex flex-col overflow-hidden">
@@ -295,7 +295,7 @@ export default function BaZiPage() {
             </div>
             
             {/* 底部版权 */}
-            <div className="text-center py-4 opacity-60 text-[11px] text-stone-600 font-serif w-full shrink-0 relative z-10">
+            <div className="text-center py-4 opacity-60 text-[0.6875rem] text-stone-600 font-serif w-full shrink-0 relative z-10">
                 易知 · 实证易学平台
             </div>
 
@@ -307,7 +307,7 @@ export default function BaZiPage() {
                           <Edit3 className="w-5 h-5" /> 录入生辰信息
                       </Button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[85vh] rounded-t-[20px] px-0 bg-[#f5f5f7]">
+                  <SheetContent side="bottom" className="h-[85vh] rounded-t-[1.25rem] px-0 bg-[#f5f5f7]">
                   <SheetHeader className="px-6 mb-4">
                       <SheetTitle className="text-left font-serif text-xl font-bold flex items-center gap-2 text-stone-800">
                           <Settings2 className="w-5 h-5 text-[#C82E31]" /> 录入契文
@@ -347,7 +347,7 @@ export default function BaZiPage() {
 
         {/* 右侧边栏 - 参数设置 (仅 PC 端显示) */}
         <aside className="hidden lg:block w-90 shrink-0 h-full bg-white/90 border-l border-stone-200/60 shadow-[-1px_0_2px_rgba(0,0,0,0.02)] relative z-20 backdrop-blur-sm flex flex-col">
-          <ScrollArea className="h-[calc(100%-112px)] p-8">
+          <ScrollArea className="h-[calc(100%-7rem)] p-8">
             <h2 className="text-lg font-serif font-bold text-stone-800 mb-8 flex items-center gap-2 select-none">
               <Scroll className="w-5 h-5 text-[#C82E31]" />
               <span>录入契文</span>

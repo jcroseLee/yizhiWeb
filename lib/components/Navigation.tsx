@@ -15,6 +15,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface NavItem {
   href: string
@@ -42,6 +43,7 @@ export default function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [hydrated, setHydrated] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [mobileSearchQuery, setMobileSearchQuery] = useState('')
@@ -67,6 +69,10 @@ export default function Navigation() {
   useEffect(() => {
     setExpandedItem(shouldExpandItem)
   }, [shouldExpandItem])
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   // 合并session初始化和auth状态监听，避免重复查询
   useEffect(() => {
@@ -208,58 +214,66 @@ export default function Navigation() {
 
   return (
     <>   
-      {/* 导航栏 - 响应式布局 */}
-      <nav className="bg-white/90 border-b sticky top-0 z-50 pt-5 nav-bg-pattern">
-        <div className="flex items-center h-16 relative max-w-full overflow-hidden">
-          {/* 左侧：Logo区域 - 响应式宽度 */}
-          <div className="w-64 shrink-0 flex px-4 h-full border-r max-md:w-auto max-md:px-2 max-md:border-r-0 max-md:min-w-0">
-            <Link href="/" className="flex pl-2 pt-2 max-md:pl-1">
-              <Logo />
+      {/* 顶部导航栏：同色系米色背景 + 毛玻璃效果 */}
+      <header className="sticky top-0 pt-[1.2rem] z-50 w-full  bg-[#FDFBF7]/85 backdrop-blur-md transition-all">
+        <div className="relative flex h-16 items-center justify-between px-4 sm:px-6 max-w-[1920px] mx-auto">
+          <div className="flex items-center gap-4 w-12 sm:w-auto">
+            <Link
+              href="/"
+              className="flex items-center justify-center lg:hidden"
+              aria-label="返回首页"
+              onClick={() => {
+                setMobileMenuOpen(false)
+                setExpandedItem(null)
+              }}
+            >
+              <Logo variant="icon" width={32} height={32} />
             </Link>
           </div>
-          
-          {/* 右侧：操作区 - 响应式布局，靠右对齐 */}
-          <div className="flex-1 flex items-center justify-end gap-4 px-4 max-md:gap-2 max-md:px-2 min-w-0">            
-            {/* 搜索栏 - 桌面端显示，移动端隐藏 */}
-            <div className="max-md:hidden">
-              <HeaderSearch />
-            </div>
-            
-            {/* 移动端菜单按钮 */}
+
+          {/* 右侧：功能区 */}
+          <div className="flex items-center gap-2 sm:gap-3 justify-end w-auto sm:min-w-fit">
             <Button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 hover:bg-ink-50 rounded-full transition-colors"
+              className="lg:hidden text-stone-500 hover:bg-stone-200/50 rounded-full"
               variant="ghost"
               size="icon"
               aria-label="菜单"
             >
               {mobileMenuOpen ? (
-                <X className="h-5 w-5 text-ink-600" />
+                <X className="h-5 w-5" />
               ) : (
-                <Menu className="h-5 w-5 text-ink-600" />
+                <Menu className="h-5 w-5" />
               )}
             </Button>
+
+            {/* 搜索图标 - 桌面端显示 */}
+            <div className="hidden md:block">
+              <HeaderSearch />
+            </div>
 
             {/* 通知按钮 - 仅已登录用户显示 */}
             {session && (
               <Link href="/messages">
-                <Button className="p-2 hover:bg-ink-50 rounded-full transition-colors relative" variant="ghost" size="icon">
-                  <Bell className="h-5 w-5 text-ink-600" />
+                <Button 
+                  className="text-stone-500 hover:text-stone-800 hover:bg-stone-200/50 relative h-9 w-9 rounded-full"
+                  variant="ghost" 
+                  size="icon"
+                >
+                  <Bell className="h-5 w-5" />
                   {totalUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1.5 bg-cinnabar-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                      {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                    </span>
+                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#C82E31] ring-2 ring-[#FDFBF7]" />
                   )}
                 </Button>
               </Link>
             )}
-            
-            {/* 已登录用户：显示用户头像下拉菜单 */}
+
+            {/* 已登录用户：头像下拉菜单 */}
             {session ? (
               <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                 <PopoverTrigger asChild>
-                  <Button className="flex items-center gap-2 p-2 hover:bg-ink-50 rounded-full transition-colors" variant="ghost">
-                    <div className="w-8 h-8 rounded-full border border-ink-200 flex items-center justify-center overflow-hidden bg-ink-100">
+                  <Button className="flex items-center gap-2 p-1.5 rounded-full hover:bg-stone-200/60 transition-colors" variant="ghost">
+                    <div className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center overflow-hidden bg-stone-100 hover:ring-2 hover:ring-[#C82E31]/20 transition-all">
                       {userProfile?.avatar_url ? (
                         <Image
                           src={userProfile.avatar_url}
@@ -270,10 +284,10 @@ export default function Navigation() {
                           unoptimized
                         />
                       ) : (
-                        <User className="h-4 w-4 text-ink-800" />
+                        <User className="h-4 w-4 text-stone-600" />
                       )}
                     </div>
-                    <ChevronDown className={`h-4 w-4 text-ink-600 hidden lg:block transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 text-stone-500 hidden lg:block transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
@@ -320,138 +334,138 @@ export default function Navigation() {
             ) : (
               /* 未登录用户：显示登录链接 */
               <Link
-                href={`/login?redirect=${encodeURIComponent(pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : ''))}`}
-                className="px-4 py-2 text-sm text-ink-700 hover:text-ink-800 transition-colors"
+                href={`/login?redirect=${encodeURIComponent(
+                  pathname + (hydrated && searchParams?.toString() ? `?${searchParams.toString()}` : '')
+                )}`}
+                className="px-4 py-2 text-sm text-stone-700 hover:text-stone-900 transition-colors"
               >
                 登录
               </Link>
             )}
           </div>
         </div>
-
-      </nav>
+      </header>
 
       {/* 移动端菜单 - 悬浮显示，带遮罩 */}
-      {mobileMenuOpen && (
-        <>
-          {/* 半透明白色遮罩 */}
-          <div 
-            className="fixed inset-0 bg-white/60 backdrop-blur-sm z-40 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
-          />
-          
-          {/* 菜单内容 - 悬浮在遮罩上方 */}
-          <div className="fixed top-16 left-0 right-0 bg-white border-b shadow-lg z-50 md:hidden transition-all duration-200 ease-in-out">
-            {/* 移动端搜索栏 */}
-            <div className="px-4 py-3 border-b border-ink-100">
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ink-400" />
-                  <Input
-                    type="text"
-                    placeholder="搜索案例、关键词、卦象..."
-                    value={mobileSearchQuery}
-                    onChange={(e) => setMobileSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && mobileSearchQuery.trim()) {
-                        if (pathname !== '/cases') {
-                          router.push(`/cases?q=${encodeURIComponent(mobileSearchQuery.trim())}`)
-                        }
-                        setMobileMenuOpen(false)
-                      }
-                    }}
-                    className="pl-10 bg-white border-ink-200"
-                  />
-                </div>
-                <Button 
-                  className="bg-ink-800 hover:bg-ink-900 text-white"
-                  onClick={() => {
-                    if (mobileSearchQuery.trim()) {
-                      if (pathname !== '/cases') {
-                        router.push(`/cases?q=${encodeURIComponent(mobileSearchQuery.trim())}`)
-                      }
-                      setMobileMenuOpen(false)
-                    }
-                  }}
-                >
-                  搜索
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex flex-col py-2">
-              {navItems.map((item) => {
-                // 判断是否激活：精确匹配或路径以该导航项开头（用于详情页）
-                const isActive = pathname === item.href || 
-                  pathname.startsWith(item.href + '/') ||
-                  (item.children && item.children.some(child => pathname === child.href))
-                const isExpanded = expandedItem === item.href
-                const hasChildren = item.children && item.children.length > 0
+      {hydrated && mobileMenuOpen
+        ? createPortal(
+            <>
+              <div 
+                className="fixed inset-0 bg-white/60 backdrop-blur-sm z-40 md:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
 
-                return (
-                  <div key={item.href}>
-                    <div className="flex items-center">
-                <Link
-                  href={item.href}
-                        onClick={(e) => {
-                          if (hasChildren) {
-                            e.preventDefault()
-                            handleNavClick(item)
-                          } else {
+              <div className="fixed top-[calc(4rem+1.2rem)] left-0 right-0 bg-white border-b shadow-lg z-50 md:hidden transition-all duration-200 ease-in-out max-h-[calc(100vh-5.2rem)] overflow-y-auto">
+                <div className="px-4 py-3 border-b border-ink-100">
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ink-400" />
+                      <Input
+                        type="text"
+                        placeholder="搜索案例、关键词、卦象..."
+                        value={mobileSearchQuery}
+                        onChange={(e) => setMobileSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && mobileSearchQuery.trim()) {
+                            if (pathname !== '/cases') {
+                              router.push(`/cases?q=${encodeURIComponent(mobileSearchQuery.trim())}`)
+                            }
                             setMobileMenuOpen(false)
-                            handleNavClick(item)
                           }
                         }}
-                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-lg mx-2 ${
-                          isActive
-                      ? 'text-ink-800 bg-ink-50'
-                      : 'text-ink-600 hover:bg-ink-50 hover:text-ink-800'
-                  }`}
-                >
-                        <div className="flex items-center justify-between">
-                          <span>{item.label}</span>
-                          {hasChildren && (
-                            <ChevronDown 
-                              className={`h-4 w-4 text-ink-500 transition-transform ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`}
-                            />
-                          )}
-                        </div>
-                      </Link>
+                        className="pl-10 bg-white border-ink-200"
+                      />
                     </div>
-                    {hasChildren && isExpanded && (
-                      <div className="ml-4 mt-1 space-y-1">
-                        {item.children!.map((child) => {
-                          const isChildActive = pathname === child.href
-                          return (
-                            <Link
-                              key={child.href}
-                              href={child.href}
-                              onClick={() => {
-                                setMobileMenuOpen(false)
-                                setExpandedItem(null)
-                              }}
-                              className={`block px-4 py-2 text-sm font-medium transition-colors rounded-lg mx-2 ${
-                                isChildActive
-                                  ? 'text-ink-800 bg-ink-50'
-                                  : 'text-ink-800 hover:bg-ink-50'
-                              }`}
-                            >
-                              {child.label}
-                </Link>
-                          )
-                        })}
-                      </div>
-                    )}
+                    <Button 
+                      className="bg-ink-800 hover:bg-ink-900 text-white"
+                      onClick={() => {
+                        if (mobileSearchQuery.trim()) {
+                          if (pathname !== '/cases') {
+                            router.push(`/cases?q=${encodeURIComponent(mobileSearchQuery.trim())}`)
+                          }
+                          setMobileMenuOpen(false)
+                        }
+                      }}
+                    >
+                      搜索
+                    </Button>
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        </>
-      )}
+                </div>
+
+                <div className="flex flex-col py-2">
+                  {navItems.map((item) => {
+                    const isActive = pathname === item.href || 
+                      pathname.startsWith(item.href + '/') ||
+                      (item.children && item.children.some(child => pathname === child.href))
+                    const isExpanded = expandedItem === item.href
+                    const hasChildren = item.children && item.children.length > 0
+
+                    return (
+                      <div key={item.href}>
+                        <div className="flex items-center">
+                          <Link
+                            href={item.href}
+                            onClick={(e) => {
+                              if (hasChildren) {
+                                e.preventDefault()
+                                handleNavClick(item)
+                              } else {
+                                setMobileMenuOpen(false)
+                                handleNavClick(item)
+                              }
+                            }}
+                            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-lg mx-2 ${
+                              isActive
+                                ? 'text-ink-800 bg-ink-50'
+                                : 'text-ink-600 hover:bg-ink-50 hover:text-ink-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span>{item.label}</span>
+                              {hasChildren && (
+                                <ChevronDown 
+                                  className={`h-4 w-4 text-ink-500 transition-transform ${
+                                    isExpanded ? 'rotate-180' : ''
+                                  }`}
+                                />
+                              )}
+                            </div>
+                          </Link>
+                        </div>
+                        {hasChildren && isExpanded && (
+                          <div className="ml-4 mt-1 space-y-1">
+                            {item.children!.map((child) => {
+                              const isChildActive = pathname === child.href
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={() => {
+                                    setMobileMenuOpen(false)
+                                    setExpandedItem(null)
+                                  }}
+                                  className={`block px-4 py-2 text-sm font-medium transition-colors rounded-lg mx-2 ${
+                                    isChildActive
+                                      ? 'text-ink-800 bg-ink-50'
+                                      : 'text-ink-800 hover:bg-ink-50'
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </>,
+            document.body
+          )
+        : null}
     </>
   )
 }

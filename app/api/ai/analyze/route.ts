@@ -37,28 +37,16 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'Server configuration error: Missing API Key' }), { status: 500 });
   }
 
-  // 2. 验证用户身份 (Auth Logic)
   const authHeader = req.headers.get('Authorization');
-  let user = null;
-  let supabase = null;
-  let skipPayment = false;
-
-  if (!authHeader && process.env.NODE_ENV === 'development') {
-      console.warn('⚠️ No Auth Header in Dev Mode. Skipping Auth & Payment.');
-      skipPayment = true;
-  } else if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      try {
-        supabase = createSupabaseAdmin();
-        const { data, error } = await supabase.auth.getUser(token);
-        if (!error && data.user) user = data.user;
-        else if (process.env.NODE_ENV === 'development') skipPayment = true;
-      } catch {
-         if (process.env.NODE_ENV === 'development') skipPayment = true;
-      }
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
-  if (!user && !skipPayment) {
+  const token = authHeader.replace('Bearer ', '');
+  const supabase = createSupabaseAdmin();
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
+  const user = !authError ? authData.user : null;
+  if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
@@ -68,7 +56,11 @@ export async function POST(req: Request) {
   } catch (e) {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
-  const { question, background, guaData, idempotencyKey } = body;
+  const { question, background, guaData, idempotencyKey, mode } = body;
+  const analysisMode = mode === 'preview' || mode === 'full' ? mode : mode == null ? 'full' : null;
+  if (!analysisMode) {
+    return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
+  }
 
   // 3. 扣费逻辑
   let requestId: string | null = null;
@@ -76,7 +68,7 @@ export async function POST(req: Request) {
 
   const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
 
-  if (!skipAiPayment && user && !skipPayment && supabase) {
+  if (analysisMode === 'full' && !skipAiPayment && user && supabase) {
     const COST = 50;
     // 使用 RPC 进行幂等扣费
     const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`; // Fallback key
@@ -141,7 +133,17 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
+          content:
+            analysisMode === 'preview'
+              ? `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
+分析风格：
+1. **严谨客观**：依据五行生克、旺衰、动变推导。
+2. **结构清晰**：按【用神->旺衰->动变->吉凶->建议】步骤。
+3. **格式要求**：使用 Markdown，重点加粗。
+输出要求：
+1. 仅输出“预览版”，内容尽量精炼。
+2. 总长度控制在约 20% 的详批量级（建议 400-600 字）。`
+              : `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
             分析风格：
             1. **严谨客观**：依据五行生克、旺衰、动变推导。
             2. **结构清晰**：按【用神->旺衰->动变->吉凶->建议】步骤。
@@ -150,8 +152,9 @@ export async function POST(req: Request) {
         { role: 'user', content: promptContext }
       ],
       temperature: 0.3,
+      maxOutputTokens: analysisMode === 'preview' ? 900 : undefined,
        onFinish: async ({ text }) => {
-         if (requestId && supabase) {
+         if (analysisMode === 'full' && requestId && supabase) {
              // 保存结果并标记完成
              await supabase.from('ai_analysis_requests').update({
                  status: 'completed',
@@ -177,38 +180,34 @@ export async function POST(req: Request) {
     // RPC `refund_ai_analysis` 内部有状态检查，防止重复退款。
     // 虽然存在极端竞态（原请求成功但连接断开，重试请求失败导致退款），
     // 但优先保障用户资金安全是首要原则。
-    if (requestId && supabase) {
-        await supabase.rpc('refund_ai_analysis', { 
-            p_request_id: requestId, 
-            p_reason: error instanceof Error ? error.message : String(error) 
+    if (analysisMode === 'full') {
+      if (requestId && supabase) {
+        await supabase.rpc('refund_ai_analysis', {
+          p_request_id: requestId,
+          p_reason: error instanceof Error ? error.message : String(error),
         });
-    } else if (supabase && user && !requestId) {
-        // Fallback refund logic (when requestId is null, likely used fallback payment)
+      } else if (supabase && user && !requestId) {
         const COST = 50;
-        // 1. Get current balance
         const { data: profile } = await supabase
-            .from('profiles')
-            .select('yi_coins')
-            .eq('id', user.id)
-            .single();
-            
+          .from('profiles')
+          .select('yi_coins')
+          .eq('id', user.id)
+          .single();
+
         if (profile) {
-            // 2. Refund
-             await supabase
-                .from('profiles')
-                .update({ yi_coins: (profile.yi_coins || 0) + COST })
-                .eq('id', user.id);
-                
-             // 3. Record refund transaction
-             await supabase
-                .from('coin_transactions')
-                .insert({
-                    user_id: user.id,
-                    amount: COST,
-                    type: 'refund',
-                    description: `AI Analysis Refund: ${error instanceof Error ? error.message : String(error)}`
-                });
+          await supabase
+            .from('profiles')
+            .update({ yi_coins: (profile.yi_coins || 0) + COST })
+            .eq('id', user.id);
+
+          await supabase.from('coin_transactions').insert({
+            user_id: user.id,
+            amount: COST,
+            type: 'refund',
+            description: `AI Analysis Refund: ${error instanceof Error ? error.message : String(error)}`,
+          });
         }
+      }
     }
 
     return new Response(JSON.stringify({ 

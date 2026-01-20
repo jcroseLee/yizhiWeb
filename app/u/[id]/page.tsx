@@ -1,20 +1,20 @@
 'use client'
 
 import {
-  Activity,
-  Award,
-  Calendar,
-  CheckCircle2,
-  Loader2,
-  MessageSquare,
-  MoreHorizontal,
-  Quote,
-  TrendingUp,
-  UserPlus,
-  Users
+    Activity,
+    Award,
+    Calendar,
+    CheckCircle2,
+    Loader2,
+    MessageSquare,
+    MoreHorizontal,
+    Quote,
+    TrendingUp,
+    UserPlus,
+    Users
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import PostCard from '@/app/community/components/PostCard'
 import { ActivityHeatmap } from '@/app/profile/components/ActivityHeatmap'
@@ -24,19 +24,19 @@ import { Button } from '@/lib/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
-import { getCurrentUser } from '@/lib/services/auth'
+import { clearLoginIntent, getCurrentPathWithSearchAndHash, getCurrentUser, getLoginIntent, redirectToLogin, setLoginIntent } from '@/lib/services/auth'
 import { getUserPosts, type Post } from '@/lib/services/community'
 import { calculateLevel, getTitleName } from '@/lib/services/growth'
 import {
-  getDailyActivityData,
-  getUserFollowStats,
-  getUserProfileById,
-  getUserStats,
-  isFollowingUser,
-  toggleFollowUser,
-  type UserFollowStats,
-  type UserProfile,
-  type UserStats,
+    getDailyActivityData,
+    getUserFollowStats,
+    getUserProfileById,
+    getUserStats,
+    isFollowingUser,
+    toggleFollowUser,
+    type UserFollowStats,
+    type UserProfile,
+    type UserStats,
 } from '@/lib/services/profile'
 import type { User } from '@supabase/supabase-js'
 
@@ -44,15 +44,15 @@ import type { User } from '@supabase/supabase-js'
 const styles = `
   .glass-card {
     background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(1rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0.25rem 1.25rem -0.125rem rgba(0, 0, 0, 0.03);
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
   .glass-card:hover {
     background: rgba(255, 255, 255, 0.9);
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.06);
+    transform: translateY(-0.125rem);
+    box-shadow: 0 0.75rem 1.875rem -0.3125rem rgba(0, 0, 0, 0.06);
   }
 
   .nav-tab-trigger {
@@ -66,13 +66,13 @@ const styles = `
   .nav-tab-trigger[data-state='active']::after {
     content: '';
     position: absolute;
-    bottom: -2px;
+    bottom: -0.125rem;
     left: 50%;
     transform: translateX(-50%);
-    width: 24px;
-    height: 3px;
+    width: 1.5rem;
+    height: 0.1875rem;
     background-color: #C82E31;
-    border-radius: 99px;
+    border-radius: 6.1875rem;
   }
 
   /* 隐藏滚动条 */
@@ -106,7 +106,7 @@ const AccuracyRing = ({ rate }: { rate: number }) => {
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center leading-none">
-        <span className="text-[11px] font-bold text-stone-800 font-mono">{rate}%</span>
+        <span className="text-[0.6875rem] font-bold text-stone-800 font-mono">{rate}%</span>
       </div>
     </div>
   );
@@ -132,6 +132,7 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
   const [isFollowingLoading, setIsFollowingLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [activeTab, setActiveTab] = useState<'posts' | 'comments'>('posts')
+  const processedIntentRef = useRef(false)
 
   // Load Data
   useEffect(() => {
@@ -175,6 +176,37 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
     }
     loadData()
   }, [resolvedParams.id, router, toast])
+
+  useEffect(() => {
+    if (processedIntentRef.current) return
+    if (!profile?.id) return
+    processedIntentRef.current = true
+
+    const run = async () => {
+      const intent = getLoginIntent()
+      if (!intent) return
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (intent.returnTo !== current) return
+      const user = await getCurrentUser()
+      if (!user) return
+
+      if (intent.type === 'follow_user' && intent.userId === profile.id) {
+        clearLoginIntent()
+        await fetch(`/api/community/users/${profile.id}/follow`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'set', value: true }),
+        })
+        setCurrentUser(user)
+        setIsFollowing(true)
+        const updatedStats = await getUserFollowStats(profile.id)
+        setFollowStats(updatedStats)
+        toast({ title: '已关注' })
+      }
+    }
+
+    void run()
+  }, [profile?.id, toast])
 
   // Helper Functions
   const formatDate = (dateString: string): string => {
@@ -277,13 +309,13 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                
                {/* 修业日课 (热力图) - 独立卡片 */}
                <div className="glass-card rounded-2xl p-6 border-none shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#C82E31] rounded-full blur-[80px] opacity-5 pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#C82E31] rounded-full blur-[5rem] opacity-5 pointer-events-none" />
                   <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                           <Activity className="w-4 h-4 text-[#C82E31]" />
                           <h3 className="font-bold text-stone-800 text-sm">修习足迹</h3>
                       </div>
-                      <span className="text-[10px] text-stone-400 bg-stone-50 px-2 py-0.5 rounded-full border border-stone-100">
+                      <span className="text-[0.625rem] text-stone-400 bg-stone-50 px-2 py-0.5 rounded-full border border-stone-100">
                           {new Date().getFullYear()} 年度
                       </span>
                   </div>
@@ -296,7 +328,7 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                     <div className="sticky top-0 z-20 backdrop-blur-md bg-[#FDFBF7]/80 -mx-4 px-4 lg:mx-0 lg:px-0 lg:rounded-xl border-b border-stone-200/50 mb-6">
                       <TabsList className="w-full justify-start bg-transparent p-0 h-auto gap-8">
                         <TabsTrigger value="posts" className="nav-tab-trigger rounded-none border-none px-1 py-3 text-stone-500 text-sm font-medium transition-all data-[state=active]:text-stone-900 cursor-pointer hover:text-stone-700">
-                          发布的帖子 <span className="ml-1.5 text-[10px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">{posts.length}</span>
+                          发布的帖子 <span className="ml-1.5 text-[0.625rem] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full">{posts.length}</span>
                         </TabsTrigger>
                         <TabsTrigger value="comments" className="nav-tab-trigger rounded-none border-none px-1 py-3 text-stone-500 text-sm font-medium transition-all data-[state=active]:text-stone-900 cursor-pointer hover:text-stone-700">
                           评论回复
@@ -340,14 +372,14 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
               {/* 身份卡片 - 整合版 */}
               <div className="glass-card rounded-2xl p-6 lg:p-8 text-center relative overflow-hidden group">
                  {/* 装饰水印 */}
-                 <div className="absolute top-[-20px] right-[-20px] opacity-[0.03] select-none pointer-events-none rotate-12 transition-transform group-hover:rotate-0 duration-700">
+                 <div className="absolute top-[-1.25rem] right-[-1.25rem] opacity-[0.03] select-none pointer-events-none rotate-12 transition-transform group-hover:rotate-0 duration-700">
                     <span className="font-serif text-9xl">易</span>
                  </div>
 
                  {/* 头像与等级 */}
                  <div className="relative inline-block mb-5">
                     <div className="absolute inset-0 rounded-full bg-stone-800 blur-xl opacity-10 scale-90 translate-y-2"></div>
-                    <Avatar className="w-28 h-28 border-[4px] border-white shadow-xl cursor-default relative z-10">
+                    <Avatar className="w-28 h-28 border-[0.25rem] border-white shadow-xl cursor-default relative z-10">
                       <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
                       <AvatarFallback className="text-4xl bg-stone-100 text-stone-300 font-serif">
                         {profile.nickname?.[0] || '易'}
@@ -384,20 +416,20 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                  <div className="grid grid-cols-3 gap-0 border-y border-stone-100 py-4 mb-6">
                     <div className="flex flex-col items-center group/stat cursor-default">
                        <span className="font-bold text-lg font-mono text-stone-800 group-hover/stat:text-[#C82E31] transition-colors">{followStats?.followingCount || 0}</span>
-                       <span className="text-[10px] text-stone-400 uppercase tracking-widest mt-1">关注</span>
+                       <span className="text-[0.625rem] text-stone-400 uppercase tracking-widest mt-1">关注</span>
                     </div>
                     <div className="flex flex-col items-center border-l border-r border-stone-100 group/stat cursor-default">
                        <span className="font-bold text-lg font-mono text-stone-800 group-hover/stat:text-[#C82E31] transition-colors">{followStats?.followersCount || 0}</span>
-                       <span className="text-[10px] text-stone-400 uppercase tracking-widest mt-1">粉丝</span>
+                       <span className="text-[0.625rem] text-stone-400 uppercase tracking-widest mt-1">粉丝</span>
                     </div>
                     <div className="flex flex-col items-center group/stat cursor-default">
                        <span className="font-bold text-lg font-mono text-stone-800 group-hover/stat:text-[#C82E31] transition-colors">{stats?.likesReceived || 0}</span>
-                       <span className="text-[10px] text-stone-400 uppercase tracking-widest mt-1">获赞</span>
+                       <span className="text-[0.625rem] text-stone-400 uppercase tracking-widest mt-1">获赞</span>
                     </div>
                  </div>
 
                  {/* 操作按钮 (非本人时显示) */}
-                 {currentUser && currentUser.id !== profile.id && (
+                 {currentUser?.id !== profile.id && (
                   <div className="flex gap-2.5 justify-center">
                     <Button
                       className={`flex-1 shadow-md hover:shadow-lg transition-all h-10 ${
@@ -407,6 +439,11 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                       }`}
                       onClick={async () => {
                         if (isFollowingLoading) return
+                        if (!currentUser) {
+                          setLoginIntent({ type: 'follow_user', userId: profile.id, returnTo: getCurrentPathWithSearchAndHash() })
+                          redirectToLogin()
+                          return
+                        }
                         try {
                           setIsFollowingLoading(true)
                           const newFollowingStatus = await toggleFollowUser(profile.id)
@@ -474,7 +511,7 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                           <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">实证准确率</span>
                       </div>
                       <div className="text-2xl font-bold font-mono text-stone-800">{stats.accuracyRate}%</div>
-                      <div className="text-[10px] text-stone-400 mt-0.5">基于 {stats.verifiedCases} 个已验案例</div>
+                      <div className="text-[0.625rem] text-stone-400 mt-0.5">基于 {stats.verifiedCases} 个已验案例</div>
                     </div>
                     <AccuracyRing rate={stats.accuracyRate} />
                   </div>
@@ -486,14 +523,14 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
                               <TrendingUp size={16} />
                           </div>
                           <div className="text-lg font-bold text-stone-800 font-mono">{stats.participatedDeductions}</div>
-                          <div className="text-[10px] text-stone-400">参与推演</div>
+                          <div className="text-[0.625rem] text-stone-400">参与推演</div>
                       </div>
                       <div className="glass-card p-4 rounded-2xl flex flex-col justify-center items-center text-center hover:bg-white/80 transition-colors cursor-default">
                           <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
                               <Award size={16} />
                           </div>
                           <div className="text-lg font-bold text-stone-800 font-mono">{profile.reputation || 0}</div>
-                          <div className="text-[10px] text-stone-400">易学声望</div>
+                          <div className="text-[0.625rem] text-stone-400">易学声望</div>
                       </div>
                   </div>
                 </div>

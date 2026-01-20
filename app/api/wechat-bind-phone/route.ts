@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
 import { corsHeaders } from '@/lib/api/cors'
+import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Missing openid in request body.')
     }
 
-    let finalPhoneNumber = phoneNumber
+    const finalPhoneNumber = phoneNumber
 
     // If encryptedData and iv are provided, decrypt phone number
     if (encryptedData && iv && code) {
@@ -46,8 +46,26 @@ export async function POST(request: NextRequest) {
       // In production, implement proper decryption here
     }
 
-    if (!finalPhoneNumber) {
-      throw new Error('Missing phoneNumber in request body.')
+    const normalizeCNPhone = (value: string) => {
+      const trimmed = value?.trim()
+      if (!trimmed) return ''
+      const digits = trimmed.replace(/\D/g, '')
+      if (digits.length === 11 && /^1[3-9]\d{9}$/.test(digits)) {
+        return `+86${digits}`
+      }
+      if (digits.length === 13 && digits.startsWith('86')) {
+        const local = digits.slice(2)
+        if (/^1[3-9]\d{9}$/.test(local)) {
+          return `+86${local}`
+        }
+      }
+      return ''
+    }
+
+    const normalizedPhone = normalizeCNPhone(finalPhoneNumber)
+
+    if (!normalizedPhone) {
+      throw new Error('手机号格式不正确')
     }
 
     console.log('Received data:', { openid, unionid, phoneNumber: finalPhoneNumber })
@@ -59,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Try to sign in first to check if user exists
     console.log('Checking if user exists.')
-    let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -68,34 +86,47 @@ export async function POST(request: NextRequest) {
     let session: any
 
     if (signInError && signInError.message.includes('Invalid login credentials')) {
-      // User doesn't exist, create new user with phone number
+      // User doesn't exist, create new user with phone number using Admin API
+      // This avoids triggering Supabase's SMS confirmation
       console.log('User not found, creating new user with phone number.')
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const { data: newUserData, error: createError } = await supabase.auth.admin.createUser({
         email,
         password,
-        phone: finalPhoneNumber,
-        options: {
-          data: {
-            wechat_openid: openid,
-            wechat_unionid: unionid,
-            avatar_url: userInfo?.avatarUrl || null,
-            nickname: userInfo?.nickname || null,
-            phone: finalPhoneNumber,
-          },
+        phone: normalizedPhone,
+        email_confirm: true,
+        phone_confirm: true, // 直接确认手机号，避免触发 Supabase 的 SMS 确认
+        user_metadata: {
+          wechat_openid: openid,
+          wechat_unionid: unionid,
+          avatar_url: userInfo?.avatarUrl || null,
+          nickname: userInfo?.nickname || null,
+          phone: normalizedPhone,
         },
       })
 
-      if (signUpError) {
-        console.error('Sign-up error:', signUpError)
-        throw signUpError
+      if (createError) {
+        console.error('Create user error:', createError)
+        throw createError
       }
 
-      if (!signUpData || !signUpData.user) {
+      if (!newUserData || !newUserData.user) {
         throw new Error('Failed to create user.')
       }
 
-      user = signUpData.user
-      session = signUpData.session
+      user = newUserData.user
+      
+      // Create a session for the new user
+      const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (sessionError || !sessionData) {
+        console.error('Failed to create session:', sessionError)
+        throw new Error('Failed to create session after user creation.')
+      }
+
+      session = sessionData.session
     } else if (signInError) {
       console.error('Sign-in error:', signInError)
       throw signInError
@@ -105,10 +136,10 @@ export async function POST(request: NextRequest) {
       const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(
         signInData.user.id,
         {
-          phone: finalPhoneNumber,
+          phone: normalizedPhone,
           user_metadata: {
             ...signInData.user.user_metadata,
-            phone: finalPhoneNumber,
+            phone: normalizedPhone,
             avatar_url: userInfo?.avatarUrl || signInData.user.user_metadata?.avatar_url,
             nickname: userInfo?.nickname || signInData.user.user_metadata?.nickname,
           },
@@ -151,7 +182,7 @@ export async function POST(request: NextRequest) {
         avatar_url: userInfo?.avatarUrl || user.user_metadata?.avatar_url || null,
         wechat_openid: openid,
         wechat_unionid: unionid || user.user_metadata?.wechat_unionid || null,
-        phone: finalPhoneNumber,
+        phone: normalizedPhone,
       }, {
         onConflict: 'id'
       })
@@ -181,4 +212,3 @@ export async function POST(request: NextRequest) {
     })
   }
 }
-

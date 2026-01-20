@@ -39,3 +39,48 @@ export function createSupabaseWithToken(token: string): SupabaseClient {
   })
 }
 
+export async function findUserByPhone(
+  supabaseAdmin: SupabaseClient,
+  phone: string
+) {
+  const perPage = 1000
+  let page = 1
+  const trimmed = phone.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  const e164 = trimmed.startsWith('+') ? `+${digits}` : (digits.length === 11 ? `+86${digits}` : `+${digits}`)
+  const normalizedLocal = e164.startsWith('+86') ? e164.slice(3) : ''
+  const candidates = new Set([phone, e164, digits])
+  if (normalizedLocal) {
+    candidates.add(normalizedLocal)
+    candidates.add(`+86${normalizedLocal}`)
+  }
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    const matchedUser = data?.users?.find((u) => {
+      const uphone = u.phone || ''
+      if (candidates.has(uphone)) return true
+      if (normalizedLocal) {
+        return uphone.endsWith(normalizedLocal)
+      }
+      return false
+    })
+    if (matchedUser) {
+      return matchedUser
+    }
+
+    if (!data?.users || data.users.length < perPage) {
+      return null
+    }
+
+    page += 1
+  }
+}

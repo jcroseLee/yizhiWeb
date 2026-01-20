@@ -29,8 +29,12 @@ export async function POST(request: NextRequest) {
 
     let userId: string | null = null
     if (token) {
-      const { data } = await supabase.auth.getUser(token)
-      userId = data.user?.id ?? null
+      try {
+        const { data } = await supabase.auth.getUser(token)
+        userId = data.user?.id ?? null
+      } catch {
+        userId = null
+      }
     }
 
     const userIdHash = typeof properties?.user_id === 'string' ? properties.user_id : null
@@ -62,4 +66,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500, headers: corsHeaders })
   }
 }
-

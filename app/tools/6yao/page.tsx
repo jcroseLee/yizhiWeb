@@ -41,14 +41,14 @@ const styles = `
   .calligraphy-input {
     background-color: transparent;
     border: none;
-    border-bottom: 1px dashed #d6d3d1;
+    border-bottom: 0.0625rem dashed #d6d3d1;
     border-radius: 0;
     padding-left: 0;
     transition: all 0.3s ease;
   }
 
   .calligraphy-input:focus {
-    border-bottom: 1px solid #C82E31;
+    border-bottom: 0.0625rem solid #C82E31;
     box-shadow: none;
     background: linear-gradient(to bottom, transparent 95%, rgba(200, 46, 49, 0.05) 100%);
   }
@@ -66,23 +66,23 @@ const styles = `
 
   .react-datepicker {
     font-family: 'Noto Sans SC', system-ui, sans-serif;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    border: 0.0625rem solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.625rem 1.5625rem rgba(0, 0, 0, 0.1);
     background-color: white;
   }
 
   .react-datepicker__header {
     background-color: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
-    border-radius: 8px 8px 0 0;
-    padding-top: 8px;
+    border-bottom: 0.0625rem solid #e5e7eb;
+    border-radius: 0.5rem 0.5rem 0 0;
+    padding-top: 0.5rem;
   }
 
   .react-datepicker__current-month {
     font-weight: 600;
     color: #1f2937;
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
   }
 
   .react-datepicker__day-name {
@@ -97,19 +97,19 @@ const styles = `
     line-height: 2.5rem;
     margin: 0.166rem;
     color: #1f2937;
-    border-radius: 4px;
+    border-radius: 0.25rem;
   }
 
   .react-datepicker__day:hover {
     background-color: #f3f4f6;
-    border-radius: 4px;
+    border-radius: 0.25rem;
   }
 
   .react-datepicker__day--selected,
   .react-datepicker__day--keyboard-selected {
     background-color: #C82E31 !important;
     color: white !important;
-    border-radius: 4px;
+    border-radius: 0.25rem;
   }
 
   .react-datepicker__day--today {
@@ -118,7 +118,7 @@ const styles = `
   }
 
   .react-datepicker__time-container {
-    border-left: 1px solid #e5e7eb;
+    border-left: 0.0625rem solid #e5e7eb;
   }
 
   .react-datepicker__time-container .react-datepicker__time {
@@ -130,7 +130,7 @@ const styles = `
   }
 
   .react-datepicker__time-list-item {
-    padding: 8px 10px;
+    padding: 0.5rem 0.625rem;
     color: #1f2937;
   }
 
@@ -145,7 +145,7 @@ const styles = `
   }
 
   .react-datepicker__navigation {
-    top: 8px;
+    top: 0.5rem;
   }
 
   .react-datepicker__navigation-icon::before {
@@ -517,7 +517,7 @@ export default function ToolsPage() {
                             value={question}
                             onChange={(e) => handleQuestionChange(e.target.value)}
                             placeholder="所占何事？在此处输入..."
-                            className={`w-full bg-white/40 backdrop-blur-sm border-0 border-b-2 rounded-t-lg px-4 py-3 text-base min-h-[64px] resize-none text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:outline-none transition-all ${
+                            className={`w-full bg-white/40 backdrop-blur-sm border-0 border-b-2 rounded-t-lg px-4 py-3 text-base min-h-[4rem] resize-none text-stone-800 placeholder:text-stone-400 focus:ring-0 focus:outline-none transition-all ${
                               questionError
                                 ? 'border-red-400 bg-red-50/20'
                                 : 'border-stone-200 focus:border-[#C82E31] focus:bg-white/60'

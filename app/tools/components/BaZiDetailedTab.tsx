@@ -437,7 +437,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
             {summaryColumns.map((col) => (
               <div key={col.label} className="rounded-lg border bg-stone-50/50 border-stone-200/50 px-2 py-2 text-center">
-                <div className="text-[10px] text-stone-500 mb-1">{col.label}</div>
+                <div className="text-[0.625rem] text-stone-500 mb-1">{col.label}</div>
                 <div className="text-xs font-medium text-stone-600 mb-1">{col.shiShen}</div>
                 <div className={cn("text-lg font-serif font-bold leading-tight", getTextColor(col.ganWuxing))}>{col.gan || '--'}</div>
                 <div className={cn("text-lg font-serif font-bold leading-tight", getTextColor(col.zhiWuxing))}>{col.zhi || '--'}</div>
@@ -460,7 +460,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                   <div
                     key={i}
                     className={cn(
-                      "flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg border min-w-[90px]",
+                      "flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg border min-w-[5.625rem]",
                       yun.isCurrent
                         ? "bg-[#C82E31]/10 border-[#C82E31]/30 shadow-sm"
                         : "bg-stone-50/50 border-stone-200/50"
@@ -475,7 +475,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                     )}>
                       {yun.gan}{yun.zhi}
                     </div>
-                    <div className="text-[10px] text-stone-500 text-center">
+                    <div className="text-[0.625rem] text-stone-500 text-center">
                       {getShiShen(yun.gan)} {getShiShen(yun.zhi)}
                     </div>
                   </div>
@@ -506,7 +506,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                   <div
                     key={i}
                     className={cn(
-                      "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[65px]",
+                      "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[4.0625rem]",
                       isCurrent
                         ? "bg-[#C82E31]/10 border-[#C82E31]/30 shadow-sm"
                         : "bg-stone-50/50 border-stone-200/50"
@@ -516,14 +516,14 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                       "text-xs font-medium",
                       isCurrent ? "text-[#C82E31] font-bold" : "text-stone-700"
                     )}>{year}</div>
-                    <div className="text-[10px] text-stone-400">{age > 0 ? `${age}岁` : '--'}</div>
+                    <div className="text-[0.625rem] text-stone-400">{age > 0 ? `${age}岁` : '--'}</div>
                     <div className={cn(
                       "text-sm font-serif font-medium",
                       isCurrent ? "text-[#C82E31]" : "text-stone-600"
                     )}>
                       {gan}{zhi}
                     </div>
-                    <div className="text-[10px] text-stone-500">
+                    <div className="text-[0.625rem] text-stone-500">
                       {ganShiShen} {zhiShiShen}
                     </div>
                   </div>
@@ -548,14 +548,14 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                 return (
                   <div
                     key={i}
-                    className="flex flex-col items-center gap-1 px-2 py-1.5 rounded border bg-stone-50/50 border-stone-200/50 min-w-[65px]"
+                    className="flex flex-col items-center gap-1 px-2 py-1.5 rounded border bg-stone-50/50 border-stone-200/50 min-w-[4.0625rem]"
                   >
                     <div className="text-xs text-stone-500">{item.term}</div>
-                    <div className="text-[10px] text-stone-400">{item.date.getMonth() + 1}/{item.date.getDate()}</div>
+                    <div className="text-[0.625rem] text-stone-400">{item.date.getMonth() + 1}/{item.date.getDate()}</div>
                     <div className="text-sm font-serif font-medium text-stone-700">
                       {gan}{zhi}
                     </div>
-                    <div className="text-[10px] text-stone-500">
+                    <div className="text-[0.625rem] text-stone-500">
                       {ganShiShen} {zhiShiShen}
                     </div>
                   </div>
@@ -577,7 +577,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                   <div
                     key={idx}
                     className={cn(
-                      "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[65px]",
+                      "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[4.0625rem]",
                       cell.isToday
                         ? "bg-[#C82E31]/10 border-[#C82E31]/30 shadow-sm"
                         : "bg-stone-50/50 border-stone-200/50"
@@ -612,7 +612,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                 <div
                   key={i}
                   className={cn(
-                    "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[62px]",
+                    "flex flex-col items-center gap-1 px-2 py-1.5 rounded border min-w-[3.875rem]",
                     it.isCurrent
                       ? "bg-[#C82E31]/10 border-[#C82E31]/30 shadow-sm"
                       : "bg-stone-50/50 border-stone-200/50"
@@ -630,7 +630,7 @@ export function BaZiDetailedTab(props: BaZiDetailedTabProps) {
                   )}>
                     {it.gan}{it.zhi}
                   </div>
-                  <div className="text-[10px] text-stone-500">
+                  <div className="text-[0.625rem] text-stone-500">
                     {getShiShen(it.gan)}
                   </div>
                 </div>

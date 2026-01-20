@@ -2,23 +2,23 @@
 
 import { toPng } from 'html-to-image'
 import {
-    ArrowLeft,
-    ArrowRight,
-    Calendar,
-    Check,
-    ChevronDown, ChevronUp,
-    CloudFog,
-    Loader2,
-    Moon,
-    PenLine,
-    RefreshCw,
-    RotateCcw,
-    Sparkles,
-    Sun,
-    ThumbsDown,
-    ThumbsUp,
-    X,
-    Zap
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Check,
+  ChevronDown, ChevronUp,
+  CloudFog,
+  Loader2,
+  Moon,
+  PenLine,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  Sun,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+  Zap
 } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -29,29 +29,29 @@ import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Button } from '@/lib/components/ui/button'
 import { Card } from '@/lib/components/ui/card'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import {
-    LINE_LABELS,
-    RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
+  LINE_LABELS,
+  RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId
 } from '@/lib/constants/divination'
 import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser, getSession } from '@/lib/services/auth'
 import { getUserGrowth } from '@/lib/services/growth'
 import {
-    addDivinationNote,
-    getDivinationNotes,
-    getDivinationRecordById,
-    saveDivinationRecord,
-    updateDivinationNote,
-    updateDivinationQuestion,
-    type DivinationNote
+  addDivinationNote,
+  getDivinationNotes,
+  getDivinationRecordById,
+  saveDivinationRecord,
+  updateDivinationNote,
+  updateDivinationQuestion,
+  type DivinationNote
 } from '@/lib/services/profile'
 import { buildLineDisplay } from '@/lib/utils/divinationLines'
 import { buildChangedLines as buildChangedLinesUtil } from '@/lib/utils/divinationLineUtils'
@@ -184,6 +184,7 @@ function ResultPageContent() {
   const [submittingAiFeedback, setSubmittingAiFeedback] = useState(false)
   const aiAbortControllerRef = useRef<AbortController | null>(null)
   const aiIdempotencyKeyRef = useRef<string | null>(null)
+  const aiLastModeRef = useRef<'preview' | 'full'>('preview')
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
@@ -193,9 +194,11 @@ function ResultPageContent() {
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
   const [aiResult, setAiResult] = useState('')
+  const [aiPreviewResult, setAiPreviewResult] = useState('')
   const [aiResultAt, setAiResultAt] = useState<string | null>(null)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [aiPayIntent, setAiPayIntent] = useState<'preview' | 'unlock' | 'reanalyze'>('preview')
 
   
   // Question editing state
@@ -586,13 +589,14 @@ function ResultPageContent() {
     }
   }, [recordIdForAi, normalizedResultId, submittingAiFeedback])
 
-  const startAiAnalysis = useCallback(async () => {
+  const startAiAnalysis = useCallback(async (mode: 'preview' | 'full') => {
     if (!calculatedData) {
         console.warn('Cannot analyze: guaData is missing');
         return;
     }
 
     const startedAt = Date.now()
+    aiLastModeRef.current = mode
 
     // Abort previous request if any
     aiAbortControllerRef.current?.abort();
@@ -604,8 +608,7 @@ function ResultPageContent() {
     setAiStreamError(null);
     setIsAiStreaming(true); 
 
-    // Generate idempotency key if not exists
-    if (!aiIdempotencyKeyRef.current) {
+    if (mode === 'full' && !aiIdempotencyKeyRef.current) {
       aiIdempotencyKeyRef.current = generateIdempotencyKey();
     }
 
@@ -613,11 +616,12 @@ function ResultPageContent() {
       // Get session for token
       const session = await getSession();
       const token = session?.access_token;
+      if (!token) throw new Error('请先登录后再使用 AI 分析');
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (token) headers.Authorization = `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
 
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
@@ -626,7 +630,8 @@ function ResultPageContent() {
           question,
           background: '',
           guaData: calculatedData,
-          idempotencyKey: aiIdempotencyKeyRef.current,
+          idempotencyKey: mode === 'full' ? aiIdempotencyKeyRef.current : undefined,
+          mode,
         }),
         signal: controller.signal,
       });
@@ -645,8 +650,7 @@ function ResultPageContent() {
            }
         } catch {}
 
-        // If handled error (e.g. 402, 500 with refund), clear key to allow fresh retry
-        if (isHandledError) {
+        if (mode === 'full' && isHandledError) {
            aiIdempotencyKeyRef.current = null;
         }
 
@@ -670,12 +674,19 @@ function ResultPageContent() {
 
       // Analysis complete
       setIsAiStreaming(false);
-      persistAiResult(accumulatedContent);
+      if (mode === 'full') {
+        setAiPreviewResult('')
+        persistAiResult(accumulatedContent);
+      } else {
+        setAiPreviewResult(accumulatedContent)
+        setAiResultAt(new Date().toISOString())
+      }
       trackEvent('ai_response_complete', {
         latency: Date.now() - startedAt,
         token_usage: null,
         content_length: accumulatedContent.length,
         divination_type: 'liuyao',
+        mode,
       })
       
     } catch (err: any) {
@@ -689,6 +700,7 @@ function ResultPageContent() {
       trackEvent('ai_analysis_error', {
         error: err instanceof Error ? err.message : String(err),
         divination_type: 'liuyao',
+        mode,
       })
     }
   }, [calculatedData, question, persistAiResult]);
@@ -702,7 +714,7 @@ function ResultPageContent() {
     }
     trackEvent('ai_analysis_click', { source: 'mobile_bar', divination_type: 'liuyao' })
 
-    if (aiResult) {
+    if (aiResult || aiPreviewResult) {
       if (isSaved && !isAuthor) {
         toast({
           title: '提示',
@@ -726,14 +738,15 @@ function ResultPageContent() {
 
     if (!isAuthor) {
       // 非作者也可以分析，但结果不会保存
+      setAiPayIntent('preview')
       setShowAiNotOwnerConfirm(true)
       return
     }
 
-    // 显示确认弹窗，而不是直接开始分析
-    setShowAiCostConfirm(true)
+    startAiAnalysis('preview')
   }, [
     aiResult,
+    aiPreviewResult,
     isSaved,
     isAuthor,
     toast,
@@ -742,6 +755,27 @@ function ResultPageContent() {
     startAiAnalysis,
     trackEvent,
   ])
+
+  const handleUnlockFullRequest = useCallback(async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+      handleLoginRedirect()
+      return
+    }
+
+    if (!isSaved) {
+      setPendingSaveAction('ai')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
+    setAiPayIntent('unlock')
+    if (!isAuthor) {
+      setShowAiNotOwnerConfirm(true)
+      return
+    }
+    setShowAiCostConfirm(true)
+  }, [handleLoginRedirect, isAuthor, isSaved])
 
   const handleConfirmSaveForAi = async () => {
     setShowAiSaveConfirm(false)
@@ -754,6 +788,10 @@ function ResultPageContent() {
 
   const handleConfirmAiNotOwner = () => {
     setShowAiNotOwnerConfirm(false)
+    if (aiPayIntent === 'preview') {
+      startAiAnalysis('preview')
+      return
+    }
     setShowAiCostConfirm(true)
   }
 
@@ -788,7 +826,8 @@ function ResultPageContent() {
       }
 
       setShowAiCostConfirm(false)
-      startAiAnalysis()
+      if (aiPayIntent === 'reanalyze') handleResetIdempotencyKey()
+      startAiAnalysis('full')
       setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     } finally {
       setAiBalanceChecking(false)
@@ -939,7 +978,7 @@ function ResultPageContent() {
         <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 relative z-10">
           <div className="flex-1 min-w-0">
             {/* 上半部分 */}
-            <Card className="border-none shadow-none lg:shadow-sm bg-white min-h-[800px] relative overflow-hidden flex flex-col rounded-none lg:rounded-xl">
+            <Card className="border-none shadow-none lg:shadow-sm bg-white min-h-[50rem] relative overflow-hidden flex flex-col rounded-none lg:rounded-xl">
               <div className="absolute top-0 left-0 right-0 h-1 bg-[#C82E31]/80"></div>
               <div className="p-4 sm:p-8 lg:p-12 flex-1 pb-32 lg:pb-12">
                 
@@ -947,10 +986,10 @@ function ResultPageContent() {
                 <div className="mb-6 lg:mb-8 mt-2 lg:mt-0">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 lg:gap-3">
-                      <span className="text-[10px] font-medium text-[#C82E31] bg-[#C82E31]/10 border border-[#C82E31]/20 px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                      <span className="text-[0.625rem] font-medium text-[#C82E31] bg-[#C82E31]/10 border border-[#C82E31]/20 px-1.5 py-0.5 rounded tracking-wide shrink-0">
                         所占事项
                       </span>
-                      <span className="text-[10px] sm:text-xs text-stone-400 font-mono tracking-wider truncate">
+                      <span className="text-[0.625rem] sm:text-xs text-stone-400 font-mono tracking-wider truncate">
                         {['手动摇卦', '自动摇卦', '手工指定'][payload.divinationMethod]} 
                       </span>
                     </div>
@@ -1048,7 +1087,7 @@ function ResultPageContent() {
                           <span>{formatDateTime(payload.divinationTimeISO)}</span>
                        </div>
                        
-                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] sm:text-xs text-stone-500">
+                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[0.625rem] sm:text-xs text-stone-500">
                           <div className="flex items-center gap-1"><Moon className="w-3 h-3 text-stone-400" /><span className="font-serif tracking-wide">{getLunarDateStringWithoutYear(date)}</span></div>
                           <div className="w-px h-2.5 bg-stone-300"></div>
                           <div className="flex items-center gap-1"><Sun className="w-3 h-3 text-amber-500/70" /><span className="font-serif">{solarTerm.split(' ~ ')[0]}</span></div>
@@ -1060,7 +1099,7 @@ function ResultPageContent() {
                          onClick={() => setShowShenSha(!showShenSha)} 
                          variant="ghost"
                          size="sm"
-                         className="flex items-center gap-1 text-[10px] sm:text-xs text-stone-400 hover:text-[#C82E31] w-fit mt-1 group h-auto py-0.5"
+                         className="flex items-center gap-1 text-[0.625rem] sm:text-xs text-stone-400 hover:text-[#C82E31] w-fit mt-1 group h-auto py-0.5"
                        >
                           <span className="border-b border-dashed border-stone-300 group-hover:border-[#C82E31] pb-0.5">{showShenSha ? '收起神煞' : '查看神煞互参'}</span>
                           {showShenSha ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -1073,7 +1112,7 @@ function ResultPageContent() {
                       <div className="flex lg:hidden w-full justify-between items-center gap-2 border-t border-stone-100 pt-3">
                          {['年', '月', '日', '时'].map((label, i) => (
                            <div key={i} className={`flex flex-col items-center gap-1 ${label === '日' ? 'relative -top-0.5' : ''}`}>
-                              <span className="text-[10px] text-stone-400">{label}</span>
+                              <span className="text-[0.625rem] text-stone-400">{label}</span>
                               <div className={`flex flex-col items-center py-2 px-3 rounded-lg border ${label === '日' ? 'border-[#C82E31]/40 bg-red-50/20' : 'bg-white border-stone-200'}`}>
                                 <span className={`text-base font-serif font-bold leading-none mb-1 ${label === '日' ? 'text-[#C82E31]' : 'text-stone-700'}`}>{stems[i]?.char}</span>
                                 <span className={`text-base font-serif font-bold leading-none ${label === '日' ? 'text-[#C82E31]' : 'text-stone-700'}`}>{branches[i]?.char}</span>
@@ -1121,7 +1160,7 @@ function ResultPageContent() {
                       <h2 className="text-base sm:text-2xl font-bold text-stone-800 font-serif tracking-wide leading-none truncate">
                         {originalFullInfo.fullName}
                       </h2>
-                      <span className="text-[10px] sm:text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full block sm:inline">
+                      <span className="text-[0.625rem] sm:text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full block sm:inline">
                         {originalNature.nature}
                       </span>
                     </div>
@@ -1150,7 +1189,7 @@ function ResultPageContent() {
                         {hasMovingLines ? changedFullInfo.fullName : '变卦'}
                       </h2>
                       {hasMovingLines && (
-                        <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-50 px-2 py-0.5 rounded-full block sm:inline">
+                        <span className="text-[0.625rem] sm:text-xs text-stone-400 bg-stone-50 px-2 py-0.5 rounded-full block sm:inline">
                            {changedNature.nature}
                         </span>
                       )}
@@ -1165,7 +1204,7 @@ function ResultPageContent() {
                          Array(6).fill(0).map((_, i) => (
                            <div key={`empty-${i}`} className="flex flex-col h-10 lg:h-14 justify-center border-b border-dashed border-stone-100/50">
                              <div className="flex items-center gap-2 opacity-10">
-                               <div className="w-8 lg:w-16 h-[5px] lg:h-[8px] bg-stone-400 rounded-[2px]"></div>
+                               <div className="w-8 lg:w-16 h-[0.3125rem] lg:h-[0.5rem] bg-stone-400 rounded-[0.125rem]"></div>
                              </div>
                            </div>
                          ))
@@ -1210,7 +1249,7 @@ function ResultPageContent() {
                    </div>
                 </div>
 
-                {(aiResult || isAiStreaming || aiStreamError) && (
+                {(aiResult || aiPreviewResult || isAiStreaming || aiStreamError) && (
                 <div ref={aiSectionRef} className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm scroll-mt-20">
                    <div className="flex items-center gap-3 mb-4">
                       <Sparkles className="w-5 h-5 text-[#C82E31]" />
@@ -1218,17 +1257,34 @@ function ResultPageContent() {
                         AI 分析结果
                       </h4>
                       {isAiStreaming && <Loader2 className="w-4 h-4 animate-spin text-stone-400" />}
-                      {!isAiStreaming && aiResultAt && <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
+                      {!isAiStreaming && aiResultAt && <span className="text-[0.625rem] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
                    </div>
                    
                    {aiStreamError ? (
                      <div className="p-4 bg-red-50 text-red-600 rounded-md text-sm mb-4">
                        分析出错: {aiStreamError.message}
-                       <Button variant="outline" size="sm" onClick={startAiAnalysis} className="ml-4 border-red-200 hover:bg-red-100">重试</Button>
+                       <Button variant="outline" size="sm" onClick={() => startAiAnalysis(aiLastModeRef.current)} className="ml-4 border-red-200 hover:bg-red-100">重试</Button>
                       </div>
                    ) : (
                      <div className="prose prose-stone max-w-none font-serif text-stone-800 prose-headings:text-[#C82E31] prose-strong:text-[#C82E31]">
-                       <ReactMarkdown>{isAiStreaming ? aiStreamContent : aiResult}</ReactMarkdown>
+                       <ReactMarkdown>{isAiStreaming ? aiStreamContent : (aiResult || aiPreviewResult)}</ReactMarkdown>
+                     </div>
+                   )}
+
+                   {!isAiStreaming && !aiStreamError && !aiResult && aiPreviewResult && (
+                     <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-4">
+                       <div className="flex items-center justify-between gap-3">
+                         <div className="text-xs text-stone-600">
+                           当前仅展示 20% 预览内容，查看完整内容需 50 易币。
+                         </div>
+                         <Button
+                           size="sm"
+                           className="bg-[#C82E31] hover:bg-[#A61B1F] text-white"
+                           onClick={handleUnlockFullRequest}
+                         >
+                           解锁完整内容
+                         </Button>
+                       </div>
                      </div>
                    )}
 
@@ -1266,9 +1322,8 @@ function ResultPageContent() {
                         variant="outline" 
                         className="gap-2 text-[#C82E31] border-[#C82E31]/30 hover:bg-red-50" 
                         onClick={() => {
-                          handleResetIdempotencyKey()
-                          startAiAnalysis()
-                          handleScrollToResult()
+                          setAiPayIntent('reanalyze')
+                          setShowAiCostConfirm(true)
                         }}
                       >
                        <RefreshCw className="w-4 h-4" /> 重新分析
@@ -1309,9 +1364,9 @@ function ResultPageContent() {
           </div>
 
           {/* 右侧工具栏 (桌面端保持不变) */}
-          <div className="hidden lg:flex w-72 flex-col gap-4 shrink-0">
+          <div className="hidden lg:flex w-72 flex-col gap-4 shrink-0 self-start lg:sticky lg:top-8">
              <AiAnalysisCard
-               aiResult={aiResult}
+               aiStage={aiResult ? 'full' : aiPreviewResult ? 'preview' : 'none'}
                isSaved={isSaved}
                isAuthor={isAuthor}
                saving={saving}
@@ -1456,13 +1511,15 @@ function ResultPageContent() {
             <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-4">
               <Zap className="w-6 h-6 text-orange-500 fill-current" />
             </div>
-            <DialogTitle className="mb-2">确认 AI 分析</DialogTitle>
+            <DialogTitle className="mb-2">
+              {aiPayIntent === 'reanalyze' ? '确认重新分析' : '解锁完整内容'}
+            </DialogTitle>
             <DialogDescription>
               本次操作将扣除{" "}
               <span className="font-bold text-[#C82E31] text-base">50</span>{" "}
               易币
               <br />
-              用于调用大模型进行深度推理。
+              {aiPayIntent === 'reanalyze' ? '以重新生成完整 AI 分析内容。' : '以查看完整 AI 分析内容。'}
             </DialogDescription>
           </div>
           <DialogFooter className="mt-4 flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-center">
@@ -1554,7 +1611,7 @@ const IconAISparkle = ({ className }: { className?: string }) => (
     fill="none" 
     xmlns="http://www.w3.org/2000/svg" 
     className={className}
-    style={{ filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.8))' }} // 增加图标自发光
+    style={{ filter: 'drop-shadow(0 0 0.125rem rgba(255, 255, 255, 0.8))' }} // 增加图标自发光
   >
     {/* 字母 A */}
     <path 

@@ -70,7 +70,7 @@ export default function UserInfoCard() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-stone-800 truncate group-hover:text-[#C82E31] transition-colors">{user.name}</h3>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-50 text-yellow-700 border border-yellow-200 shadow-sm">
+              <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold bg-yellow-50 text-yellow-700 border border-yellow-200 shadow-sm">
                 LV.{user.level}
               </span>
             </div>

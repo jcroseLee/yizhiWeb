@@ -50,10 +50,10 @@ const SolarTermSeal = ({ term }: { term: string }) => {
       </svg>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 z-10">
-        <span className="text-white font-serif font-bold text-sm leading-none" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.1)' }}>
+        <span className="text-white font-serif font-bold text-sm leading-none" style={{ textShadow: '0 0.0625rem 0.0625rem rgba(0,0,0,0.1)' }}>
           {term[0]}
         </span>
-        <span className="text-white font-serif font-bold text-sm leading-none mt-1" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.1)' }}>
+        <span className="text-white font-serif font-bold text-sm leading-none mt-1" style={{ textShadow: '0 0.0625rem 0.0625rem rgba(0,0,0,0.1)' }}>
           {term[1]}
         </span>
       </div>
@@ -135,8 +135,8 @@ export default function DailyFortuneCard() {
       <div 
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{ 
-          backgroundImage: 'radial-gradient(#444 1px, transparent 1px)', 
-          backgroundSize: '24px 24px' 
+          backgroundImage: 'radial-gradient(#444 0.0625rem, transparent 0.0625rem)', 
+          backgroundSize: '1.5rem 1.5rem' 
         }}
       />
 
@@ -183,7 +183,7 @@ export default function DailyFortuneCard() {
           {/* 背景虚线框 */}
           <div className="absolute inset-0 border border-dashed border-stone-200 rounded-lg pointer-events-none"></div>
           
-          <div className="flex items-center py-2.5 px-3 gap-4 text-[11px]">
+          <div className="flex items-center py-2.5 px-3 gap-4 text-[0.6875rem]">
             <div className="flex items-center gap-1.5">
               <span className="text-stone-400">值卦</span>
               <span className="font-serif font-bold text-stone-700">{today.gua}</span>

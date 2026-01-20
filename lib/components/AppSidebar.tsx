@@ -2,7 +2,6 @@
 
 import { IconCases, IconCommunity, IconHome, IconLibrary } from '@/lib/components/CustomIcons'
 import SidebarNavigation, { NavItem } from '@/lib/components/SidebarNavigation'
-import { Bot, Compass, Settings } from 'lucide-react'
 
 const navItems: NavItem[] = [
   { href: '/', label: '首页', icon: IconHome },
@@ -11,23 +10,6 @@ const navItems: NavItem[] = [
   { href: '/library', label: '藏经阁', icon: IconLibrary },
 ]
 
-const bottomItems: NavItem[] = [
-  { 
-    href: '/tools/6yao', 
-    label: '排盘工具', 
-    icon: Compass,
-    children: [
-      { href: '/tools/6yao', label: '六爻排盘', icon: Settings },
-    ]
-  },
-  {
-    href: '/chat',
-    label: '易知小童',
-    icon: Bot,
-  },
-]
-
-export default function AppSidebar() {
-  return <SidebarNavigation items={navItems} bottomItems={bottomItems} />
+export default function AppSidebar({ collapsed }: { collapsed?: boolean }) {
+  return <SidebarNavigation items={navItems} collapsed={collapsed} />
 }
-

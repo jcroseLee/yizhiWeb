@@ -279,7 +279,7 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
     <div className="bg-white rounded-xl border border-stone-200/60 overflow-hidden p-4 md:p-6" ref={containerRef}>
       <div className="mb-6">
         <h3 className="text-base md:text-lg font-serif font-bold text-stone-800 mb-1">刑冲會合法則</h3>
-        <p className="text-[10px] md:text-xs text-stone-500">
+        <p className="text-[0.625rem] md:text-xs text-stone-500">
           天干地支能量交互网络 (点击高亮)
         </p>
       </div>
@@ -358,12 +358,12 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
                         <span 
                             className="bg-white border shadow-sm rounded-full whitespace-nowrap flex items-center justify-center leading-none"
                             style={{
-                                fontSize: isMobile ? '9px' : '10px',
-                                padding: isMobile ? '3px 6px' : '4px 8px',
+                                fontSize: isMobile ? '0.5625rem' : '0.625rem',
+                                padding: isMobile ? '0.1875rem 0.375rem' : '0.25rem 0.5rem',
                                 color: item.color,
                                 borderColor: isHovered ? item.color : 'transparent',
                                 fontWeight: isHovered ? 'bold' : 'normal',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                boxShadow: '0 0.0625rem 0.125rem rgba(0,0,0,0.05)',
                                 fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif'
                             }}
                         >
@@ -383,7 +383,7 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
                 className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
                 style={{ top: `${CONFIG.ganY}px`, transform: 'translate(-50%, -50%)' }}
               >
-                 <span className="text-[10px] md:text-xs text-stone-400 font-serif mb-1 md:mb-2 block relative z-10 px-1.5 py-0.5 bg-[#FDFBF7] rounded border border-stone-100 shadow-sm whitespace-nowrap">
+                 <span className="text-[0.625rem] md:text-xs text-stone-400 font-serif mb-1 md:mb-2 block relative z-10 px-1.5 py-0.5 bg-[#FDFBF7] rounded border border-stone-100 shadow-sm whitespace-nowrap">
                     {pillar.label.substring(0,1)}柱
                  </span>
                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center z-10 pointer-events-auto hover:border-[#C82E31] transition-colors cursor-default">
@@ -414,7 +414,7 @@ export function BaZiRelationships({ pillars }: BaZiRelationshipsProps) {
             <div key={type.key} className="flex items-center gap-2 p-1.5 rounded-lg bg-stone-50 border border-stone-100">
               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: type.color }}></div>
               <span className="text-xs text-stone-600 truncate">{type.label}</span>
-              <span className="ml-auto text-[10px] text-stone-400 font-mono bg-white px-1.5 rounded">{count}</span>
+              <span className="ml-auto text-[0.625rem] text-stone-400 font-mono bg-white px-1.5 rounded">{count}</span>
             </div>
           )
         })}

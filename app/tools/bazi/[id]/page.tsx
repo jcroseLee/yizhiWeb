@@ -84,7 +84,7 @@ const GLOBAL_STYLES = `
   
   .bazi-grid {
     display: grid;
-    grid-template-columns: 80px repeat(4, 1fr);
+    grid-template-columns: 5rem repeat(4, 1fr);
     width: 100%;
   }
   .bazi-cell {
@@ -106,9 +106,9 @@ const GLOBAL_STYLES = `
   
   .glass-panel {
     background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
+    backdrop-filter: blur(0.75rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0.5rem 2rem 0 rgba(31, 38, 135, 0.03);
   }
   
   .writing-vertical {
@@ -318,6 +318,7 @@ function ResultPageContent() {
   const [showAiCostConfirm, setShowAiCostConfirm] = useState(false)
   const [aiBalanceChecking, setAiBalanceChecking] = useState(false)
   const [pendingSaveAction, setPendingSaveAction] = useState<'ai' | 'note' | null>(null)
+  const [aiPayIntent, setAiPayIntent] = useState<'preview' | 'unlock' | 'reanalyze'>('preview')
   
   // AI Streaming state
   const [aiStreamContent, setAiStreamContent] = useState('')
@@ -327,6 +328,7 @@ function ResultPageContent() {
   const [submittingAiFeedback, setSubmittingAiFeedback] = useState(false)
   const aiAbortControllerRef = useRef<AbortController | null>(null)
   const aiIdempotencyKeyRef = useRef<string | null>(null)
+  const aiLastModeRef = useRef<'preview' | 'full'>('preview')
   const aiSectionRef = useRef<HTMLDivElement>(null)
   const savedOnceRef = useRef(false)
   const noteSectionRef = useRef<PrivateNotesSectionRef>(null)
@@ -338,6 +340,7 @@ function ResultPageContent() {
   // Note state
   const [notes, setNotes] = useState<DivinationNote[]>([])
   const [aiResult, setAiResult] = useState('')
+  const [aiPreviewResult, setAiPreviewResult] = useState('')
   const [aiResultAt, setAiResultAt] = useState<string | null>(null)
   const [newNoteContent, setNewNoteContent] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
@@ -559,13 +562,14 @@ function ResultPageContent() {
     }
   }, [normalizedResultId, recordIdForAi, submittingAiFeedback])
 
-  const startAiAnalysis = useCallback(async () => {
+  const startAiAnalysis = useCallback(async (mode: 'preview' | 'full') => {
     if (!calculatedData || !payload) {
       console.warn('Cannot analyze: data is missing')
       return
     }
 
     const startedAt = Date.now()
+    aiLastModeRef.current = mode
     aiAbortControllerRef.current?.abort()
     const controller = new AbortController()
     aiAbortControllerRef.current = controller
@@ -575,18 +579,19 @@ function ResultPageContent() {
     setAiStreamError(null)
     setIsAiStreaming(true)
 
-    if (!aiIdempotencyKeyRef.current) {
+    if (mode === 'full' && !aiIdempotencyKeyRef.current) {
       aiIdempotencyKeyRef.current = generateIdempotencyKey()
     }
 
     try {
       const session = await getSession()
       const token = session?.access_token
+      if (!token) throw new Error('请先登录后再使用 AI 分析')
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
-      if (token) headers.Authorization = `Bearer ${token}`
+      headers.Authorization = `Bearer ${token}`
 
       const response = await fetch('/api/ai/analyze-bazi', {
         method: 'POST',
@@ -596,7 +601,8 @@ function ResultPageContent() {
           gender: payload.gender,
           dateISO: payload.dateISO,
           result: payload.result,
-          idempotencyKey: aiIdempotencyKeyRef.current,
+          idempotencyKey: mode === 'full' ? aiIdempotencyKeyRef.current : undefined,
+          mode,
         }),
         signal: controller.signal,
       })
@@ -612,7 +618,7 @@ function ResultPageContent() {
             errorMessage = json.error
           }
         } catch {}
-        if (isHandledError) {
+        if (mode === 'full' && isHandledError) {
           aiIdempotencyKeyRef.current = null
         }
         throw new Error(errorMessage || `HTTP ${response.status}`)
@@ -634,12 +640,19 @@ function ResultPageContent() {
       }
 
       setIsAiStreaming(false)
-      persistAiResult(accumulatedContent)
+      if (mode === 'full') {
+        setAiPreviewResult('')
+        persistAiResult(accumulatedContent)
+      } else {
+        setAiPreviewResult(accumulatedContent)
+        setAiResultAt(new Date().toISOString())
+      }
       trackEvent('ai_response_complete', {
         latency: Date.now() - startedAt,
         token_usage: null,
         content_length: accumulatedContent.length,
         divination_type: 'bazi',
+        mode,
       })
       
     } catch (err: unknown) {
@@ -652,6 +665,7 @@ function ResultPageContent() {
       trackEvent('ai_analysis_error', {
         error: err instanceof Error ? err.message : String(err),
         divination_type: 'bazi',
+        mode,
       })
     }
   }, [calculatedData, payload, name, persistAiResult])
@@ -723,7 +737,7 @@ function ResultPageContent() {
       return
     }
 
-    if (aiResult) {
+    if (aiResult || aiPreviewResult) {
       if (isSaved && !isAuthor) {
         toast({
           title: '提示',
@@ -747,14 +761,15 @@ function ResultPageContent() {
 
     if (!isAuthor) {
       // 非作者也可以分析，但结果不会保存
+      setAiPayIntent('preview')
       setShowAiNotOwnerConfirm(true)
       return
     }
 
-    // 显示确认弹窗，而不是直接开始分析
-    setShowAiCostConfirm(true)
+    startAiAnalysis('preview')
   }, [
     aiResult,
+    aiPreviewResult,
     isSaved,
     isAuthor,
     toast,
@@ -762,6 +777,27 @@ function ResultPageContent() {
     handleScrollToResult,
     startAiAnalysis,
   ])
+
+  const handleUnlockFullRequest = useCallback(async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+      handleLoginRedirect()
+      return
+    }
+
+    if (!isSaved) {
+      setPendingSaveAction('ai')
+      setShowAiSaveConfirm(true)
+      return
+    }
+
+    setAiPayIntent('unlock')
+    if (!isAuthor) {
+      setShowAiNotOwnerConfirm(true)
+      return
+    }
+    setShowAiCostConfirm(true)
+  }, [handleLoginRedirect, isAuthor, isSaved])
 
   const handleConfirmSaveForAi = async () => {
     setShowAiSaveConfirm(false)
@@ -774,6 +810,10 @@ function ResultPageContent() {
 
   const handleConfirmAiNotOwner = () => {
     setShowAiNotOwnerConfirm(false)
+    if (aiPayIntent === 'preview') {
+      startAiAnalysis('preview')
+      return
+    }
     setShowAiCostConfirm(true)
   }
 
@@ -808,7 +848,8 @@ function ResultPageContent() {
       }
 
       setShowAiCostConfirm(false)
-      startAiAnalysis()
+      if (aiPayIntent === 'reanalyze') handleResetIdempotencyKey()
+      startAiAnalysis('full')
       setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     } finally {
       setAiBalanceChecking(false)
@@ -1181,7 +1222,7 @@ function ResultPageContent() {
       <div className="min-h-screen bg-paper-50 relative flex justify-center p-0 lg:p-8 font-sans">
         <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 relative z-10">
           <div className="flex-1 min-w-0">
-            <Card className="border-none shadow-none lg:shadow-sm bg-white min-h-[800px] relative overflow-hidden flex flex-col rounded-none lg:rounded-xl">
+            <Card className="border-none shadow-none lg:shadow-sm bg-white min-h-[50rem] relative overflow-hidden flex flex-col rounded-none lg:rounded-xl">
               <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#0f003f] via-[#e40404] to-[#2d0269]"></div>
               <div className="p-4 sm:p-8 lg:p-12 flex-1 pb-32 lg:pb-12">
                 
@@ -1189,10 +1230,10 @@ function ResultPageContent() {
                 <div className="mb-6 lg:mb-8 mt-2 lg:mt-0">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 lg:gap-3">
-                      <span className="text-[10px] font-medium text-[#C82E31] bg-[#C82E31]/10 border border-[#C82E31]/20 px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                      <span className="text-[0.625rem] font-medium text-[#C82E31] bg-[#C82E31]/10 border border-[#C82E31]/20 px-1.5 py-0.5 rounded tracking-wide shrink-0">
                         八字排盘
                       </span>
-                      <span className="text-[10px] sm:text-xs text-stone-400 font-mono tracking-wider truncate">
+                      <span className="text-[0.625rem] sm:text-xs text-stone-400 font-mono tracking-wider truncate">
                         {payload.gender === 'male' ? '乾造' : '坤造'}
                       </span>
                     </div>
@@ -1315,7 +1356,7 @@ function ResultPageContent() {
                   </div>
 
                   {/* Tab 内容 */}
-                  <div className="min-h-[400px]">
+                  <div className="min-h-[25rem]">
                     {/* 基本信息 Tab */}
                     {activeTab === 'basic' && (
                       <BaZiBasicInfo
@@ -1360,7 +1401,7 @@ function ResultPageContent() {
                 </div>
 
                 {/* AI 分析结果 */}
-                {(aiResult || isAiStreaming || aiStreamError) && (
+                {(aiResult || aiPreviewResult || isAiStreaming || aiStreamError) && (
                   <div ref={aiSectionRef} className="mb-8 bg-white border border-stone-200 rounded-lg p-5 lg:p-8 shadow-sm scroll-mt-20">
                     <div className="flex items-center gap-3 mb-4">
                       <Sparkles className="w-5 h-5 text-[#C82E31]" />
@@ -1368,17 +1409,34 @@ function ResultPageContent() {
                         AI 分析结果
                       </h4>
                       {isAiStreaming && <div className="w-4 h-4 border-2 border-[#C82E31] border-t-transparent rounded-full animate-spin"></div>}
-                      {!isAiStreaming && aiResultAt && <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
+                      {!isAiStreaming && aiResultAt && <span className="text-[0.625rem] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{formatDateTime(aiResultAt)}</span>}
                     </div>
                     
                     {aiStreamError ? (
                       <div className="p-4 bg-red-50 text-red-600 rounded-md text-sm mb-4">
                         分析出错: {aiStreamError.message}
-                        <Button variant="outline" size="sm" onClick={startAiAnalysis} className="ml-4 border-red-200 hover:bg-red-100">重试</Button>
+                        <Button variant="outline" size="sm" onClick={() => startAiAnalysis(aiLastModeRef.current)} className="ml-4 border-red-200 hover:bg-red-100">重试</Button>
                       </div>
                     ) : (
                       <div className="prose prose-stone max-w-none font-serif text-stone-800 prose-headings:text-[#C82E31] prose-strong:text-[#C82E31]">
-                        <ReactMarkdown>{isAiStreaming ? aiStreamContent : aiResult}</ReactMarkdown>
+                        <ReactMarkdown>{isAiStreaming ? aiStreamContent : (aiResult || aiPreviewResult)}</ReactMarkdown>
+                      </div>
+                    )}
+
+                    {!isAiStreaming && !aiStreamError && !aiResult && aiPreviewResult && (
+                      <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-stone-600">
+                            当前仅展示 20% 预览内容，查看完整内容需 50 易币。
+                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-[#C82E31] hover:bg-[#A61B1F] text-white"
+                            onClick={handleUnlockFullRequest}
+                          >
+                            解锁完整内容
+                          </Button>
+                        </div>
                       </div>
                     )}
                   
@@ -1440,9 +1498,9 @@ function ResultPageContent() {
           </div>
 
           {/* 右侧工具栏 */}
-          <div className="hidden lg:flex w-72 flex-col gap-4 shrink-0">
+          <div className="hidden lg:flex w-72 flex-col gap-4 shrink-0 self-start lg:sticky lg:top-8">
             <AiAnalysisCard
-              aiResult={aiResult}
+              aiStage={aiResult ? 'full' : aiPreviewResult ? 'preview' : 'none'}
               isSaved={isSaved}
               isAuthor={isAuthor}
               saving={saving}
@@ -1526,13 +1584,15 @@ function ResultPageContent() {
             <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-4">
               <Zap className="w-6 h-6 text-orange-500 fill-current" />
             </div>
-            <DialogTitle className="mb-2">确认 AI 分析</DialogTitle>
+            <DialogTitle className="mb-2">
+              {aiPayIntent === 'reanalyze' ? '确认重新分析' : '解锁完整内容'}
+            </DialogTitle>
             <DialogDescription>
               本次操作将扣除{" "}
               <span className="font-bold text-[#C82E31] text-base">50</span>{" "}
               易币
               <br />
-              用于调用大模型进行深度推理。
+              {aiPayIntent === 'reanalyze' ? '以重新生成完整 AI 分析内容。' : '以查看完整 AI 分析内容。'}
             </DialogDescription>
           </div>
           <DialogFooter className="mt-4 flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-center">

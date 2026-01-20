@@ -34,8 +34,8 @@ export default function CaseDetailSkeleton() {
             <div className="p-4 sm:p-6 lg:p-12 space-y-6">
               {/* Header Meta */}
               <div className="flex flex-wrap items-center gap-3">
-                <Skeleton className="h-5 w-16 rounded-[2px]" />
-                <Skeleton className="h-5 w-20 rounded-[2px]" />
+                <Skeleton className="h-5 w-16 rounded-[0.125rem]" />
+                <Skeleton className="h-5 w-20 rounded-[0.125rem]" />
                 <Skeleton className="h-3 w-32 ml-2" />
               </div>
 
@@ -48,7 +48,7 @@ export default function CaseDetailSkeleton() {
               {/* Background Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <Skeleton className="w-[3px] h-3.5" />
+                  <Skeleton className="w-[0.1875rem] h-3.5" />
                   <Skeleton className="h-4 w-32" />
                 </div>
                 <div className="space-y-2">
@@ -73,7 +73,7 @@ export default function CaseDetailSkeleton() {
               {/* Analysis Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <Skeleton className="w-[3px] h-3.5" />
+                  <Skeleton className="w-[0.1875rem] h-3.5" />
                   <Skeleton className="h-4 w-40" />
                 </div>
                 <div className="space-y-2">
@@ -149,7 +149,7 @@ export default function CaseDetailSkeleton() {
         </div>
 
         {/* Right Sidebar Skeleton (Desktop) */}
-        <div className="hidden lg:block lg:flex-[0_0_360px] w-full">
+        <div className="hidden lg:block lg:flex-[0_0_22.5rem] w-full">
           <div className="sticky top-24 space-y-4">
             <div className="space-y-3">
               <Skeleton className="h-5 w-24" />

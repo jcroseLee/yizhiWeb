@@ -19,7 +19,7 @@ export const CircularProgress = ({ value, label, totalVerified = 0 }: CircularPr
           </span>
         </div>
         <span className="text-sm font-medium text-gray-600">{label}</span>
-        <span className="text-[10px] text-gray-400 text-center px-2 leading-tight">
+        <span className="text-[0.625rem] text-gray-400 text-center px-2 leading-tight">
           暂无验证数据<br />快去参与推演吧
         </span>
       </div>

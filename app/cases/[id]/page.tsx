@@ -1,13 +1,16 @@
 'use client'
 
 import DOMPurify from 'isomorphic-dompurify'
-import { ArrowLeft, Bookmark, CheckCircle2, Loader2, Printer, Share2, ThumbsUp, Undo2, UserPlus } from 'lucide-react'
+import { Bookmark, CheckCircle2, Loader2, Printer, ThumbsUp, Undo2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import CaseDetailSkeleton from '@/app/cases/components/CaseDetailSkeleton'
+import BaZiPanelDual from '@/app/community/components/BaZiPanelDual'
 import GuaPanelDual from '@/app/community/components/GuaPanelDual'
+import { getBaziInfo } from '@/app/community/components/PostCard'
+import DetailPageHeader from '@/lib/components/DetailPageHeader'
 import Divider from '@/lib/components/Divider'
 import UserHoverCard from '@/lib/components/UserHoverCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
@@ -215,10 +218,21 @@ export default function CaseDetailPage() {
     void load()
   }, [id, router, toast])
 
-  const fullGuaData = useMemo(() => {
-    if (!data?.divination_record) return null
-    return convertDivinationRecordToFullGuaData(data.divination_record)
+  const isBaziRecord = useMemo(() => {
+    if (!data?.divination_record) return false
+    const record = data.divination_record
+    return record.method === 1 || record.original_key === 'bazi'
   }, [data?.divination_record])
+
+  const baziData = useMemo(() => {
+    if (!data?.divination_record) return null
+    return getBaziInfo(data.divination_record)
+  }, [data?.divination_record])
+
+  const fullGuaData = useMemo(() => {
+    if (!data?.divination_record || isBaziRecord) return null
+    return convertDivinationRecordToFullGuaData(data.divination_record)
+  }, [data?.divination_record, isBaziRecord])
 
   const handleUnarchive = async () => {
     if (!data?.post?.id) return
@@ -349,6 +363,11 @@ export default function CaseDetailPage() {
     }
   }, [data?.post?.content_html, data?.post?.content])
 
+  const safeAdoptedCommentHtml = useMemo(() => {
+    const raw = data?.adopted_comment?.content || ''
+    return DOMPurify.sanitize(raw)
+  }, [data?.adopted_comment?.content])
+
   if (loading) {
     return <CaseDetailSkeleton />
   }
@@ -361,54 +380,33 @@ export default function CaseDetailPage() {
     <>
       <style jsx global>{styles}</style>
       <div className="min-h-screen paper-texture font-sans text-stone-800 pb-20 lg:pb-8">
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-stone-200 h-14 flex items-center justify-between px-4 lg:px-8 shadow-sm">
-          <div className="flex items-center gap-2 text-sm text-stone-500">
-            <Button variant="ghost" className="hover:text-stone-900 flex items-center h-auto p-1.5 -ml-2 sm:ml-0" onClick={() => router.push('/cases')}>
-              <ArrowLeft className="h-5 w-5 sm:mr-1" />
-              <span className="hidden sm:inline">案例库</span>
-            </Button>
-            <span className="hidden sm:inline text-stone-300">/</span>
-            <span className="text-stone-800 font-medium truncate max-w-[200px] sm:max-w-none">{data.post.title}</span>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            {currentUser && data && currentUser.id === data.post.user_id && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full text-stone-500 hover:text-red-600"
-                disabled={unarchiving}
-                onClick={handleUnarchive}
-                title="撤销结案"
-              >
-                <Undo2 className="h-4 w-4" />
+        <DetailPageHeader
+          backHref="/cases"
+          backLabel="返回案例库"
+          share={{
+            title: data.post.title,
+            url: typeof window !== 'undefined' ? window.location.href : ''
+          }}
+          actions={
+            <>
+              {currentUser && data && currentUser.id === data.post.user_id && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full text-stone-500 hover:text-red-600"
+                  disabled={unarchiving}
+                  onClick={handleUnarchive}
+                  title="撤销结案"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="rounded-full text-stone-500">
+                <Printer className="h-4 w-4" />
               </Button>
-            )}
-            <Button variant="ghost" size="icon" className="rounded-full text-stone-500">
-              <Printer className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-stone-500"
-              onClick={async () => {
-                const url = typeof window !== 'undefined' ? window.location.href : ''
-                try {
-                  if (typeof window !== 'undefined' && 'share' in window.navigator) {
-                    await window.navigator.share({ title: data.post.title, url })
-                    return
-                  }
-                  if (typeof window !== 'undefined' && window.navigator.clipboard?.writeText) {
-                    await window.navigator.clipboard.writeText(url)
-                    toast({ title: '链接已复制' })
-                    return
-                  }
-                } catch {}
-              }}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </header>
+            </>
+          }
+        />
 
         <main className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-6 py-4 lg:py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
           <div className="flex-1 min-w-0 space-y-6 w-full">
@@ -419,7 +417,7 @@ export default function CaseDetailPage() {
                   const categoryTag = data.tags?.find(t => t.category === 'category')
                   if (categoryTag) {
                     return (
-                      <span className="bg-[#C82E31] text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-sm shadow-sm">
+                      <span className="bg-[#C82E31] text-white text-[0.625rem] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-sm shadow-sm">
                         {categoryTag.name}
                       </span>
                     )
@@ -429,12 +427,12 @@ export default function CaseDetailPage() {
                 {(() => {
                   const Icon = accuracyConfig.icon
                   return (
-                    <span className={`${accuracyConfig.bg} ${accuracyConfig.color} ${accuracyConfig.border} border text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-sm flex items-center gap-1`}>
+                    <span className={`${accuracyConfig.bg} ${accuracyConfig.color} ${accuracyConfig.border} border text-[0.625rem] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-sm flex items-center gap-1`}>
                       <Icon className="h-3 w-3" /> {accuracyConfig.text}
                     </span>
                   )
                 })()}
-                <span className="text-stone-400 text-[10px] sm:text-xs">{new Date(data.post.created_at).toLocaleString()} 发布</span>
+                <span className="text-stone-400 text-[0.625rem] sm:text-xs">{new Date(data.post.created_at).toLocaleString()} 发布</span>
               </div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif-sc font-bold text-stone-900 leading-tight mb-4 sm:mb-6">
                 {data.post.title}
@@ -446,7 +444,7 @@ export default function CaseDetailPage() {
                 {/* Background Section */}
                 <div className="mb-14">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-[3px] h-3.5 bg-stone-300"></div>
+                    <div className="w-[0.1875rem] h-3.5 bg-stone-300"></div>
                     <h3 className="text-xs sm:text-sm font-bold text-stone-400 uppercase tracking-widest">BACKGROUND / 背景</h3>
                   </div>
                   <p className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8" dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml || '' }} />
@@ -456,12 +454,24 @@ export default function CaseDetailPage() {
                 <Divider className='mb-14' />
                 
 
-                {fullGuaData && (
+                {(fullGuaData || (baziData && baziData.pillars)) && (
                   <div className="lg:hidden mb-14">
-                    <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
-                      <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
-                    </h2>
-                    <GuaPanelDual data={fullGuaData} recordId={data.divination_record?.id} />
+                    {fullGuaData && (
+                      <>
+                        <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
+                          <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
+                        </h2>
+                        <GuaPanelDual data={fullGuaData} recordId={data.divination_record?.id} />
+                      </>
+                    )}
+                    {baziData && baziData.pillars && (
+                      <>
+                        <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
+                          <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 八字排盘
+                        </h2>
+                        <BaZiPanelDual data={baziData} recordId={data.divination_record?.id} />
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -469,10 +479,10 @@ export default function CaseDetailPage() {
                 {safeHtml.analysisHtml ? (
                   <div className="mb-14">
                     <div className="flex items-center gap-3 mb-6">
-                      <div className="w-[3px] h-3.5 bg-[#C82E31]"></div>
+                      <div className="w-[0.1875rem] h-3.5 bg-[#C82E31]"></div>
                       <h3 className="text-xs font-bold text-[#C82E31] uppercase tracking-[0.15em] font-sans">ANALYSIS / 卦理推演</h3>
                     </div>
-                    <div className="prose prose-stone max-w-none text-stone-800 text-base sm:text-[17px] leading-[1.8] font-serif-sc text-justify" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
+                    <div className="prose prose-stone max-w-none text-stone-800 text-base sm:text-[1.0625rem] leading-[1.8] font-serif-sc text-justify" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
                   </div>
                 ) : null}
 
@@ -482,7 +492,7 @@ export default function CaseDetailPage() {
                      <CheckCircle2 className="w-4 h-4" />
                      <h3 className="text-xs font-bold uppercase tracking-[0.15em] font-sans">Result / 实际反馈</h3>
                    </div>
-                   <div className="text-base sm:text-[17px] text-stone-700 leading-[1.8] font-serif-sc mb-2 relative z-10 text-justify">
+                   <div className="text-base sm:text-[1.0625rem] text-stone-700 leading-[1.8] font-serif-sc mb-2 relative z-10 text-justify">
                      {data.case_metadata.feedback_content}
                    </div>
                    {data.case_metadata.occurred_at && (
@@ -492,7 +502,7 @@ export default function CaseDetailPage() {
                    {/* Stamp */}
                    {resultConfig.stamp && (
                      <div className="absolute -right-6 -bottom-6 w-40 h-40 opacity-90 pointer-events-none select-none">
-                        <div className={`w-full h-full border-[3px] rounded-full flex items-center justify-center rotate-[-15deg] ${resultConfig.stamp.border}`}>
+                        <div className={`w-full h-full border-[0.1875rem] rounded-full flex items-center justify-center rotate-[-15deg] ${resultConfig.stamp.border}`}>
                           <div className={`w-[85%] h-[85%] border rounded-full flex items-center justify-center ${resultConfig.stamp.border}`}>
                              <div className={`flex flex-col items-center justify-center ${resultConfig.stamp.text}`}>
                                 <span className="font-bold text-xl tracking-widest mb-1">验证</span>
@@ -523,11 +533,11 @@ export default function CaseDetailPage() {
                                 </span>
                                 {adoptedCommentAuthorProfile && (
                                   <>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-white font-mono shrink-0">
+                                    <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold bg-stone-800 text-white font-mono shrink-0">
                                       Lv.{calculateLevel(adoptedCommentAuthorProfile.exp)}
                                     </span>
                                     {adoptedCommentAuthorProfile.title_level > 1 && (
-                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                      <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                                         {getTitleName(adoptedCommentAuthorProfile.title_level)}
                                       </span>
                                     )}
@@ -543,7 +553,7 @@ export default function CaseDetailPage() {
                             {data.adopted_comment?.created_at ? new Date(data.adopted_comment.created_at).toLocaleString() : ''}
                           </span>
                         </div>
-                        <div className="text-sm sm:text-base text-stone-800 leading-relaxed whitespace-pre-wrap">{data.adopted_comment?.content || ''}</div>
+                        <div className="text-sm sm:text-base text-stone-800 leading-relaxed prose prose-stone max-w-none" dangerouslySetInnerHTML={{ __html: safeAdoptedCommentHtml }} />
                       </div>
                     </div>
                   </>
@@ -589,7 +599,7 @@ export default function CaseDetailPage() {
 
           </div>
 
-          <aside className="hidden lg:block lg:flex-[0_0_360px] w-full">
+          <aside className="hidden lg:block lg:flex-[0_0_22.5rem] w-full">
             {/* Author Card */}
             {data?.post?.profiles && data.post.profiles.id && (
               <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-4">
@@ -607,12 +617,12 @@ export default function CaseDetailPage() {
                           {data.post.profiles.nickname || '匿名'}
                         </h3>
                         {authorStats && (
-                          <span className="text-[10px] bg-stone-800 text-white px-1.5 py-0.5 rounded font-mono shrink-0">
+                          <span className="text-[0.625rem] bg-stone-800 text-white px-1.5 py-0.5 rounded font-mono shrink-0">
                             Lv.{authorStats.level}
                           </span>
                         )}
                         {authorProfile && authorProfile.title_level > 1 && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                             {getTitleName(authorProfile.title_level)}
                           </span>
                         )}
@@ -676,30 +686,42 @@ export default function CaseDetailPage() {
                   <div className="grid grid-cols-3 gap-2 py-3 bg-stone-50 rounded-lg text-center">
                     <div>
                       <div className="text-lg font-bold text-stone-800">{authorStats.publishedCases}</div>
-                      <div className="text-[10px] text-stone-400 uppercase">案例</div>
+                      <div className="text-[0.625rem] text-stone-400 uppercase">案例</div>
                     </div>
                     <div>
                       <div className="text-lg font-bold text-stone-800">{authorStats.likesReceived}</div>
-                      <div className="text-[10px] text-stone-400 uppercase">获赞</div>
+                      <div className="text-[0.625rem] text-stone-400 uppercase">获赞</div>
                     </div>
                     <div>
                       <div className="text-lg font-bold text-amber-600">
                         {authorStats.accuracyRate > 0 ? `${Math.round(authorStats.accuracyRate)}%` : '-'}
                       </div>
-                      <div className="text-[10px] text-stone-400 uppercase">准确率</div>
+                      <div className="text-[0.625rem] text-stone-400 uppercase">准确率</div>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* 卦象排盘 - Sticky */}
-            {fullGuaData && (
-              <div className="lg:sticky lg:top-24 lg:z-10">
-                <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
-                  <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
-                </h2>
-                <GuaPanelDual data={fullGuaData} recordId={data.divination_record?.id} />
+            {/* 卦象排盘 / 八字排盘 - Sticky */}
+            {(fullGuaData || (baziData && baziData.pillars)) && (
+              <div className="lg:sticky lg:top-24 lg:z-10 space-y-4">
+                {fullGuaData && (
+                  <div>
+                    <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
+                      <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 卦象排盘
+                    </h2>
+                    <GuaPanelDual data={fullGuaData} recordId={data.divination_record?.id} />
+                  </div>
+                )}
+                {baziData && baziData.pillars && (
+                  <div>
+                    <h2 className="text-sm font-bold text-stone-800 mb-3 px-2 flex items-center gap-2">
+                      <span className="w-1 h-3 bg-[#C82E31] rounded-full"></span> 八字排盘
+                    </h2>
+                    <BaZiPanelDual data={baziData} recordId={data.divination_record?.id} />
+                  </div>
+                )}
               </div>
             )}
           </aside>

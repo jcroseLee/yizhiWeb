@@ -6,9 +6,9 @@ import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Input } from '@/lib/components/ui/input'
 import {
-    Sheet,
-    SheetContent,
-    SheetTitle
+  Sheet,
+  SheetContent,
+  SheetTitle
 } from "@/lib/components/ui/sheet"
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -16,15 +16,15 @@ import { getCurrentUser } from '@/lib/services/auth'
 import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord } from '@/lib/services/profile'
 import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    Loader2,
-    Plus,
-    Save,
-    ScrollText,
-    Send,
-    X
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Save,
+  ScrollText,
+  Send,
+  X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -44,14 +44,14 @@ const styles = `
     outline: none;
   }
   
-  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar { width: 0.375rem; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 20px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 1.25rem; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #d6d3d1; }
 
   /* 核心修复：强制编辑器高度自适应（写文章模式） */
   .rich-text-content {
-    min-height: 300px !important;
+    min-height: 18.75rem !important;
     height: auto !important;
     overflow: visible !important;
     border: none !important;
@@ -60,34 +60,34 @@ const styles = `
   /* 移动端工具栏调整 */
   .rich-text-content > div:first-child {
     position: sticky !important;
-    top: 56px !important; /* 移动端 Navbar 高度通常稍小 */
+    top: 3.5rem !important; /* 移动端 Navbar 高度通常稍小 */
     z-index: 30 !important;
     background-color: rgba(255, 255, 255, 0.98) !important;
-    border-bottom: 1px solid #e7e5e4 !important;
+    border-bottom: 0.0625rem solid #e7e5e4 !important;
     margin: 0 !important;
-    padding: 8px 4px !important;
+    padding: 0.5rem 0.25rem !important;
     overflow-x: auto !important; /* 允许工具栏横向滚动 */
   }
   
-  @media (min-width: 1024px) {
+  @media (min-width: 64rem) {
     .rich-text-content > div:first-child {
-      top: 64px !important;
+      top: 4rem !important;
     }
   }
 
   .rich-text-content > div:last-child {
-    min-height: 300px !important;
+    min-height: 18.75rem !important;
     max-height: none !important;
     height: auto !important;
     overflow: visible !important;
   }
 
   .rich-text-content .ProseMirror {
-    min-height: 300px !important;
+    min-height: 18.75rem !important;
     height: auto !important; 
     overflow: visible !important;
     outline: none !important;
-    padding-bottom: 50px !important;
+    padding-bottom: 3.125rem !important;
   }
   
   .rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
@@ -159,9 +159,9 @@ const RecordCard = ({ data, onClick, isSelected = false, compact = false }: { da
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${isSelected ? 'bg-[#C82E31] text-white border-[#C82E31]' : 'bg-stone-100 text-stone-500 border-stone-200 group-hover:border-red-200 group-hover:text-red-600 group-hover:bg-red-50'}`}>{data.gua}</span>
-            <span className="text-[10px] text-stone-400 font-mono">{data.date}</span>
+            <span className="text-[0.625rem] text-stone-400 font-mono">{data.date}</span>
           </div>
-          <h4 className={`font-serif font-bold truncate ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
+          <h4 className={`font-serif font-bold break-words whitespace-normal ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
           <div className="mt-2 flex items-center text-xs text-stone-400 gap-2">
             <span className="flex items-center gap-1"><ScrollText className="w-3 h-3" /> {data.gua}</span>
           </div>
@@ -343,13 +343,12 @@ function PublishCasePageContent() {
                 .replace(/\*\*问题[^*]*\*\*/g, '')
                 .replace(/关联排盘[:：][^\n]*/g, '')
                 .replace(/问题[:：][^\n]*/g, '')
-                .trim()
                 
               // 2. 分离背景和推演
               const parts = cleanedContent.split('<h2>卦理推演</h2>')
               if (parts.length > 1) {
-                 setBackgroundDesc(parts[0].trim())
-                 setReasoning(parts[1].trim())
+                 setBackgroundDesc(parts[0])
+                 setReasoning(parts[1])
               } else {
                  setBackgroundDesc(cleanedContent)
                  setReasoning('')
@@ -381,6 +380,12 @@ function PublishCasePageContent() {
     
     try {
       setIsSubmitting(true)
+      const record = await getDivinationRecordById(selectedRecord.record.id, true)
+      if (!record) {
+        toast({ title: '排盘记录不存在', description: '该排盘可能未保存或已删除，请重新选择', variant: 'destructive' })
+        setSelectedRecord(null)
+        return
+      }
       let content = backgroundDesc
       
       if (reasoning.trim()) {
@@ -395,8 +400,8 @@ function PublishCasePageContent() {
       }
       
       const postData = {
-        title: title.trim(),
-        content: content.trim(),
+        title,
+        content,
         type: 'help' as const, // 使用 'help' 类型，因为它支持关联排盘
         divination_record_id: selectedRecord.record.id,
         method,
@@ -439,6 +444,14 @@ function PublishCasePageContent() {
     
     try {
       setIsSavingDraft(true)
+      if (selectedRecord) {
+        const record = await getDivinationRecordById(selectedRecord.record.id, true)
+        if (!record) {
+          toast({ title: '排盘记录不存在', description: '该排盘可能未保存或已删除，请重新选择', variant: 'destructive' })
+          setSelectedRecord(null)
+          return
+        }
+      }
       let content = backgroundDesc
       
       if (reasoning.trim()) {
@@ -453,8 +466,8 @@ function PublishCasePageContent() {
       }
       
       const draftData = {
-        title: title.trim() || '未命名案例草稿',
-        content: content.trim() || '',
+        title: title || '未命名案例草稿',
+        content: content || '',
         type: 'help' as const,
         divination_record_id: selectedRecord ? selectedRecord.record.id : null,
         method,
@@ -501,7 +514,7 @@ function PublishCasePageContent() {
               >
                 <ArrowLeft className="h-5 w-5 text-stone-600" />
               </Button>
-              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[120px] lg:max-w-none">
+              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[7.5rem] lg:max-w-none">
                 {isEditMode ? '编辑案例' : '发布案例'}
               </h1>
             </div>
@@ -656,7 +669,7 @@ function PublishCasePageContent() {
             </div>
 
             {/* 右侧设置区 */}
-            <div className="hidden lg:flex w-80 shrink-0 flex-col gap-4 h-[600px] mt-8">
+            <div className="hidden lg:flex w-80 shrink-0 flex-col gap-4 h-[37.5rem] mt-8">
               <RecordSelectionList 
                 records={historyRecords} 
                 loading={loadingRecords} 

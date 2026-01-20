@@ -19,7 +19,7 @@ const BAZI_CHART_STYLES = `
   
   .bazi-grid {
     display: grid;
-    grid-template-columns: 80px repeat(4, 1fr);
+    grid-template-columns: 5rem repeat(4, 1fr);
     width: 100%;
   }
   .bazi-cell {
@@ -41,9 +41,9 @@ const BAZI_CHART_STYLES = `
   
   .glass-panel {
     background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
+    backdrop-filter: blur(0.75rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0.5rem 2rem 0 rgba(31, 38, 135, 0.03);
   }
 `
 
@@ -137,7 +137,7 @@ export function BaZiChart({ pillars }: BaZiChartProps) {
                 {p.cangGan.map((cg, idx) => (
                   <div key={idx} className="flex gap-1 items-center justify-center">
                     <span className={`${getTextColor(cg.wuxing)} font-ganzhi font-medium`}>{cg.char}</span>
-                    <span className="text-[11px] text-stone-400 scale-90">{p.fuXing[idx] || ''}</span>
+                    <span className="text-[0.6875rem] text-stone-400 scale-90">{p.fuXing[idx] || ''}</span>
                   </div>
                 ))}
               </div>
@@ -193,12 +193,12 @@ export function BaZiChart({ pillars }: BaZiChartProps) {
               <div key={i} className="bazi-cell flex-col gap-1.5 pt-3">
                 {p.shenSha.length > 0 ? (
                   p.shenSha.map((s, idx) => (
-                    <span key={idx} className="text-[12px] text-stone-500 bg-stone-100/50 px-2 py-0.5 rounded-full border border-stone-100 whitespace-nowrap">
+                    <span key={idx} className="text-[0.75rem] text-stone-500 bg-stone-100/50 px-2 py-0.5 rounded-full border border-stone-100 whitespace-nowrap">
                       {s}
                     </span>
                   ))
                 ) : (
-                  <span className="text-[10px] text-stone-400">--</span>
+                  <span className="text-[0.625rem] text-stone-400">--</span>
                 )}
               </div>
             ))}

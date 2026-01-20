@@ -223,7 +223,7 @@ export function WikiSidebar({
                 {/* Section 1 */}
                 {foundationCats.length > 0 && (
                   <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
-                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                    <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                         <Layout className="w-3 h-3" /> 易学通识
                     </h3>
                     <div className="pl-1">
@@ -235,7 +235,7 @@ export function WikiSidebar({
                 {/* Section 2 */}
                 {schoolCats.length > 0 && (
                   <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
-                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                    <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                         <GitBranch className="w-3 h-3" /> 分门别类
                     </h3>
                     <div className="pl-1">
@@ -247,7 +247,7 @@ export function WikiSidebar({
                 {/* Section 3 (Tags) - Styled as Stamps */}
                 {tags.length > 0 && (
                   <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-300">
-                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                     <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                         <Hash className="w-3 h-3" /> 分类占验
                      </h3>
                      <div className="flex flex-wrap gap-2 px-2">
@@ -267,7 +267,7 @@ export function WikiSidebar({
                 
                 {otherCats.length > 0 && (
                   <div>
-                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2">其他</h3>
+                    <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2">其他</h3>
                     <div className="pl-1">
                         {renderTree(otherCats)}
                     </div>

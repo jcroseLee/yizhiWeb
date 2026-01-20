@@ -1,6 +1,6 @@
 import { trackEvent } from '@/lib/analytics'
 import { logError } from '../utils/errorLogger'
-import { getCurrentUser } from './auth'
+import { getCurrentPathWithSearchAndHash, getCurrentUser, redirectToLogin, setLoginIntent } from './auth'
 import { getSupabaseClient } from './supabaseClient'
 
 // -----------------------------------------------------------------------------
@@ -651,50 +651,29 @@ export async function getPost(postId: string): Promise<Post | null> {
  * 创建帖子
  */
 export async function createPost(input: CreatePostInput): Promise<Post> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('User not authenticated')
+    setLoginIntent({ type: 'create_post', returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
-  const { data, error } = await supabase
-    .from('posts')
-    .insert({
-      user_id: currentUser.id,
-      title: input.title,
-      content: input.content,
-      content_html: input.content_html || input.content,
-      type: input.type || 'theory',
-      bounty: input.bounty || 0,
-      divination_record_id: input.divination_record_id || null,
-      cover_image_url: input.cover_image_url || null,
-      method: input.method ?? null,
-    })
-    .select('*')
-    .single()
+  const res = await fetch('/api/community/posts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
 
-  if (error) {
-    logError('Error creating post:', error)
-    throw error
-  }
-
-  // 查询用户信息
-  let author = null
-  if (data.user_id) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .eq('id', data.user_id)
-      .single()
-
-    if (profile) {
-      author = profile
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'create_post', returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
     }
+    throw new Error(json?.error || '发布失败')
   }
+
+  const data = json?.post as Post
 
   // 发布帖子成功后，自动增加修业值
   try {
@@ -707,7 +686,6 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
 
   return {
     ...data,
-    author,
     is_liked: false,
   }
 }
@@ -1064,8 +1042,11 @@ export async function getUserLikedPosts(options?: {
     .range(offset, offset + limit - 1)
 
   if (likesError) {
-    console.error('Error fetching liked posts:', likesError)
-    throw likesError
+    logError('Error fetching liked posts:', likesError)
+    const likesErrorMessage = (likesError as { message?: string })?.message
+    throw likesError instanceof Error
+      ? likesError
+      : new Error(likesErrorMessage || 'Failed to fetch liked posts')
   }
 
   if (!likes || likes.length === 0) {
@@ -1095,8 +1076,11 @@ export async function getUserLikedPosts(options?: {
     .order('created_at', { ascending: false })
 
   if (postsError) {
-    console.error('Error fetching posts:', postsError)
-    throw postsError
+    logError('Error fetching posts:', postsError)
+    const postsErrorMessage = (postsError as { message?: string })?.message
+    throw postsError instanceof Error
+      ? postsError
+      : new Error(postsErrorMessage || 'Failed to fetch posts')
   }
 
   if (!posts || posts.length === 0) {
@@ -1186,153 +1170,82 @@ export async function deletePost(postId: string): Promise<void> {
  * 切换帖子点赞状态
  */
 export async function togglePostLike(postId: string): Promise<boolean> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('User not authenticated')
+    setLoginIntent({ type: 'post_like', postId, returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
-  // 检查是否已点赞
-  const { data: existingLike } = await supabase
-    .from('post_likes')
-    .select('post_id')
-    .eq('post_id', postId)
-    .eq('user_id', currentUser.id)
-    .maybeSingle()
+  const res = await fetch(`/api/community/posts/${postId}/like`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'toggle' }),
+  })
 
-  if (existingLike) {
-    // 取消点赞
-    const { error } = await supabase
-      .from('post_likes')
-      .delete()
-      .eq('post_id', postId)
-      .eq('user_id', currentUser.id)
-
-    if (error) {
-      console.error('Error unliking post:', JSON.stringify(error, null, 2))
-      throw error
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'post_like', postId, returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
     }
-    trackEvent('post_interaction', {
-      action_type: 'unlike',
-      target_id: postId,
-      target_type: 'post',
-    })
-    return false
-  } else {
-    // 点赞
-    const { error } = await supabase
-      .from('post_likes')
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id,
-      })
+    throw new Error(json?.error || '操作失败')
+  }
 
-    if (error) {
-      // Handle race condition: if already liked (unique violation), consider it a success
-      if (error.code === '23505') {
-        trackEvent('post_interaction', {
-          action_type: 'like',
-          target_id: postId,
-          target_type: 'post',
-        })
-        return true
-      }
-      console.error('Error liking post:', JSON.stringify(error, null, 2))
-      throw error
-    }
+  const liked = !!json?.liked
 
-    // 点赞成功后，自动增加修业值
+  if (liked) {
     try {
       const { addExp } = await import('./growth')
       await addExp(2, '点赞帖子')
     } catch (error) {
-      // 静默处理错误，不影响点赞
       console.error('Failed to add exp for post like:', error)
     }
-
-    trackEvent('post_interaction', {
-      action_type: 'like',
-      target_id: postId,
-      target_type: 'post',
-    })
-    return true
   }
+
+  trackEvent('post_interaction', {
+    action_type: liked ? 'like' : 'unlike',
+    target_id: postId,
+    target_type: 'post',
+  })
+
+  return liked
 }
 
 /**
  * 切换帖子收藏状态
  */
 export async function togglePostFavorite(postId: string): Promise<boolean> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('User not authenticated')
+    setLoginIntent({ type: 'post_favorite', postId, returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
-  // 检查是否已收藏
-  const { data: existingFavorite } = await supabase
-    .from('post_favorites')
-    .select('post_id')
-    .eq('post_id', postId)
-    .eq('user_id', currentUser.id)
-    .maybeSingle()
+  const res = await fetch(`/api/community/posts/${postId}/favorite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'toggle' }),
+  })
 
-  if (existingFavorite) {
-    // 取消收藏
-    const { error } = await supabase
-      .from('post_favorites')
-      .delete()
-      .eq('post_id', postId)
-      .eq('user_id', currentUser.id)
-
-    if (error) {
-      console.error('Error unfavoriting post:', error)
-      throw error
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'post_favorite', postId, returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
     }
-    trackEvent('post_interaction', {
-      action_type: 'unfavorite',
-      target_id: postId,
-      target_type: 'post',
-    })
-    return false
-  } else {
-    // 收藏
-    const { error } = await supabase
-      .from('post_favorites')
-      .insert({
-        post_id: postId,
-        user_id: currentUser.id,
-      })
-
-    if (error) {
-      // Handle race condition: if already favorited (unique violation), consider it a success
-      if (error.code === '23505') {
-        trackEvent('post_interaction', {
-          action_type: 'favorite',
-          target_id: postId,
-          target_type: 'post',
-        })
-        return true
-      }
-      console.error('Error favoriting post:', JSON.stringify(error, null, 2))
-      throw error
-    }
-
-    trackEvent('post_interaction', {
-      action_type: 'favorite',
-      target_id: postId,
-      target_type: 'post',
-    })
-    return true
+    throw new Error(json?.error || '操作失败')
   }
+
+  const favorited = !!json?.favorited
+  trackEvent('post_interaction', {
+    action_type: favorited ? 'favorite' : 'unfavorite',
+    target_id: postId,
+    target_type: 'post',
+  })
+
+  return favorited
 }
 
 // -----------------------------------------------------------------------------
@@ -1527,30 +1440,33 @@ export async function getUserComments(options?: {
 export async function createComment(
   input: CreateCommentInput
 ): Promise<Comment> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    setLoginIntent({ type: 'comment_focus', postId: input.post_id, returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
+  }
+
+  const res = await fetch('/api/community/comments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'comment_focus', postId: input.post_id, returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
+    }
+    throw new Error(json?.error || '评论失败')
+  }
+
+  const data = json?.comment as CommentRow
+
   const supabase = getSupabaseClient()
   if (!supabase) {
     throw new Error('Supabase client not initialized')
-  }
-
-  const currentUser = await getCurrentUser()
-  if (!currentUser) {
-    throw new Error('User not authenticated')
-  }
-
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({
-      post_id: input.post_id,
-      user_id: currentUser.id,
-      content: input.content,
-      parent_id: input.parent_id || null,
-    })
-    .select('*')
-    .single()
-
-  if (error) {
-    logError('Error creating comment:', error)
-    throw error
   }
 
   // 查询用户信息
@@ -1594,25 +1510,19 @@ export async function createComment(
  * 删除评论
  */
 export async function deleteComment(commentId: string): Promise<void> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('User not authenticated')
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
-  const { error } = await supabase
-    .from('comments')
-    .delete()
-    .eq('id', commentId)
-    .eq('user_id', currentUser.id)
-
-  if (error) {
-    console.error('Error deleting comment:', error)
-    throw error
+  const res = await fetch(`/api/community/comments/${commentId}`, { method: 'DELETE' })
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      redirectToLogin()
+    }
+    throw new Error(json?.error || '删除失败')
   }
 }
 
@@ -1621,95 +1531,56 @@ export async function deleteComment(commentId: string): Promise<void> {
  * 当评论被点赞时，评论作者获得 +1 声望值
  */
 export async function toggleCommentLike(commentId: string): Promise<boolean> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error('User not authenticated')
+    setLoginIntent({ type: 'comment_like', commentId, returnTo: getCurrentPathWithSearchAndHash() })
+    redirectToLogin()
+    throw new Error('请先登录后再操作')
   }
 
-  // 获取评论信息（需要评论作者ID）
-  const { data: comment } = await supabase
-    .from('comments')
-    .select('user_id')
-    .eq('id', commentId)
-    .single()
+  const res = await fetch(`/api/community/comments/${commentId}/like`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'toggle' }),
+  })
 
-  if (!comment) {
-    throw new Error('Comment not found')
+  const json = await res.json().catch(() => null as any)
+  if (!res.ok) {
+    if (res.status === 401) {
+      setLoginIntent({ type: 'comment_like', commentId, returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
+    }
+    throw new Error(json?.error || '操作失败')
   }
 
-  // 检查是否已点赞
-  const { data: existingLike } = await supabase
-    .from('comment_likes')
-    .select('comment_id')
-    .eq('comment_id', commentId)
-    .eq('user_id', currentUser.id)
-    .maybeSingle()
+  const liked = !!json?.liked
+  if (liked) {
+    const supabase = getSupabaseClient()
+    if (supabase) {
+      const { data: comment } = await supabase
+        .from('comments')
+        .select('user_id')
+        .eq('id', commentId)
+        .single()
 
-  if (existingLike) {
-    // 取消点赞（不扣除声望值，因为PRD中没有规定）
-    const { error } = await supabase
-      .from('comment_likes')
-      .delete()
-      .eq('comment_id', commentId)
-      .eq('user_id', currentUser.id)
-
-    if (error) {
-      console.error('Error unliking comment:', error)
-      throw error
-    }
-    trackEvent('post_interaction', {
-      action_type: 'unlike',
-      target_id: commentId,
-      target_type: 'comment',
-    })
-    return false
-  } else {
-    // 点赞
-    const { error } = await supabase
-      .from('comment_likes')
-      .insert({
-        comment_id: commentId,
-        user_id: currentUser.id,
-      })
-
-    if (error) {
-      // Handle race condition: if already liked (unique violation), consider it a success
-      if (error.code === '23505') {
-        trackEvent('post_interaction', {
-          action_type: 'like',
-          target_id: commentId,
-          target_type: 'comment',
-        })
-        return true
-      }
-      console.error('Error liking comment:', JSON.stringify(error, null, 2))
-      throw error
-    }
-
-    // 评论被点赞，评论作者获得 +1 声望值
-    // 注意：只有评论作者不是当前用户时才加声望（不能给自己点赞加声望）
-    if (comment.user_id !== currentUser.id) {
-      try {
-        const { addReputation } = await import('./growth')
-        await addReputation(1, '断语获得赞同', commentId)
-      } catch (error) {
-        // 声望增加失败不影响点赞操作
-        console.error('Failed to add reputation for comment like:', error)
+      if (comment?.user_id && comment.user_id !== currentUser.id) {
+        try {
+          const { addReputation } = await import('./growth')
+          await addReputation(1, '断语获得赞同', commentId)
+        } catch (error) {
+          console.error('Failed to add reputation for comment like:', error)
+        }
       }
     }
-
-    trackEvent('post_interaction', {
-      action_type: 'like',
-      target_id: commentId,
-      target_type: 'comment',
-    })
-    return true
   }
+
+  trackEvent('post_interaction', {
+    action_type: liked ? 'like' : 'unlike',
+    target_id: commentId,
+    target_type: 'comment',
+  })
+
+  return liked
 }
 
 /**
@@ -2276,24 +2147,18 @@ export async function getUserDrafts(
 
   const { data, error } = await supabase
     .from('posts')
-    .select(`
-      *,
-      divination_records (
-        id,
-        original_key,
-        changed_key,
-        lines,
-        changing_flags,
-        method,
-        original_json
-      )
-    `)
+    .select('*,divination_records(id,original_key,changed_key,lines,changing_flags,method,original_json,question,divination_time)')
     .eq('user_id', currentUser.id)
     .eq('status', 'draft')
     .order('updated_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
   if (error) {
+    const message = typeof (error as any)?.message === 'string' ? (error as any).message : ''
+    if (message.includes('Failed to fetch')) {
+      console.warn('Error fetching drafts (network):', error)
+      return []
+    }
     logError('Error fetching drafts:', error)
     throw error
   }

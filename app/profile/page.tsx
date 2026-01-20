@@ -1,29 +1,32 @@
 'use client'
 
 import {
-  Activity,
-  ArrowDown,
-  ArrowUp,
-  Award,
-  BookOpen,
-  CalendarCheck,
-  CheckCircle2,
-  CheckSquare,
-  Circle,
-  Clock,
-  Coins,
-  Edit2,
-  HelpCircle,
-  Loader2,
-  Trash2,
-  TrendingUp,
-  X
+    Activity,
+    ArrowDown,
+    ArrowUp,
+    Award,
+    BookOpen,
+    CalendarCheck,
+    CheckCircle2,
+    CheckSquare,
+    Circle,
+    Clock,
+    Coins,
+    Edit2,
+    HelpCircle,
+    Loader2,
+    Trash2,
+    TrendingUp,
+    X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
 
 import PostCard, { extractTextFromHTML } from '@/app/community/components/PostCard'
+import { trackEvent } from '@/lib/analytics'
+import { BindPhoneDialog } from '@/lib/components/BindPhoneDialog'
 import { EditProfileDialog } from '@/lib/components/EditProfileDialog'
+import { SmartphoneIcon } from '@/lib/components/icons/SmartphoneIcon'
 import { ToastProviderWrapper } from '@/lib/components/ToastProviderWrapper'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Badge } from '@/lib/components/ui/badge'
@@ -33,17 +36,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/ta
 import { RESULTS_LIST_STORAGE_KEY, type StoredDivinationPayload, type StoredResultWithId } from '@/lib/constants/divination'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
-import { trackEvent } from '@/lib/analytics'
 import { getCurrentUser } from '@/lib/services/auth'
 import { deleteDraft, deletePost, getUserDrafts, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
-  calculateLevel,
-  checkIn,
-  getCoinTransactions,
-  getTitleName,
-  getUserGrowth,
-  hasCheckedInToday,
-  type CoinTransaction
+    calculateLevel,
+    checkIn,
+    getCoinTransactions,
+    getTitleName,
+    getUserGrowth,
+    hasCheckedInToday,
+    LEVEL_CONFIG,
+    type CoinTransaction
 } from '@/lib/services/growth'
 import { deleteDivinationRecord, deleteDivinationRecords, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
@@ -53,6 +56,7 @@ import { DeletePostDialog } from './components/DeletePostDialog'
 import { DeleteRecordDialog } from './components/DeleteRecordDialog'
 import { ExpRulesDialog } from './components/ExpRulesDialog'
 import ProfileSkeleton from './components/ProfileSkeleton'
+import { RechargeDialog } from './components/RechargeDialog'
 import { ReportsList } from './components/ReportsList'
 import { StatCard } from './components/StatCard'
 import { UserCard } from './components/UserCard'
@@ -69,15 +73,15 @@ const styles = `
   /* 玻璃卡片 - 通透感 */
   .glass-card {
     background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(1rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0.25rem 1.25rem -0.125rem rgba(0, 0, 0, 0.03);
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
   .glass-card:hover {
     background: rgba(255, 255, 255, 0.85);
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.06);
+    transform: translateY(-0.125rem);
+    box-shadow: 0 0.75rem 1.875rem -0.3125rem rgba(0, 0, 0, 0.06);
   }
 
   /* Tab 激活态 - 底部红线 */
@@ -95,10 +99,10 @@ const styles = `
     bottom: 0;
     left: 50%;
     transform: translateX(-50%);
-    width: 20px;
-    height: 3px;
+    width: 1.25rem;
+    height: 0.1875rem;
     background-color: #C82E31;
-    border-radius: 99px;
+    border-radius: 6.1875rem;
   }
 
   /* 隐藏滚动条 */
@@ -109,7 +113,71 @@ const styles = `
   .bg-gradient-mask {
     mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
   }
+
+  /* 流光边框特效 */
+  @keyframes shimmer-border {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
+  }
+  
+  .animate-shimmer-border {
+    --bg-color: #FFFBEB;
+    border-color: transparent !important;
+    background: linear-gradient(var(--bg-color), var(--bg-color)) padding-box,
+                linear-gradient(90deg, #d97706, #fbbf24, #d97706) border-box;
+    background-size: 100% 100%, 200% 100%;
+    background-position: 0 0, 0 0;
+    animation: shimmer-border 2s linear infinite;
+    box-shadow: 0 0 0.625rem rgba(245, 158, 11, 0.4);
+  }
 `
+
+function getTitleBadgeStyle(titleName: string) {
+  // 基础：字体加粗，边框透明（利用背景模拟边框或渐变）
+  const base = "px-3 py-0.5 rounded-full text-xs font-bold border transition-all hover:scale-105";
+
+  switch (titleName) {
+    case '学人': 
+      return `${base} bg-slate-100 text-slate-600 border-slate-200`;
+      
+    case '术士': 
+      return `${base} bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 border-orange-200`;
+      
+    case '方家': // 银色金属光泽
+      return `${base} bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 text-gray-800 border-gray-300 shadow-sm`;
+      
+    case '先生': // 金色流光
+      return `${base} bg-gradient-to-b from-yellow-50 to-amber-100 text-amber-800 border-amber-300 shadow-md shadow-amber-500/10`;
+      
+    case '国手': // 玉质通透感 + 强烈光环
+      return `${base} bg-gradient-to-tr from-emerald-50 via-teal-50 to-emerald-100 text-emerald-900 border-emerald-400 shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-300`;
+      
+    case '白身':
+    default:
+      return `${base} bg-gray-50 text-gray-400 border-gray-100`;
+  }
+}
+
+function getBadgeStyle(level: number) {
+  if (level === 0) return "" // Lv.0 无
+  if (level === 1) return "text-stone-500 bg-stone-50 border-stone-200" // Lv.1 灰边框
+  if (level === 2) return "text-orange-700 bg-orange-50 border-orange-200" // Lv.2 铜边框
+  if (level === 3) return "text-slate-600 bg-slate-50 border-slate-300" // Lv.3 银边框
+  if (level === 4) return "text-slate-700 bg-slate-50 border-slate-300 shadow-[0_0_8px_rgba(148,163,184,0.4)]" // Lv.4 银边框+流光
+  if (level === 5) return "text-yellow-700 bg-yellow-50 border-yellow-400" // Lv.5 金边框
+  if (level === 6) return "text-yellow-800 bg-yellow-100 border-yellow-500 border-double" // Lv.6 金边框+纹饰
+  return "text-amber-900 animate-shimmer-border" // Lv.7+ 动态特效
+}
+
+function getAvatarStyle(level: number) {
+  if (level <= 1) return "border-stone-200" // Lv.1 灰边框
+  if (level === 2) return "border-orange-200" // Lv.2 铜边框
+  if (level === 3) return "border-slate-300" // Lv.3 银边框
+  if (level === 4) return "border-slate-300 shadow-[0_0_8px_rgba(148,163,184,0.4)]" // Lv.4 银边框+流光
+  if (level === 5) return "border-yellow-400" // Lv.5 金边框
+  if (level === 6) return "border-yellow-500 border-double" // Lv.6 金边框+纹饰
+  return "animate-shimmer-border" // Lv.7+ 动态特效
+}
 
 export default function ProfilePage() {
   return (
@@ -137,6 +205,8 @@ function ProfilePageContent() {
   const [loadingPosts, setLoadingPosts] = useState(false)
   const [divinationRecords, setDivinationRecords] = useState<DivinationRecord[]>([])
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [bindPhoneDialogOpen, setBindPhoneDialogOpen] = useState(false)
+  const [userPhone, setUserPhone] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
@@ -157,6 +227,7 @@ function ProfilePageContent() {
   const [activeMainTab, setActiveMainTab] = useState<'notes' | 'divinations' | 'follows' | 'wallet' | 'reports'>('notes')
   const tabsRef = useRef<HTMLDivElement>(null)
   const [coinRulesDialogOpen, setCoinRulesDialogOpen] = useState(false)
+  const [rechargeDialogOpen, setRechargeDialogOpen] = useState(false)
   const [expRulesDialogOpen, setExpRulesDialogOpen] = useState(false)
   const loadedTabsRef = useRef<Set<'fav' | 'liked' | 'draft'>>(new Set())
   
@@ -189,6 +260,7 @@ function ProfilePageContent() {
           router.push(`/login?redirect=${encodeURIComponent('/profile')}`)
           return
         }
+        setUserPhone(currentUser.phone || null)
         
         const [profileWithGrowth, statsData, postsData, divinationData, transactions, dailyActivity, followStatsData] = await Promise.all([
           getUserProfileWithGrowth(),
@@ -240,6 +312,114 @@ function ProfilePageContent() {
     }
     init()
   }, [router])
+
+  const refreshWalletData = async () => {
+    try {
+      const [balanceRes, txRes] = await Promise.all([
+        fetch('/api/v1/wallet/balance', { cache: 'no-store' }),
+        fetch('/api/v1/wallet/transactions?limit=100&offset=0', { cache: 'no-store' })
+      ])
+
+      let total: number | null = null
+      let txs: CoinTransaction[] | null = null
+
+      if (balanceRes.ok) {
+        const balance = await balanceRes.json().catch(() => null)
+        const parsed = Number(balance?.total)
+        if (Number.isFinite(parsed) && parsed >= 0) {
+          total = parsed
+          setGrowth((prev) =>
+            prev
+              ? { ...prev, yiCoins: parsed }
+              : {
+                  level: 1,
+                  titleName: '易学研习者',
+                  yiCoins: parsed,
+                  exp: 0,
+                  reputation: 0
+                }
+          )
+        }
+      }
+
+      if (txRes.ok) {
+        const data = await txRes.json().catch(() => null)
+        const items = Array.isArray(data) ? data : []
+        txs = items
+          .map((x: any) => ({
+            id: String(x?.id || ''),
+            amount: Number(x?.amount || 0),
+            type: String(x?.type || ''),
+            description: typeof x?.description === 'string' ? x.description : null,
+            created_at: String(x?.created_at || '')
+          }))
+          .filter((x: any) => x.id && x.created_at)
+        setCoinTransactions(txs)
+      }
+      return { total, txs }
+    } catch {}
+    return { total: null, txs: null }
+  }
+
+  useEffect(() => {
+    const recharge = searchParams.get('recharge')
+    if (recharge !== 'success') return
+
+    const outTradeNo = searchParams.get('out_trade_no') || ''
+    const startedAt = Date.now()
+    const initialBalance = typeof growth?.yiCoins === 'number' ? growth.yiCoins : null
+    const initialTxId = coinTransactions?.[0]?.id || null
+
+    toast({ title: '充值完成', description: '正在同步余额与明细...' })
+
+    let cancelled = false
+    const run = async () => {
+      const syncOnce = async () => {
+        if (!outTradeNo) return
+        try {
+          await fetch('/api/v1/wallet/recharge/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify({ out_trade_no: outTradeNo })
+          })
+        } catch {}
+      }
+
+      await syncOnce()
+      for (let i = 0; i < 10; i++) {
+        if (cancelled) return
+        if (i === 5) await syncOnce()
+        const snapshot = await refreshWalletData()
+        const latestTxId = snapshot.txs?.[0]?.id || null
+        const hasNewTx =
+          (initialTxId && latestTxId && latestTxId !== initialTxId) ||
+          (!!outTradeNo && (snapshot.txs?.some((t) => typeof t?.description === 'string' && t.description.includes(outTradeNo)) || false))
+
+        const balanceChanged =
+          initialBalance !== null && typeof snapshot.total === 'number' && Number.isFinite(snapshot.total) && snapshot.total !== initialBalance
+
+        if (hasNewTx || balanceChanged) {
+          toast({ title: '已更新', description: '易币余额与明细已同步' })
+          break
+        }
+
+        if (Date.now() - startedAt > 20000) break
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+
+      const sp = new URLSearchParams(searchParams.toString())
+      sp.delete('recharge')
+      sp.delete('out_trade_no')
+      const next = sp.toString()
+      router.replace(next ? `/profile?${next}` : '/profile')
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams])
 
   const loadFollowsData = async (type: 'following' | 'followers') => {
     setLoadingFollows(true)
@@ -416,28 +596,35 @@ function ProfilePageContent() {
             <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative z-10 items-center lg:items-start">
               
               {/* 头像区域 */}
-              <div className="flex flex-col items-center shrink-0 gap-4">
-                <div className="relative group/avatar">
-                  {/* 光环装饰 */}
-                  <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-[#C82E31]/20 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity blur-md" />
-                  <Avatar className="w-24 h-24 lg:w-28 lg:h-28 border-[4px] border-white shadow-xl cursor-pointer transition-transform hover:scale-105 relative z-10">
-                    <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
-                    <AvatarFallback className="bg-stone-100 text-stone-400 text-4xl font-serif">{profile.nickname?.charAt(0) || '易'}</AvatarFallback>
-                  </Avatar>
-                  
-                  {/* 等级徽章 - 悬浮在头像底部 */}
-                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-stone-900 text-[#FDFBF7] px-3 py-0.5 rounded-full text-[10px] font-bold border-2 border-white shadow-sm whitespace-nowrap z-20">
-                    Lv.{growth?.level ?? 1}
+                <div className="flex flex-col items-center shrink-0 gap-4">
+                  <div className="relative group/avatar">
+                    {/* 光环装饰 */}
+                    <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-[#C82E31]/20 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity blur-md" />
+                    <Avatar className={`w-24 h-24 lg:w-28 lg:h-28 border-[0.25rem] shadow-xl cursor-pointer transition-transform hover:scale-105 relative z-10 ${getAvatarStyle(growth?.level || 1)}`}>
+                      <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
+                      <AvatarFallback className="bg-stone-100 text-stone-400 text-4xl font-serif">{profile.nickname?.charAt(0) || '易'}</AvatarFallback>
+                    </Avatar>
+                    
+                    {/* 等级徽章 - 悬浮在头像底部 */}
+                    <div className={`absolute -bottom-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[0.625rem] font-bold border-2 shadow-sm whitespace-nowrap z-20 ${getBadgeStyle(growth?.level || 1) || 'bg-stone-900 text-[#FDFBF7] border-white'}`}>
+                      Lv.{growth?.level ?? 1}
+                    </div>
                   </div>
+                  
+                  {/* 称号 */}
+                  <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className={`border ${getTitleBadgeStyle(growth?.titleName ?? '白身')}`}>
+                          {growth?.titleName ?? '白身'}
+                      </Badge>
+                      {/* 如果有等级称号，也显示出来 */}
+                      {growth?.level && growth.level > 0 && (
+                        <Badge variant="outline" className={`text-[0.625rem] ${getBadgeStyle(growth.level)}`}>
+                          {LEVEL_CONFIG.find(l => l.level === growth.level)?.name}
+                        </Badge>
+                      )}
+                  </div>
+                  
                 </div>
-                
-                {/* 称号 */}
-                <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className="bg-amber-100/50 text-amber-700 hover:bg-amber-100 border border-amber-200/50 shadow-sm">
-                        {growth?.titleName ?? '白身'}
-                    </Badge>
-                </div>
-              </div>
 
               {/* 信息区域 */}
               <div className="flex-1 min-w-0 pt-2 text-center lg:text-left w-full">
@@ -449,6 +636,9 @@ function ProfilePageContent() {
                         </h1>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-400 hover:text-stone-600 rounded-full hover:bg-stone-100" onClick={() => setEditDialogOpen(true)}>
                             <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-400 hover:text-stone-600 rounded-full hover:bg-stone-100" onClick={() => setBindPhoneDialogOpen(true)} title={userPhone ? "更换手机号" : "绑定手机号"}>
+                            <SmartphoneIcon className={`w-4 h-4 ${userPhone ? 'fill-[#C82E31]' : 'fill-stone-400'}`} />
                         </Button>
                     </div>
                     
@@ -497,15 +687,23 @@ function ProfilePageContent() {
                         className={`flex flex-col items-center lg:items-start group/stat transition-colors ${item.tab ? 'cursor-pointer' : 'cursor-default'}`} 
                         onClick={item.tab ? () => { setActiveMainTab(item.tab as any); if(item.subTab) setFollowTab(item.subTab as any); setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) } : undefined}
                     >
-                      <span className="text-2xl lg:text-3xl font-bold font-serif text-stone-800 group-hover/stat:text-[#C82E31] transition-colors leading-none mb-1">
-                          {item.value}
-                      </span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-2xl lg:text-3xl font-bold font-serif text-stone-800 group-hover/stat:text-[#C82E31] transition-colors leading-none mb-1">
+                              {item.value}
+                          </span>
+                          {item.label === '易币' && (
+                              <Button variant="outline" className="h-6 px-2 text-[0.625rem] rounded-full border-stone-200 text-[#C82E31] hover:bg-red-50 hover:border-[#C82E31] -mt-1" onClick={(e) => { e.stopPropagation(); setRechargeDialogOpen(true) }}>
+                                  充值易币
+                              </Button>
+                          )}
+                      </div>
                       <span className="text-xs text-stone-400 uppercase tracking-wider flex items-center">
                           {item.icon} {item.label}
                       </span>
                     </div>
                   ))}
                 </div>
+                
               </div>
             </div>
           </div>
@@ -513,7 +711,7 @@ function ProfilePageContent() {
           {/* 2. 统计概览 (Bento Grid 风格) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
             <Card className="glass-card rounded-2xl border-none shadow-sm col-span-1 group hover:-translate-y-1 transition-transform duration-300">
-              <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[140px]">
+              <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[8.75rem]">
                 <CircularProgress value={stats.accuracyRate} label="实证准确率" totalVerified={stats.verifiedCases} />
               </CardContent>
             </Card>
@@ -691,7 +889,7 @@ function ProfilePageContent() {
 
                   return (
                     <>
-                      <div className={`sticky top-[60px] lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
+                      <div className={`sticky top-[3.75rem] lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
                         isSelectMode 
                           ? 'bg-red-50/95 border-red-200 shadow-md p-3' 
                           : 'bg-white/60 border-stone-100 shadow-sm p-4 backdrop-blur-md'
@@ -812,7 +1010,7 @@ function ProfilePageContent() {
                         }`}
                       >
                         {tab.label}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        <span className={`text-[0.625rem] px-1.5 py-0.5 rounded-full ${
                             followTab === tab.id ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-400'
                         }`}>
                             {tab.count}
@@ -822,7 +1020,7 @@ function ProfilePageContent() {
                 </div>
 
                 {/* 关注列表渲染逻辑保持不变，容器样式微调 */}
-                <div className="min-h-[300px]">
+                <div className="min-h-[18.75rem]">
                     {followTab === 'following' && (
                         /* ... same content ... */
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -849,9 +1047,14 @@ function ProfilePageContent() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-stone-700">最近交易</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setCoinRulesDialogOpen(true)} className="text-xs h-8 text-stone-400 hover:text-stone-600">
-                    <HelpCircle className="w-3.5 h-3.5 mr-1.5" /> 规则
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setRechargeDialogOpen(true)} className="text-xs h-8 text-[#C82E31] border-[#C82E31] hover:bg-red-50">
+                        <Coins className="w-3.5 h-3.5 mr-1.5" /> 充值
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCoinRulesDialogOpen(true)} className="text-xs h-8 text-stone-400 hover:text-stone-600">
+                        <HelpCircle className="w-3.5 h-3.5 mr-1.5" /> 规则
+                    </Button>
+                  </div>
                 </div>
                 {/* 交易列表样式微调：增加圆角和阴影，移除边框 */}
                 {coinTransactions.length > 0 ? (
@@ -894,9 +1097,17 @@ function ProfilePageContent() {
 
         {/* Dialogs 保持不变 */}
         <EditProfileDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} profile={profile} onUpdate={() => window.location.reload()} />
+        <BindPhoneDialog open={bindPhoneDialogOpen} onOpenChange={setBindPhoneDialogOpen} onSuccess={() => window.location.reload()} />
         <DeleteRecordDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onConfirm={handleConfirmDelete} deleting={deleting} />
         <DeletePostDialog open={deletePostDialogOpen} onOpenChange={setDeletePostDialogOpen} onConfirm={handleConfirmDeletePost} deleting={deletingPost} />
         <CoinRulesDialog open={coinRulesDialogOpen} onOpenChange={setCoinRulesDialogOpen} />
+        <RechargeDialog
+          open={rechargeDialogOpen}
+          onOpenChange={setRechargeDialogOpen}
+          onSuccess={async () => {
+            await refreshWalletData()
+          }}
+        />
         <ExpRulesDialog open={expRulesDialogOpen} onOpenChange={setExpRulesDialogOpen} />
       </div>
     </>

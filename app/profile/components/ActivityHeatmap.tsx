@@ -25,11 +25,11 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
     const updateWeeks = () => {
       const width = containerRef.current?.offsetWidth || 0
       if (width > 0) {
-        // 左侧星期轴预留宽度 (w-6 = 24px) + 右侧一点余量
+        // 左侧星期轴预留宽度 (w-6 = 1.5rem) + 右侧一点余量
         const labelAreaWidth = 28 
         const availableWidth = width - labelAreaWidth
         
-        // 每一列的基础宽度：10px 格子 + 3px 间距 = 13px
+        // 每一列的基础宽度：0.625rem 格子 + 0.1875rem 间距 = 0.8125rem
         // 我们用这个作为基准来计算能放下多少列
         const colBaseWidth = 13 
         
@@ -191,7 +191,7 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className="text-[10px] text-stone-400 font-mono bg-stone-100 px-2 py-0.5 rounded-full">
+          <div className="text-[0.625rem] text-stone-400 font-mono bg-stone-100 px-2 py-0.5 rounded-full">
             近一年累积 {calculatedTotal > 0 ? calculatedTotal : totalActivity} 次
           </div>
         </div> */}
@@ -204,7 +204,7 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
           <div className="w-full">
             
             {/* 月份轴 */}
-            <div className="flex mb-1.5 text-[9px] text-stone-400 relative h-4 w-full">
+            <div className="flex mb-1.5 text-[0.5625rem] text-stone-400 relative h-4 w-full">
               {/* 左侧占位，对应星期轴宽度 */}
               <div className="w-6 shrink-0" /> 
               <div className="relative flex-1">
@@ -227,24 +227,24 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
             <div className="flex w-full">
               
               {/* 星期轴 */}
-              <div className="flex flex-col justify-between w-6 pr-2 py-[1px] shrink-0 text-[9px] text-stone-300 font-mono h-[88px]"> 
+              <div className="flex flex-col justify-between w-6 pr-2 py-[0.0625rem] shrink-0 text-[0.5625rem] text-stone-300 font-mono h-[5.5rem]"> 
                 {weekLabels.map((day, i) => (
-                  <span key={i} className="h-[10px] leading-[10px] text-right">{day}</span>
+                  <span key={i} className="h-[0.625rem] leading-[0.625rem] text-right">{day}</span>
                 ))}
               </div>
 
               {/* 热力图网格 */}
-              <div className="flex gap-[3px] flex-1">
+              <div className="flex gap-[0.1875rem] flex-1">
                 {heatmapData.weeks.map((week, wIndex) => (
                   // flex-1 确保列平分剩余空间，填满容器
-                  <div key={wIndex} className="flex flex-col gap-[3px] flex-1"> 
+                  <div key={wIndex} className="flex flex-col gap-[0.1875rem] flex-1"> 
                     {week.map((day, dIndex) => (
                       <Tooltip key={`${wIndex}-${dIndex}`}>
                         <TooltipTrigger asChild>
                           {/* w-full aspect-square 确保格子填满列宽并保持正方形 */}
                           <div 
                             className={`
-                              w-full aspect-square rounded-[2px] transition-all duration-300
+                              w-full aspect-square rounded-[0.125rem] transition-all duration-300
                               ${getIntensityClass(day.count)}
                             `} 
                           />
@@ -254,7 +254,7 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
                           className="bg-stone-900 border-stone-800 text-white text-xs px-3 py-2"
                         >
                           <div className="font-bold mb-0.5">{formatDate(day.dateStr)}</div>
-                          <div className="text-stone-400 text-[10px]">
+                          <div className="text-stone-400 text-[0.625rem]">
                             {day.count} 次修习 · {getIntensityDescription(day.count)}
                           </div>
                         </TooltipContent>
@@ -267,15 +267,15 @@ export const ActivityHeatmap = ({ totalActivity, activityData: propActivityData 
 
             {/* 图例 */}
             <div className="flex justify-end items-center gap-2 mt-4 px-1">
-              <span className="text-[10px] text-stone-400">少</span>
+              <span className="text-[0.625rem] text-stone-400">少</span>
               <div className="flex gap-1">
-                <div className="w-[10px] h-[10px] rounded-[2px] bg-stone-100/80" />
-                <div className="w-[10px] h-[10px] rounded-[2px] bg-stone-300" />
-                <div className="w-[10px] h-[10px] rounded-[2px] bg-stone-400" />
-                <div className="w-[10px] h-[10px] rounded-[2px] bg-stone-600" />
-                <div className="w-[10px] h-[10px] rounded-[2px] bg-[#C82E31]" />
+                <div className="w-[0.625rem] h-[0.625rem] rounded-[0.125rem] bg-stone-100/80" />
+                <div className="w-[0.625rem] h-[0.625rem] rounded-[0.125rem] bg-stone-300" />
+                <div className="w-[0.625rem] h-[0.625rem] rounded-[0.125rem] bg-stone-400" />
+                <div className="w-[0.625rem] h-[0.625rem] rounded-[0.125rem] bg-stone-600" />
+                <div className="w-[0.625rem] h-[0.625rem] rounded-[0.125rem] bg-[#C82E31]" />
               </div>
-              <span className="text-[10px] text-stone-400">多</span>
+              <span className="text-[0.625rem] text-stone-400">多</span>
             </div>
 
           </div>

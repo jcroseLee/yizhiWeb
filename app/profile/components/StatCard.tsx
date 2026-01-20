@@ -39,7 +39,7 @@ export const StatCard = ({
           </div>
           <div className="text-xs text-gray-500 mt-1">{label}</div>
           {isEmpty && isClickable && actionText && (
-            <div className="text-[10px] text-[#C0392B] mt-2 opacity-0 group-hover:opacity-100 transition-opacity font-serif">
+            <div className="text-[0.625rem] text-[#C0392B] mt-2 opacity-0 group-hover:opacity-100 transition-opacity font-serif">
               {actionText} →
             </div>
           )}

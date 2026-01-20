@@ -66,7 +66,50 @@ export async function GET(req: NextRequest) {
     const rows = Array.isArray(data) ? data : []
     const total = rows.length ? Number(rows[0]?.total_count || 0) : 0
 
-    return NextResponse.json({ items: rows, total })
+    const baziPostIds = rows
+      .filter((row: any) => Number(row?.divination_method) === 1)
+      .map((row: any) => row?.post_id)
+      .filter(Boolean)
+
+    if (!baziPostIds.length) {
+      return NextResponse.json({ items: rows, total })
+    }
+
+    const { data: posts } = await supabase
+      .from('posts')
+      .select('id, divination_record_id')
+      .in('id', baziPostIds)
+
+    const postIdToRecordId = new Map<string, string>()
+    for (const p of posts || []) {
+      if (p?.id && p?.divination_record_id) postIdToRecordId.set(p.id, p.divination_record_id)
+    }
+
+    const recordIds = Array.from(postIdToRecordId.values())
+    if (!recordIds.length) {
+      return NextResponse.json({ items: rows, total })
+    }
+
+    const { data: records } = await supabase
+      .from('divination_records')
+      .select('id, original_json')
+      .in('id', recordIds)
+
+    const recordIdToOriginalJson = new Map<string, unknown>()
+    for (const r of records || []) {
+      if (r?.id) recordIdToOriginalJson.set(r.id, (r as any).original_json)
+    }
+
+    const enriched = rows.map((row: any) => {
+      if (Number(row?.divination_method) !== 1) return row
+      const recordId = postIdToRecordId.get(row?.post_id)
+      if (!recordId) return row
+      const originalJson = recordIdToOriginalJson.get(recordId)
+      if (!originalJson) return row
+      return { ...row, original_json: originalJson }
+    })
+
+    return NextResponse.json({ items: enriched, total })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 })
   }

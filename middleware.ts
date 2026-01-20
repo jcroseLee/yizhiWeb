@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server'
 const protectedRoutes = [
   '/profile',
   '/messages',
-  '/community',
+  '/community/publish',
+  '/community/drafts',
   '/masters',
   // 可以根据需要添加更多需要保护的路由
 ]

@@ -22,15 +22,15 @@ const styles = `
   .tree-line::before {
     content: '';
     position: absolute;
-    left: 11px; /* 对齐图标中心 */
+    left: 0.6875rem; /* 对齐图标中心 */
     top: 0;
     bottom: 0;
-    width: 1px;
+    width: 0.0625rem;
     background-color: #e5e5e5;
     z-index: 0;
   }
   .tree-line:last-child::before {
-    height: 16px; /* 最后一项只连到一半 */
+    height: 1rem; /* 最后一项只连到一半 */
   }
   
   /* 子节点水平连接线 */
@@ -40,10 +40,10 @@ const styles = `
   .tree-branch::after {
     content: '';
     position: absolute;
-    left: -12px; /* 连接到父级垂直线 */
+    left: -0.75rem; /* 连接到父级垂直线 */
     top: 50%;
-    width: 12px;
-    height: 1px;
+    width: 0.75rem;
+    height: 0.0625rem;
     background-color: #e5e5e5;
   }
 `

@@ -60,7 +60,7 @@ const styles = `
     transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .book-lift:hover {
-    transform: translateY(-6px) scale(1.02);
+    transform: translateY(-0.375rem) scale(1.02);
     z-index: 10;
   }
 `
@@ -350,7 +350,7 @@ export default function AllBooksPage() {
         
         {/* --- Header: 固定高度，不随页面滚动 --- */}
         <div className="flex-none px-6 lg:px-8 py-4 border-b border-stone-200/50 bg-[#F9F7F2]/90 backdrop-blur-md z-50">
-          <div className="max-w-[1920px] mx-auto w-full flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="max-w-[120rem] mx-auto w-full flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Left: Title */}
             <div className="flex items-center gap-4">
               <Button
@@ -372,7 +372,7 @@ export default function AllBooksPage() {
 
             {/* Right: Search & Sort */}
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-[280px] group">
+              <div className="relative flex-1 md:w-[17.5rem] group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400 group-focus-within:text-[#C82E31] transition-colors" />
                 <Input
                   placeholder="检索书名、作者..."
@@ -382,7 +382,7 @@ export default function AllBooksPage() {
                 />
               </div>
               <Select defaultValue="popular">
-                <SelectTrigger className="w-[120px] h-9 bg-white/60 border-stone-200 rounded-full shadow-sm text-xs">
+                <SelectTrigger className="w-[7.5rem] h-9 bg-white/60 border-stone-200 rounded-full shadow-sm text-xs">
                   <SortAsc className="w-3.5 h-3.5 mr-2 text-stone-500" />
                   <SelectValue placeholder="排序" />
                 </SelectTrigger>
@@ -397,7 +397,7 @@ export default function AllBooksPage() {
         </div>
 
         {/* --- Content Body: 占据剩余空间 --- */}
-        <div className="flex-1 flex overflow-hidden max-w-[1920px] mx-auto w-full">
+        <div className="flex-1 flex overflow-hidden max-w-[120rem] mx-auto w-full">
             
             {/* 
               Left Sidebar: 
@@ -409,7 +409,7 @@ export default function AllBooksPage() {
                 
                 {/* 学科分类 */}
                 <div>
-                  <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
+                  <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
                     <LayoutGrid className="w-3 h-3" /> 学科分类
                   </h3>
                   <div className="space-y-0.5">
@@ -427,7 +427,7 @@ export default function AllBooksPage() {
                         >
                           {isActive && <div className="absolute left-0 h-4 w-0.5 bg-[#C82E31] rounded-r-full" />}
                           <span className="font-serif tracking-wide">{cat.name}</span>
-                          <span className={`text-[10px] ${isActive ? 'text-stone-600' : 'text-stone-500 group-hover:text-stone-400'}`}>
+                          <span className={`text-[0.625rem] ${isActive ? 'text-stone-600' : 'text-stone-500 group-hover:text-stone-400'}`}>
                             {cat.count}
                           </span>
                         </button>
@@ -440,7 +440,7 @@ export default function AllBooksPage() {
 
                 {/* 年代检索 */}
                 <div>
-                  <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
+                  <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-1.5 px-2">
                     <History className="w-3 h-3" /> 年代检索
                   </h3>
                   <div className="flex flex-wrap gap-1.5 px-1">
@@ -451,7 +451,7 @@ export default function AllBooksPage() {
                           key={dynasty}
                           variant="outline"
                           onClick={() => setActiveDynasty(isActive ? null : dynasty)}
-                          className={`cursor-pointer transition-all font-serif text-[11px] px-2 py-0.5 font-normal ${
+                          className={`cursor-pointer transition-all font-serif text-[0.6875rem] px-2 py-0.5 font-normal ${
                             isActive
                               ? 'bg-[#C82E31] border-[#C82E31] text-white hover:bg-[#A02528]'
                               : 'bg-white/40 border-stone-200/60 text-stone-500 hover:border-[#C82E31] hover:text-[#C82E31] hover:bg-white'
@@ -542,7 +542,7 @@ export default function AllBooksPage() {
                             onClick={() => handleBookClick(book.id)}
                           />
                           {/* 底部柔和阴影 */}
-                          <div className="absolute -bottom-3 left-3 right-3 h-2 rounded-[100%] shelf-shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-[2px] pointer-events-none" />
+                          <div className="absolute -bottom-3 left-3 right-3 h-2 rounded-[100%] shelf-shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-[0.125rem] pointer-events-none" />
                         </div>
 
                         {/* Metadata Info - Scaled down font sizes */}
@@ -553,10 +553,10 @@ export default function AllBooksPage() {
                                 {book.title}
                               </h4>
                               <div className="flex items-center gap-1.5 mt-1">
-                                <span className="text-[10px] text-stone-500 font-medium bg-stone-100 px-1 py-px rounded-[2px] truncate max-w-[60px]">
+                                <span className="text-[0.625rem] text-stone-500 font-medium bg-stone-100 px-1 py-px rounded-[0.125rem] truncate max-w-[3.75rem]">
                                   {book.dynasty}
                                 </span>
-                                <span className="text-[10px] text-stone-400 truncate">
+                                <span className="text-[0.625rem] text-stone-400 truncate">
                                   {book.author}
                                 </span>
                               </div>
@@ -585,7 +585,7 @@ export default function AllBooksPage() {
                           
                           {/* Read Badge */}
                           {book.progress === 100 && (
-                            <div className="mt-2 flex items-center gap-1 text-[10px] text-green-600 opacity-60">
+                            <div className="mt-2 flex items-center gap-1 text-[0.625rem] text-green-600 opacity-60">
                                 <CheckCircle2 className="w-2.5 h-2.5" /> 已读
                             </div>
                           )}

@@ -2,6 +2,7 @@
 
 import CaseCard, { type CaseItem } from '@/app/cases/components/CaseCard'
 import CaseCardSkeleton from '@/app/cases/components/CaseCardSkeleton'
+import { getBaziInfo } from '@/app/community/components/PostCard'
 import TextType from '@/lib/components/TextType'
 import { Button } from '@/lib/components/ui/button'
 import { Input } from '@/lib/components/ui/input'
@@ -18,7 +19,6 @@ import { getTags, type DivinationMethodType, type Tag } from '@/lib/services/com
 import { calculateLevel } from '@/lib/services/growth'
 import { cn } from '@/lib/utils/cn'
 import {
-  ArrowRight,
   CheckCircle2,
   Clock,
   Filter,
@@ -54,12 +54,13 @@ type ApiCaseRow = {
   accuracy_rating: Accuracy | null
   gua_original_name: string | null
   original_key: string | null
+  divination_method?: number | null
+  original_json?: unknown
   changing_flags: unknown
   tags: Array<{ id: string; name: string; category: string; scope: string | null }> | null
 }
 
 interface FilterOptions {
-  verifiedOnly: boolean
   followingOnly: boolean
 }
 
@@ -105,9 +106,9 @@ const styles = `
     left: 0 !important;
     right: 0 !important;
     height: 100% !important;
-    background-image: linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px) !important;
-    background-size: 40px 40px !important;
+    background-image: linear-gradient(to right, rgba(0,0,0,0.05) 0.0625rem, transparent 0.0625rem),
+                      linear-gradient(to bottom, rgba(0,0,0,0.05) 0.0625rem, transparent 0.0625rem) !important;
+    background-size: 2.5rem 2.5rem !important;
     mask-image: linear-gradient(to bottom, transparent 20%, black 100%) !important;
     -webkit-mask-image: linear-gradient(to bottom, transparent 20%, black 100%) !important;
     pointer-events: none !important;
@@ -120,7 +121,7 @@ const styles = `
     bottom: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    height: 3.75rem;
     background: linear-gradient(to bottom, transparent, #FDFBF7);
     pointer-events: none;
   }
@@ -131,9 +132,9 @@ const styles = `
   /* 玻璃拟态面板 */
   .glass-panel {
     background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(0.75rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0.25rem 1.25rem -0.125rem rgba(0, 0, 0, 0.05);
   }
 
   /* 输入框聚焦动画 */
@@ -142,7 +143,7 @@ const styles = `
   }
   .input-focus-ring:focus-within {
     border-color: #C82E31;
-    box-shadow: 0 0 0 3px rgba(200, 46, 49, 0.1);
+    box-shadow: 0 0 0 0.1875rem rgba(200, 46, 49, 0.1);
     background: white;
   }
 
@@ -151,7 +152,7 @@ const styles = `
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .tag-chip:hover {
-    transform: translateY(-1px);
+    transform: translateY(-0.0625rem);
   }
   .tag-chip-active {
     background-color: #FFF1F2;
@@ -295,7 +296,7 @@ const AdvancedFilterContent = ({
 
   const renderTags = (tags: Tag[], title: string) => (
     <div className="mb-6 last:mb-0">
-      <h4 className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+      <h4 className="text-[0.6875rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
         <span className="w-1 h-1 bg-stone-300 rounded-full"></span>
         {title}
       </h4>
@@ -327,7 +328,12 @@ const AdvancedFilterContent = ({
   )
 
   return (
-    <div className={cn("space-y-6", !isSidebarMode && "max-h-[70vh] overflow-y-auto pr-2 pb-4")}>
+    <div className={cn(
+      "space-y-6 overflow-y-auto pr-2 pb-4",
+      !isSidebarMode 
+        ? "max-h-[70vh] sticky top-[1.2rem]" 
+        : "sticky top-[1.2rem] max-h-[calc(100vh-1.2rem)]"
+    )}>
       
       {/* 搜索区 - 视觉优化 */}
       <div className="space-y-4 bg-stone-50/50 p-4 rounded-xl border border-stone-100">
@@ -357,7 +363,7 @@ const AdvancedFilterContent = ({
 
       {/* 门派选择 */}
       <div>
-        <h4 className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <h4 className="text-[0.6875rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             <span className="w-1 h-1 bg-stone-300 rounded-full"></span>
             所属门派
         </h4>
@@ -384,7 +390,7 @@ const AdvancedFilterContent = ({
 
       {/* 反馈状态 */}
       <div>
-        <h4 className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <h4 className="text-[0.6875rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             <span className="w-1 h-1 bg-stone-300 rounded-full"></span>
             验者反馈
         </h4>
@@ -411,7 +417,7 @@ const AdvancedFilterContent = ({
       </div>
 
       <div>
-        <h4 className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <h4 className="text-[0.6875rem] font-bold text-stone-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             <span className="w-1 h-1 bg-stone-300 rounded-full"></span>
             特殊卦象
         </h4>
@@ -441,18 +447,6 @@ const AdvancedFilterContent = ({
       {renderTags(subjectTags, '事类标签')}
       {method !== 'general' && renderTags(techniqueTags, '技法断语')}
       {renderTags(customTags, '自定义标签')}
-
-      <div className="pt-2">
-        <label className="flex items-center justify-between p-3 rounded-lg border border-stone-200 bg-white cursor-pointer hover:border-stone-300 transition-colors">
-          <span className="text-sm text-stone-700 font-medium">只看认证卦师</span>
-          <input 
-            type="checkbox" 
-            checked={filterOptions.verifiedOnly}
-            onChange={e => setFilterOptions({...filterOptions, verifiedOnly: e.target.checked})}
-            className="accent-[#C82E31] w-4 h-4 rounded border-stone-300"
-          />
-        </label>
-      </div>
 
       {!isSidebarMode && (
         <div className="flex gap-3 pt-4 sticky bottom-0 bg-white/95 backdrop-blur pb-2 border-t border-stone-100">
@@ -484,7 +478,7 @@ const FilterPanel = (props: FilterPanelProps) => {
   const router = useRouter()
 
   return (
-    <div className="sticky top-0 z-20 pb-4 bg-transparent">
+    <div className="sticky top-[1.2rem] z-20 pb-4 bg-transparent">
         <div className="glass-panel rounded-2xl px-1 py-1 flex items-center justify-between">
             {/* Desktop Tabs */}
             <div className="hidden lg:flex items-center p-1">
@@ -582,7 +576,7 @@ export default function CasesPage() {
   const [accuracy, setAccuracy] = useState<Accuracy | ''>('')
   const [isLiuChong, setIsLiuChong] = useState<boolean | null>(null)
   const [isLiuHe, setIsLiuHe] = useState<boolean | null>(null)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ verifiedOnly: false, followingOnly: false })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ followingOnly: false })
   const [q, setQ] = useState('')
   const [guaName, setGuaName] = useState('')
 
@@ -613,12 +607,11 @@ export default function CasesPage() {
     if (isLiuHe !== null) sp.set('is_liu_he', isLiuHe ? '1' : '0')
     if (q.trim()) sp.set('q', q.trim())
     if (guaName.trim()) sp.set('gua_name', guaName.trim())
-    if (filterOptions.verifiedOnly) sp.set('verified', '1')
     
     sp.set('limit', '20')
     sp.set('offset', String(pOffset))
     return sp
-  }, [activeTab, selectedTagIds, accuracy, isLiuChong, isLiuHe, filterOptions, q, guaName])
+  }, [activeTab, selectedTagIds, accuracy, isLiuChong, isLiuHe, q, guaName])
 
   const fetchCases = useCallback(async (pOffset: number, mode: 'replace' | 'append') => {
     try {
@@ -687,7 +680,7 @@ export default function CasesPage() {
       void fetchCases(0, 'replace')
     }, 500)
     return () => clearTimeout(timer)
-  }, [activeTab, selectedTags, accuracy, isLiuChong, isLiuHe, filterOptions, q, guaName, method, fetchCases])
+  }, [activeTab, selectedTags, accuracy, isLiuChong, isLiuHe, q, guaName, method, fetchCases])
 
   const canLoadMore = items.length < total
 
@@ -706,7 +699,7 @@ export default function CasesPage() {
     setAccuracy('')
     setIsLiuChong(null)
     setIsLiuHe(null)
-    setFilterOptions({ verifiedOnly: false, followingOnly: false })
+    setFilterOptions({ followingOnly: false })
     setQ('')
     setGuaName('')
   }
@@ -721,12 +714,23 @@ export default function CasesPage() {
       const tagNames = Array.isArray(row.tags) ? row.tags.map((t) => t.name).filter(Boolean) : []
       const accuracyText = row.accuracy_rating === 'accurate' ? '验·准' : row.accuracy_rating === 'inaccurate' ? '验·错' : row.accuracy_rating === 'partial' ? '半准' : '已结案'
 
+      const isBaziRow = Number(row.divination_method) === 1 || row.original_key === 'bazi'
+      const baziInfo = isBaziRow
+        ? getBaziInfo({
+            method: Number(row.divination_method),
+            original_key: row.original_key || undefined,
+            original_json: row.original_json as any,
+          })
+        : null
+
       return {
         id: row.post_id,
         question: row.title || '',
         background: bg,
         tags: tagNames,
         guaName: row.gua_original_name || '未知卦',
+        hasBazi: !!baziInfo,
+        baziPillars: baziInfo?.pillars,
         author: {
           id: row.user_id,
           name: row.author_nickname || '匿名',
@@ -756,7 +760,7 @@ export default function CasesPage() {
       <style dangerouslySetInnerHTML={{ __html: styles }} />
       
       <div className="min-h-screen font-sans text-stone-800 paper-texture selection:bg-[#C82E31] selection:text-white">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 pb-12 lg:py-12">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 pb-12 lg:py-1">
           
           {/* Header Area - 方案一：虚室生白 */}
           <div className="header-bg-void mb-10 pt-10 pb-12 -mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-stone-100 relative">
@@ -888,16 +892,7 @@ export default function CasesPage() {
                     isSidebarMode={true}
                   />
                 </div>
-                
-                {/* 装饰性占位或广告位 */}
-                <div className="rounded-2xl bg-gradient-to-br from-[#1c1917] to-[#2d2a28] p-6 text-white relative overflow-hidden shadow-lg group cursor-pointer">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#C82E31] rounded-full blur-[60px] opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <h4 className="text-lg font-serif font-bold mb-2 relative z-10">悬赏解卦</h4>
-                    <p className="text-xs text-white/60 mb-4 leading-relaxed relative z-10">遇到疑难卦象？发布悬赏，邀请社区高人指点迷津。</p>
-                    <div className="flex items-center text-xs font-bold text-[#C82E31]">
-                        立即发布 <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform"/>
-                    </div>
-                </div>
+
               </div>
             </div>
           </div>

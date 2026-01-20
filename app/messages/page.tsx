@@ -730,7 +730,7 @@ function MessagesPageContent() {
                           <img 
                             src={imageUrl} 
                             alt="图片" 
-                            className="max-w-[200px] max-h-[300px] rounded-lg object-cover cursor-pointer"
+                            className="max-w-[12.5rem] max-h-[18.75rem] rounded-lg object-cover cursor-pointer"
                             loading="lazy"
                             onClick={() => window.open(imageUrl, '_blank')}
                           />

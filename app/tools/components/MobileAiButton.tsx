@@ -10,7 +10,7 @@ const IconAI = ({ className }: { className?: string }) => (
     fill="none" 
     xmlns="http://www.w3.org/2000/svg" 
     className={className}
-    style={{ filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.8))' }}
+    style={{ filter: 'drop-shadow(0 0 0.125rem rgba(255, 255, 255, 0.8))' }}
   >
     {/* 字母 A */}
     <path 
@@ -111,7 +111,7 @@ export function MobileAiButton({
       >
         {/* 1. 外部旋转流光光环 (加强版) */}
         <div 
-          className="absolute inset-[-3px] rounded-full opacity-70 blur-[2px] animate-[spin_4s_linear_infinite]"
+          className="absolute inset-[-0.1875rem] rounded-full opacity-70 blur-[0.125rem] animate-[spin_4s_linear_infinite]"
           style={{ background: STYLES.ROTATING_GRADIENT }}
           aria-hidden="true"
         />

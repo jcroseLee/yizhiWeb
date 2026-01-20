@@ -555,7 +555,7 @@ export function CitySelector({ value, onChange, placeholder = '出生城市', cl
           />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-white" align="start">
+      <PopoverContent className="w-[25rem] p-0 bg-white" align="start">
         <div className="p-3 border-b border-stone-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -568,7 +568,7 @@ export function CitySelector({ value, onChange, placeholder = '出生城市', cl
             />
           </div>
         </div>
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="h-[18.75rem]">
           <div className="p-2">
             {filteredRegions.length === 0 ? (
               <div className="text-center py-8 text-sm text-stone-400">未找到相关地区</div>

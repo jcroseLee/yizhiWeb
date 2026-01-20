@@ -68,9 +68,9 @@ export function RelatedCases({ articleId }: { articleId: string }) {
                     <div className="flex items-center gap-2">
                         <Avatar className="w-4 h-4">
                             <AvatarImage src={post.profiles?.avatar_url} />
-                            <AvatarFallback className="text-[9px]">{post.profiles?.nickname?.[0]}</AvatarFallback>
+                            <AvatarFallback className="text-[0.5625rem]">{post.profiles?.nickname?.[0]}</AvatarFallback>
                         </Avatar>
-                        <span className="text-xs text-slate-500 truncate max-w-[80px]">{post.profiles?.nickname}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-[5rem]">{post.profiles?.nickname}</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-400">
                         <div className="flex items-center">

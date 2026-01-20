@@ -370,7 +370,7 @@ export function BaZiForm({
                      <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer">
                         <SelectValue placeholder="年" />
                      </SelectTrigger>
-                     <SelectContent className='cursor-pointer max-h-[300px] bg-white'>
+                     <SelectContent className='cursor-pointer max-h-[18.75rem] bg-white'>
                         {yearOptions.map(year => (
                            <SelectItem key={year} value={year.toString()}>
                               {year}年
@@ -398,7 +398,7 @@ export function BaZiForm({
                      <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer">
                         <SelectValue placeholder="月" />
                      </SelectTrigger>
-                     <SelectContent className='cursor-pointer max-h-[300px] bg-white'>
+                     <SelectContent className='cursor-pointer max-h-[18.75rem] bg-white'>
                         {monthOptions.map((month, index) => (
                            <SelectItem 
                               key={`${month.value}-${month.isLeap ? 'leap' : 'normal'}-${index}`} 
@@ -417,7 +417,7 @@ export function BaZiForm({
                      <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer">
                         <SelectValue placeholder="日" />
                      </SelectTrigger>
-                     <SelectContent className='cursor-pointer max-h-[300px] bg-white'>
+                     <SelectContent className='cursor-pointer max-h-[18.75rem] bg-white'>
                         {dayOptions.map(day => (
                            <SelectItem key={day} value={day.toString()}>
                               {LUNAR_DAY_NAMES[day - 1]}
@@ -432,7 +432,7 @@ export function BaZiForm({
                   <>
                     <Select value={hour} onValueChange={(value) => setHour?.(value)}>
                        <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer"><SelectValue placeholder="时" /></SelectTrigger>
-                       <SelectContent className='cursor-pointer max-h-[250px] bg-white'>
+                       <SelectContent className='cursor-pointer max-h-[15.625rem] bg-white'>
                           {Array.from({ length: 24 }, (_, i) => i).map(h => (
                              <SelectItem key={h} value={h.toString()}>
                                 {String(h).padStart(2, '0')}时
@@ -442,7 +442,7 @@ export function BaZiForm({
                     </Select>
                     <Select value={minute} onValueChange={(value) => setMinute?.(value)}>
                        <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer"><SelectValue placeholder="分" /></SelectTrigger>
-                       <SelectContent className='cursor-pointer max-h-[250px] bg-white'>
+                       <SelectContent className='cursor-pointer max-h-[15.625rem] bg-white'>
                           {Array.from({ length: 60 }, (_, i) => i).map(m => (
                              <SelectItem key={m} value={m.toString()}>
                                 {String(m).padStart(2, '0')}分
@@ -454,7 +454,7 @@ export function BaZiForm({
                 ) : (
                   <Select value={hour} onValueChange={(value) => setHour?.(value)}>
                      <SelectTrigger className="border-stone-200 bg-white h-10 cursor-pointer"><SelectValue placeholder="时辰" /></SelectTrigger>
-                     <SelectContent className='cursor-pointer max-h-[250px] bg-white'>
+                     <SelectContent className='cursor-pointer max-h-[15.625rem] bg-white'>
                         <SelectItem value="unknown">不详</SelectItem>
                         <SelectItem value="zi">子时 (23-01)</SelectItem>
                         <SelectItem value="chou">丑时 (01-03)</SelectItem>
@@ -477,7 +477,7 @@ export function BaZiForm({
 
        <div className="pt-6 border-t border-dashed border-stone-200 space-y-4">
           <div className="flex items-center justify-between">
-             <div className="flex flex-col"><span className="text-sm font-bold text-stone-700">早晚子时</span><span className="text-[10px] text-stone-400">早子时(23-00) 晚子时(00-01)</span></div>
+             <div className="flex flex-col"><span className="text-sm font-bold text-stone-700">早晚子时</span><span className="text-[0.625rem] text-stone-400">早子时(23-00) 晚子时(00-01)</span></div>
              <Switch 
                checked={earlyZiHour} 
                onCheckedChange={setEarlyZiHour}
@@ -485,7 +485,7 @@ export function BaZiForm({
              />
           </div>
           <div className="flex items-center justify-between">
-             <div className="flex flex-col"><span className="text-sm font-bold text-stone-700">真太阳时校正</span><span className="text-[10px] text-stone-400">经纬度时差</span></div>
+             <div className="flex flex-col"><span className="text-sm font-bold text-stone-700">真太阳时校正</span><span className="text-[0.625rem] text-stone-400">经纬度时差</span></div>
              <Switch 
                checked={solarTimeCorrection} 
                onCheckedChange={setSolarTimeCorrection}
@@ -516,7 +516,7 @@ export function BaZiForm({
                   </span>
                 </div>
                 {trueSolarTimeInfo.timeDiffInfo.longitudeDiff !== 0 && (
-                  <div className="flex justify-between items-center text-[10px] text-stone-400">
+                  <div className="flex justify-between items-center text-[0.625rem] text-stone-400">
                     <span>经度 {trueSolarTimeInfo.timeDiffInfo.longitude.toFixed(1)}°E</span>
                     <span>
                       {trueSolarTimeInfo.timeDiffInfo.longitudeDiff > 0 ? '+' : ''}

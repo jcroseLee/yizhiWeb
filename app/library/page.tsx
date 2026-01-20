@@ -39,7 +39,7 @@ const styles = `
     background-image: 
       radial-gradient(circle at 80% 20%, rgba(200, 46, 49, 0.18) 0%, transparent 40%),
       url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10 C 20 20, 40 20, 50 10 C 60 0, 80 0, 90 10 S 90 40, 50 50 S 10 40, 10 10 Z M50 50 C 60 60, 80 60, 90 50 C 100 40, 100 80, 90 90 S 60 100, 50 90 S 0 80, 10 90 S 40 100, 50 50 Z' stroke='%23FFFFFF' stroke-width='0.5' fill='none' opacity='0.03'/%3E%3C/svg%3E");
-    background-size: cover, 60px 60px;
+    background-size: cover, 3.75rem 3.75rem;
   }
 
   /* 3. 书脊拟物效果：增加光泽感和圆弧感 */
@@ -49,12 +49,12 @@ const styles = `
       #f0efeb 20%, 
       #e6e4df 50%, 
       #dcdad5 100%);
-    box-shadow: inset 2px 0 5px rgba(0,0,0,0.05), inset -2px 0 5px rgba(0,0,0,0.05);
+    box-shadow: inset 0.125rem 0 0.3125rem rgba(0,0,0,0.05), inset -0.125rem 0 0.3125rem rgba(0,0,0,0.05);
   }
 
   /* 4. 文字发光效果 (用于Dark Mode) */
   .text-glow {
-    text-shadow: 0 0 20px rgba(255,255,255,0.3);
+    text-shadow: 0 0 1.25rem rgba(255,255,255,0.3);
   }
   
   /* 5. 隐藏滚动条但保留功能 */
@@ -76,7 +76,7 @@ const styles = `
     position: absolute;
     width: 100%;
     transform: scaleX(0);
-    height: 1px;
+    height: 0.0625rem;
     bottom: 0;
     left: 0;
     background-color: currentColor;
@@ -132,9 +132,9 @@ export default function LibraryPage() {
 
   // 计算书籍列表总宽度（书籍宽度 + 间距 + 留白）
   const booksContainerWidth = useMemo(() => {
-    const bookWidth = 120 // 每本书宽度 120px
-    const bookGap = 40 // 书籍间距 space-x-10 = 40px
-    const padding = 32 // 左右 padding pl-4 pr-4 = 16px * 2 = 32px
+    const bookWidth = 120 // 每本书宽度 7.5rem
+    const bookGap = 40 // 书籍间距 space-x-10 = 2.5rem
+    const padding = 32 // 左右 padding pl-4 pr-4 = 1rem * 2 = 2rem
     const bookCount = booksLoading ? 5 : books.length // loading 时显示 5 个骨架屏
     if (bookCount === 0) return 0
     return bookCount * bookWidth + (bookCount - 1) * bookGap + padding
@@ -225,7 +225,7 @@ export default function LibraryPage() {
             </div>
 
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <form onSubmit={handleSearch} className="relative w-full md:w-[320px] group">
+              <form onSubmit={handleSearch} className="relative w-full md:w-[20rem] group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#C82E31] transition-colors" />
                 <Input
                   placeholder="搜索古籍、技法..."
@@ -258,7 +258,7 @@ export default function LibraryPage() {
                 
                 {/* 装饰：顶部标签 */}
                 <div className="absolute top-6 right-6 z-20">
-                  <div className="flex items-center gap-2 border border-[#C82E31]/40 text-[#ff6b6b] bg-[#C82E31]/10 px-3 py-1 text-[10px] font-bold font-serif tracking-[0.2em] backdrop-blur-md rounded-full shadow-[0_0_10px_rgba(200,46,49,0.2)]">
+                  <div className="flex items-center gap-2 border border-[#C82E31]/40 text-[#ff6b6b] bg-[#C82E31]/10 px-3 py-1 text-[0.625rem] font-bold font-serif tracking-[0.2em] backdrop-blur-md rounded-full shadow-[0_0_10px_rgba(200,46,49,0.2)]">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#ff6b6b] animate-pulse"/>
                     每日一学
                   </div>
@@ -285,7 +285,7 @@ export default function LibraryPage() {
                           <h3 className="font-serif text-lg font-bold tracking-widest text-white/90">
                             智慧·推演
                           </h3>
-                          <p className="text-[10px] text-stone-500 uppercase tracking-[0.2em] font-medium">
+                          <p className="text-[0.625rem] text-stone-500 uppercase tracking-[0.2em] font-medium">
                             Logic & Wisdom
                           </p>
                        </div>
@@ -306,11 +306,11 @@ export default function LibraryPage() {
                       <>
                         <div className="flex items-center gap-3 mb-4">
                           {latestArticle.category_name && (
-                            <span className="text-[11px] font-bold text-[#ff6b6b] bg-[#C82E31]/10 px-2 py-0.5 rounded border border-[#C82E31]/20">
+                            <span className="text-[0.6875rem] font-bold text-[#ff6b6b] bg-[#C82E31]/10 px-2 py-0.5 rounded border border-[#C82E31]/20">
                               {latestArticle.category_name}
                             </span>
                           )}
-                          <span className="text-[11px] text-stone-500 flex items-center gap-1">
+                          <span className="text-[0.6875rem] text-stone-500 flex items-center gap-1">
                              <div className="w-1 h-1 rounded-full bg-stone-500"/>
                              {latestArticle.view_count || 0} 人正在研习
                           </span>
@@ -381,7 +381,7 @@ export default function LibraryPage() {
                       onClick={() => handleCategoryClick(item.title)}
                     >
                       {/* 背景装饰字 */}
-                      <div className="absolute -right-4 -bottom-4 text-[80px] font-serif font-black text-stone-50 opacity-[0.03] group-hover:opacity-[0.05] pointer-events-none select-none transition-opacity">
+                      <div className="absolute -right-4 -bottom-4 text-[5rem] font-serif font-black text-stone-50 opacity-[0.03] group-hover:opacity-[0.05] pointer-events-none select-none transition-opacity">
                           {item.char}
                       </div>
 
@@ -425,16 +425,16 @@ export default function LibraryPage() {
                     <div className="flex w-max space-x-10 pl-4 pr-4 pb-4 pt-2">
                       {booksLoading ? (
                         Array.from({ length: 5 }).map((_, i) => (
-                          <div key={`skeleton-${i}`} className="shrink-0 w-[120px] h-[180px] bg-stone-300/50 animate-pulse rounded-sm shadow-sm" />
+                          <div key={`skeleton-${i}`} className="shrink-0 w-[7.5rem] h-[11.25rem] bg-stone-300/50 animate-pulse rounded-sm shadow-sm" />
                         ))
                       ) : books.length > 0 ? (
                         books.map((book) => (
                           <div
                             key={book.id}
-                            className="group relative shrink-0 w-[120px] cursor-pointer perspective-500"
+                            className="group relative shrink-0 w-[7.5rem] cursor-pointer perspective-500"
                             onClick={() => handleBookClick(book.id)}
                           >
-                            <div className="relative aspect-2/3 bg-[#FDFBF7] shadow-[4px_0_10px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.02)] group-hover:-translate-y-3 group-hover:shadow-[10px_20px_30px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out border-r border-stone-300 rounded-[2px] overflow-hidden transform-style-3d">
+                            <div className="relative aspect-2/3 bg-[#FDFBF7] shadow-[4px_0_10px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.02)] group-hover:-translate-y-3 group-hover:shadow-[10px_20px_30px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out border-r border-stone-300 rounded-[0.125rem] overflow-hidden transform-style-3d">
                               
                               {/* 书脊细节 */}
                               <div className="absolute left-0 top-0 bottom-0 w-5 book-spine z-10 flex flex-col justify-between py-6 items-center border-r border-black/5">
@@ -468,7 +468,7 @@ export default function LibraryPage() {
                               {/* 册数标记 */}
                               {(book.volume_type === 'upper' || book.volume_type === 'lower') && (
                                 <div className="absolute right-1.5 bottom-2">
-                                    <span className="text-[10px] font-serif text-stone-500 border border-stone-300 px-0.5 py-1 rounded-sm writing-mode-vertical">
+                                    <span className="text-[0.625rem] font-serif text-stone-500 border border-stone-300 px-0.5 py-1 rounded-sm writing-mode-vertical">
                                         {book.volume_type === 'upper' ? '上' : '下'}
                                     </span>
                                 </div>
@@ -476,7 +476,7 @@ export default function LibraryPage() {
 
                               {/* 作者印章 */}
                               <div className="absolute bottom-3 left-7 opacity-70">
-                                <div className="border border-[#C82E31] text-[#C82E31] text-[8px] px-1 py-1 rounded-[2px] font-serif leading-none bg-white/80">
+                                <div className="border border-[#C82E31] text-[#C82E31] text-[0.5rem] px-1 py-1 rounded-[0.125rem] font-serif leading-none bg-white/80">
                                   {book.author?.slice(0,2)}
                                 </div>
                               </div>
@@ -524,7 +524,7 @@ export default function LibraryPage() {
                       className="flex items-baseline gap-3 group cursor-pointer"
                       onClick={() => handleHotTopicClick(item.title)}
                     >
-                      <span className={`text-[10px] font-bold w-4 text-center shrink-0 font-serif ${
+                      <span className={`text-[0.625rem] font-bold w-4 text-center shrink-0 font-serif ${
                         index < 3 ? 'text-[#C82E31]' : 'text-stone-300'
                       }`}>
                         {index + 1 < 10 ? `0${index + 1}` : index + 1}
@@ -533,7 +533,7 @@ export default function LibraryPage() {
                         <div className="text-sm text-stone-700 font-medium font-serif group-hover:text-[#C82E31] transition-colors truncate">
                           {item.title}
                         </div>
-                        <div className="text-[10px] text-stone-400 mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-1 group-hover:translate-y-0">
+                        <div className="text-[0.625rem] text-stone-400 mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-1 group-hover:translate-y-0">
                           <BookOpen className="w-3 h-3" /> {item.views} 研习
                         </div>
                       </div>
@@ -577,7 +577,7 @@ export default function LibraryPage() {
                   <div className="flex flex-col gap-5">
                     <div className="flex items-start justify-between">
                         <div className="space-y-2">
-                            <div className="inline-flex items-center gap-1.5 border border-[#C5A065]/30 text-[#C5A065] bg-[#C5A065]/5 px-2 py-0.5 text-[10px] font-bold font-serif tracking-widest rounded-sm">
+                            <div className="inline-flex items-center gap-1.5 border border-[#C5A065]/30 text-[#C5A065] bg-[#C5A065]/5 px-2 py-0.5 text-[0.625rem] font-bold font-serif tracking-widest rounded-sm">
                                 <Sparkles className="w-3 h-3" /> 共修藏经阁
                             </div>
                             <h5 className="font-serif font-bold text-xl text-white group-hover:text-[#C5A065] transition-colors">

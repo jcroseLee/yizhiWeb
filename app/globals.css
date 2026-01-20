@@ -28,8 +28,8 @@
   /* 圆角配置 */
   --radius: 0.3rem;
   --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 0.125rem);
+  --radius-sm: calc(var(--radius) - 0.25rem);
 }
 
 @layer base {
@@ -129,7 +129,7 @@
   }
   
   /* 移动端优化 */
-  @media (max-width: 768px) {
+  @media (max-width: 48rem) {
     body {
       -webkit-overflow-scrolling: touch;
       position: relative;
@@ -154,7 +154,7 @@
     
     /* 优化输入框在移动端的显示 */
     input, textarea, select {
-      font-size: 16px; /* 防止 iOS 自动缩放 */
+      font-size: 1rem; /* 防止 iOS 自动缩放 */
     }
     
     /* 优化滚动容器 */
@@ -164,9 +164,9 @@
   }
   
   /* 超小屏幕优化 */
-  @media (max-width: 375px) {
+  @media (max-width: 23.4375rem) {
     body {
-      font-size: 14px;
+      font-size: 0.875rem;
     }
   }
 }
@@ -178,10 +178,10 @@
   
   /* 导航栏背景样式 */
   .nav-bg-pattern {
-    background-image: url(/images/backgrounds/topbg.png);
+    background-image: url(/images/backgrounds/topbg1.png);
     background-position: top;
     background-repeat: repeat-x;
-    background-size: auto 1.5rem;
+    background-size: auto 1.3rem;
   }
   
   /* 宣纸背景样式（用于页面背景） */
@@ -189,7 +189,7 @@
     background-image: url(/images/backgrounds/he-wu.png);
     background-position: center;
     background-repeat: repeat;
-    background-size: auto 200px;
+    background-size: auto 12.5rem;
   }
   /* 宣纸纹理背景 - 使用细腻的噪点模拟纸张质感 */
   .paper-texture {
@@ -200,32 +200,32 @@
   /* 宣纸上的墨迹效果 */
   .ink-text {
     color: #2c3e50;
-    text-shadow: 0 0 1px rgba(44, 62, 80, 0.1);
+    text-shadow: 0 0 0.0625rem rgba(44, 62, 80, 0.1);
   }
   
   /* 印章样式 - 方印/椭圆印，双边框效果，金石气 */
   .seal-stamp {
-    border: 2px solid #C82E31;
+    border: 0.125rem solid #C82E31;
     color: #C82E31;
-    border-radius: 2px; /* 微圆角，接近直角 */
+    border-radius: 0.125rem; /* 微圆角，接近直角 */
     transform: rotate(-8deg);
-    padding: 5px 10px;
+    padding: 0.3125rem 0.625rem;
     font-family: "STFangsong", "FangSong", "STSong", "SimSun", serif;
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.98), rgba(255, 250, 240, 0.95));
     box-shadow: 
-      0 2px 6px rgba(200, 46, 49, 0.25),
-      inset 0 1px 2px rgba(255, 255, 255, 0.8);
+      0 0.125rem 0.375rem rgba(200, 46, 49, 0.25),
+      inset 0 0.0625rem 0.125rem rgba(255, 255, 255, 0.8);
     display: inline-block;
     font-weight: bold;
-    letter-spacing: 2px;
-    font-size: 12px;
+    letter-spacing: 0.125rem;
+    font-size: 0.75rem;
     line-height: 1.2;
     position: relative;
   }
   
   /* 方印样式 */
   .seal-stamp-square {
-    border-radius: 2px;
+    border-radius: 0.125rem;
   }
   
   /* 待验印章 - 赭石色/土黄色 */
@@ -238,12 +238,12 @@
   .seal-stamp::before {
     content: '';
     position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
-    border: 1px solid rgba(200, 46, 49, 0.4);
-    border-radius: 1px;
+    top: 0.125rem;
+    left: 0.125rem;
+    right: 0.125rem;
+    bottom: 0.125rem;
+    border: 0.0625rem solid rgba(200, 46, 49, 0.4);
+    border-radius: 0.0625rem;
     pointer-events: none;
   }
   
@@ -282,14 +282,14 @@
   .hexagram-container {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 0;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
   }
   
   .gua-lines {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0.375rem;
   }
   
   /* 卦象容器样式 - 去框化，降低背景透明度 */
@@ -304,36 +304,36 @@
   /* 动爻标记 - 空心红圈 */
   .changing-line-marker {
     position: absolute;
-    right: -6px;
+    right: -0.375rem;
     top: 50%;
     transform: translateY(-50%);
-    width: 8px;
-    height: 8px;
-    border: 2px solid #C82E31;
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 0.125rem solid #C82E31;
     border-radius: 50%;
     background: transparent;
-    box-shadow: 0 0 2px rgba(200, 46, 49, 0.3);
+    box-shadow: 0 0 0.125rem rgba(200, 46, 49, 0.3);
   }
   
   /* 动爻文字印章 */
   .changing-line-seal {
     position: absolute;
-    right: -12px;
+    right: -0.75rem;
     top: 50%;
     transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    border: 1.5px solid #C82E31;
-    border-radius: 3px;
+    width: 1rem;
+    height: 1rem;
+    border: 0.0938rem solid #C82E31;
+    border-radius: 0.1875rem;
     background: rgba(255, 255, 255, 0.95);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 8px;
+    font-size: 0.5rem;
     color: #C82E31;
     font-family: "KaiTi", "STKaiti", "楷体", serif;
     font-weight: bold;
-    box-shadow: 0 1px 2px rgba(200, 46, 49, 0.2);
+    box-shadow: 0 0.0625rem 0.125rem rgba(200, 46, 49, 0.2);
   }
 
   /* 圆形灰色印章 - 已结案 */
@@ -348,44 +348,44 @@
      display: flex;
      align-items: center;
      justify-content: center;
-     width: 64px;
-     height: 64px;
+     width: 4rem;
+     height: 4rem;
      
      /* 浅绿色系 - 优雅青瓷色 */
-     border: 3px double #94bba5; 
+     border: 0.1875rem double #94bba5; 
      color: #5c8d75;
      
      border-radius: 50%;
      font-family: "STFangsong", "FangSong", "STSong", "SimSun", serif;
      font-weight: bold;
-     font-size: 14px;
-     letter-spacing: 1px;
+     font-size: 0.875rem;
+     letter-spacing: 0.0625rem;
      background: transparent;
      opacity: 0.85;
      
      mix-blend-mode: multiply;
-     box-shadow: inset 0 0 8px rgba(148, 187, 165, 0.1);
+     box-shadow: inset 0 0 0.5rem rgba(148, 187, 165, 0.1);
    }
 
-   @media (min-width: 640px) {
+   @media (min-width: 40rem) {
      .seal-stamp-archived {
-       width: 88px;
-       height: 88px;
-       font-size: 18px;
+       width: 5.5rem;
+       height: 5.5rem;
+       font-size: 1.125rem;
        right: 18%; /* 大屏中央偏右 */
        top: 40%;
-       border-width: 4px;
-       letter-spacing: 2px;
+       border-width: 0.25rem;
+       letter-spacing: 0.125rem;
      }
    }
   
   /* 卡片阴影 - 暖色扩散阴影 */
   .card-shadow {
-    box-shadow: 0 4px 20px rgba(163, 148, 128, 0.1);
+    box-shadow: 0 0.25rem 1.25rem rgba(163, 148, 128, 0.1);
   }
   
   .card-shadow-hover {
-    box-shadow: 0 6px 24px rgba(163, 148, 128, 0.15);
+    box-shadow: 0 0.375rem 1.5rem rgba(163, 148, 128, 0.15);
   }
   
   /* 排名图标样式 */
@@ -393,51 +393,51 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 1.25rem;
+    height: 1.25rem;
     border-radius: 50%;
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: bold;
-    margin-right: 8px;
+    margin-right: 0.5rem;
   }
   
   .rank-1 {
     background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
     color: #8B6914;
-    box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0.125rem 0.25rem rgba(255, 215, 0, 0.3);
   }
   
   .rank-2 {
     background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
     color: #505050;
-    box-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
+    box-shadow: 0 0.125rem 0.25rem rgba(192, 192, 192, 0.3);
   }
   
   .rank-3 {
     background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
     color: #5C3A1A;
-    box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+    box-shadow: 0 0.125rem 0.25rem rgba(205, 127, 50, 0.3);
   }
   
   .rank-4 {
     background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
     color: #374151;
-    box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3);
+    box-shadow: 0 0.125rem 0.25rem rgba(156, 163, 175, 0.3);
   }
   
   /* 进度条样式 - 墨蓝色 */
   .accuracy-progress {
-    height: 3px;
+    height: 0.1875rem;
     background: #e5e7eb;
-    border-radius: 2px;
+    border-radius: 0.125rem;
     overflow: hidden;
-    margin-top: 4px;
+    margin-top: 0.25rem;
   }
   
   .accuracy-progress-fill {
     height: 100%;
     background: linear-gradient(to right, #334155, #1e293b); /* 墨蓝色 */
-    border-radius: 2px;
+    border-radius: 0.125rem;
     transition: width 0.3s ease;
   }
   
@@ -453,8 +453,8 @@
   
   /* 毛玻璃效果 */
   .backdrop-blur-md {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(0.75rem);
+    -webkit-backdrop-filter: blur(0.75rem);
   }
   
   /* Tab 下划线样式 - 毛笔笔触效果 */
@@ -465,20 +465,20 @@
   .tab-underline::after {
     content: '';
     position: absolute;
-    bottom: -2px;
+    bottom: -0.125rem;
     left: 10%;
     right: 10%;
-    height: 2.5px;
+    height: 0.1563rem;
     background: linear-gradient(to right, 
       transparent 0%, 
       #C82E31 15%, 
       #C82E31 85%, 
       transparent 100%
     );
-    border-radius: 2px;
+    border-radius: 0.125rem;
     box-shadow: 
-      0 1px 3px rgba(200, 46, 49, 0.35),
-      inset 0 1px 1px rgba(255, 255, 255, 0.2);
+      0 0.0625rem 0.1875rem rgba(200, 46, 49, 0.35),
+      inset 0 0.0625rem 0.0625rem rgba(255, 255, 255, 0.2);
     /* 模拟毛笔笔触的渐变边缘 */
     opacity: 0.95;
   }
@@ -507,7 +507,7 @@
 
 /* 铜钱3D动画 */
 .perspective-800 {
-  perspective: 800px;
+  perspective: 50rem;
 }
 
 .coin-3d {
@@ -516,7 +516,7 @@
   transform-style: preserve-3d;
   will-change: transform;
   animation: float 3s ease-in-out infinite;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 0.25rem 0.5rem rgba(0, 0, 0, 0.15));
 }
 
 .coin-3d:nth-child(1) { animation-delay: 0s; }
@@ -531,16 +531,16 @@
 
 @keyframes float {
   0% { 
-    transform: translateY(0px); 
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    transform: translateY(0); 
+    filter: drop-shadow(0 0.25rem 0.5rem rgba(0,0,0,0.15));
   }
   50% { 
-    transform: translateY(-6px); 
-    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));
+    transform: translateY(-0.375rem); 
+    filter: drop-shadow(0 0.375rem 0.75rem rgba(0,0,0,0.2));
   }
   100% { 
-    transform: translateY(0px); 
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    transform: translateY(0); 
+    filter: drop-shadow(0 0.25rem 0.5rem rgba(0,0,0,0.15));
   }
 }
 
@@ -569,23 +569,23 @@
 @keyframes coin-toss-3d {
   0% {
     transform: translateY(0) scale(1) rotateX(0) rotateY(0);
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    filter: drop-shadow(0 0.25rem 0.5rem rgba(0,0,0,0.15));
   }
   40% {
     transform: translateY(-5rem) scale(1.3) rotateX(calc(180deg * var(--rot-axis-x))) rotateY(calc(180deg * var(--rot-axis-y)));
-    filter: drop-shadow(0 20px 15px rgba(0,0,0,0.1));
+    filter: drop-shadow(0 1.25rem 0.9375rem rgba(0,0,0,0.1));
   }
   80% {
     transform: translateY(0) scale(1) rotateX(calc(360deg * var(--rot-axis-x))) rotateY(calc(360deg * var(--rot-axis-y)));
-    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+    filter: drop-shadow(0 0.25rem 0.625rem rgba(0,0,0,0.25));
   }
   90% {
     transform: translateY(-0.5rem) scale(1.02) rotateX(calc(360deg * var(--rot-axis-x) + 10deg)) rotateY(calc(360deg * var(--rot-axis-y) + 10deg));
-    filter: drop-shadow(0 5px 12px rgba(0,0,0,0.2));
+    filter: drop-shadow(0 0.3125rem 0.75rem rgba(0,0,0,0.2));
   }
   100% {
     transform: translateY(0) scale(1) rotateX(calc(360deg * var(--rot-axis-x))) rotateY(calc(360deg * var(--rot-axis-y)));
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+    filter: drop-shadow(0 0.25rem 0.5rem rgba(0,0,0,0.15));
   }
 }
 
@@ -605,14 +605,14 @@
 /* 卡片悬浮效果 - 模拟宣纸浮起，增强纸张质感 */
 .paper-card {
   transition: all 0.3s ease;
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 0.0625rem solid rgba(0,0,0,0.06);
   background: white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 0.0625rem 0.1875rem rgba(0,0,0,0.04);
 }
 
 .paper-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-0.125rem);
+  box-shadow: 0 0.625rem 1.875rem -0.625rem rgba(0,0,0,0.12), 0 0.125rem 0.5rem rgba(0,0,0,0.06);
   border-color: rgba(200, 46, 49, 0.25); /* 悬浮微红边框 */
 }
 
@@ -621,8 +621,8 @@
 /* 错误震动动画 */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-0.25rem); }
+  20%, 40%, 60%, 80% { transform: translateX(0.25rem); }
 }
 
 /* 水墨呼吸 */
@@ -635,10 +635,10 @@
 
 /* 浮动卦象 */
 @keyframes float-up {
-  0% { transform: translateY(120px) rotate(0deg) scale(0.8); opacity: 0; }
+  0% { transform: translateY(7.5rem) rotate(0deg) scale(0.8); opacity: 0; }
   20% { opacity: 0.3; }
   80% { opacity: 0.3; }
-  100% { transform: translateY(-120px) rotate(15deg) scale(1.1); opacity: 0; }
+  100% { transform: translateY(-7.5rem) rotate(15deg) scale(1.1); opacity: 0; }
 }
 
 /* 全息扫描动效 */
@@ -663,7 +663,7 @@
 
 /* 模糊入场 */
 @keyframes blur-in {
-  0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
+  0% { filter: blur(0.75rem); opacity: 0; transform: translateY(0.625rem); }
   100% { filter: blur(0); opacity: 1; transform: translateY(0); }
 }
 
@@ -677,19 +677,33 @@
 /* 脉冲光点 */
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(200, 46, 49, 0.2); transform: scale(1); }
-  50% { box-shadow: 0 0 0 6px rgba(200, 46, 49, 0); transform: scale(1.1); }
+  50% { box-shadow: 0 0 0 0.375rem rgba(200, 46, 49, 0); transform: scale(1.1); }
 }
 
 /* 虚空网格 */
 @keyframes grid-flow {
-  0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
-  100% { transform: perspective(500px) rotateX(60deg) translateY(40px); }
+  0% { transform: perspective(31.25rem) rotateX(60deg) translateY(0); }
+  100% { transform: perspective(31.25rem) rotateX(60deg) translateY(2.5rem); }
 }
 
 /* 呼吸光渊 */
 @keyframes abyss-pulse {
   0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
   50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* 流光动画 - 用于登录页面卡片顶部 */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
 }
 
 /* ===== 动画类 ===== */
@@ -704,10 +718,10 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 650px;
-  height: 650px;
+  width: 40.625rem;
+  height: 40.625rem;
   background: radial-gradient(circle at center, rgba(60, 60, 60, 0.15) 0%, rgba(200, 200, 200, 0) 70%);
-  filter: blur(50px);
+  filter: blur(3.125rem);
   animation: organic-breathe 12s infinite ease-in-out;
   z-index: 0;
   pointer-events: none;
@@ -718,11 +732,11 @@
   position: absolute;
   top: 45%;
   left: 55%;
-  width: 500px;
-  height: 500px;
+  width: 31.25rem;
+  height: 31.25rem;
   background: radial-gradient(circle at center, rgba(220, 50, 50, 0.12) 0%, transparent 70%);
   mix-blend-mode: multiply;
-  filter: blur(60px);
+  filter: blur(3.75rem);
   animation: organic-breathe 15s infinite ease-in-out reverse;
   z-index: 0;
   pointer-events: none;
@@ -743,9 +757,9 @@
   position: absolute;
   left: 0;
   width: 100%;
-  height: 2px;
+  height: 0.125rem;
   background: linear-gradient(90deg, transparent, #C82E31, transparent);
-  box-shadow: 0 0 10px #C82E31;
+  box-shadow: 0 0 0.625rem #C82E31;
   animation: scan-line 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   z-index: 10;
   pointer-events: none;
@@ -778,9 +792,9 @@
 /* 边框流光 */
 .gradient-border-mask {
   position: absolute;
-  inset: -1px;
-  border-radius: 9999px;
-  padding: 1px;
+  inset: -0.0625rem;
+  border-radius: 624.9375rem;
+  padding: 0.0625rem;
   background: linear-gradient(90deg, transparent, rgba(200, 46, 49, 0.3), transparent);
   background-size: 200% 100%;
   animation: border-flow 3s linear infinite;
@@ -798,9 +812,9 @@
   left: -50%;
   top: 0;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 0.0625rem, transparent 0.0625rem),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 0.0625rem, transparent 0.0625rem);
+  background-size: 2.5rem 2.5rem;
   animation: grid-flow 2s linear infinite;
   mask-image: linear-gradient(to bottom, transparent, black 40%, black 80%, transparent);
   pointer-events: none;
@@ -811,10 +825,10 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 800px;
-  height: 400px;
+  width: 50rem;
+  height: 25rem;
   background: radial-gradient(ellipse at center, rgba(200, 46, 49, 0.15), transparent 70%);
-  filter: blur(80px);
+  filter: blur(5rem);
   animation: abyss-pulse 8s infinite ease-in-out;
   pointer-events: none;
 }
@@ -829,7 +843,7 @@
 
 .mobile-ai-border {
   position: absolute;
-  inset: -2px; /* 边框宽度 */
+  inset: -0.125rem; /* 边框宽度 */
   background: conic-gradient(
     transparent 0deg, 
     #C82E31 90deg, 
@@ -837,9 +851,9 @@
     #C82E31 170deg, 
     transparent 360deg
   );
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   animation: spin-slow 3s linear infinite;
-  filter: blur(2px); /* 让光晕柔和 */
+  filter: blur(0.125rem); /* 让光晕柔和 */
   z-index: 0;
 }
 
@@ -847,11 +861,11 @@
 @keyframes inner-pulse {
   0%, 100% { 
     background-color: rgba(200, 46, 49, 0.1); 
-    box-shadow: inset 0 0 10px rgba(200, 46, 49, 0.2); 
+    box-shadow: inset 0 0 0.625rem rgba(200, 46, 49, 0.2); 
   }
   50% { 
     background-color: rgba(200, 46, 49, 0.3); 
-    box-shadow: inset 0 0 20px rgba(200, 46, 49, 0.5); 
+    box-shadow: inset 0 0 1.25rem rgba(200, 46, 49, 0.5); 
   }
 }
 

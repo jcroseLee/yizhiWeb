@@ -137,7 +137,7 @@ export default function TrendingTopicsCard({ topics }: TrendingTopicsCardProps) 
                   <p className="text-xs text-stone-700 font-medium group-hover:text-[#C82E31] transition-colors line-clamp-1">
                     {item.title}
                   </p>
-                  <span className="text-[10px] text-stone-400 mt-0.5 block">{item.viewCount.toLocaleString()} 阅读</span>
+                  <span className="text-[0.625rem] text-stone-400 mt-0.5 block">{item.viewCount.toLocaleString()} 阅读</span>
                 </div>
               </div>
             ))}

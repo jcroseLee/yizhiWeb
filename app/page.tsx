@@ -1,11 +1,11 @@
 'use client'
 
+import { trackEvent } from '@/lib/analytics'
 import Logo from '@/lib/components/Logo'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent } from '@/lib/components/ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from '@/lib/components/ui/popover'
-import { trackEvent } from '@/lib/analytics'
 import { getSession, onAuthStateChange, signOut } from '@/lib/services/auth'
 import { getUserProfile, type UserProfile } from '@/lib/services/profile'
 import type { Session } from '@supabase/supabase-js'
@@ -63,9 +63,9 @@ const styles = `
   /* 4. 导航栏 */
   .nav-scrolled {
     background: rgba(253, 251, 247, 0.9);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(28, 25, 23, 0.05);
-    box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05);
+    backdrop-filter: blur(0.75rem);
+    border-bottom: 0.0625rem solid rgba(28, 25, 23, 0.05);
+    box-shadow: 0 0.25rem 1.25rem -0.3125rem rgba(0,0,0,0.05);
   }
 
   /* 卡片悬浮视差 */
@@ -74,7 +74,7 @@ const styles = `
     will-change: transform;
   }
   .parallax-card:hover {
-    box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1.875rem 3.75rem -0.75rem rgba(0, 0, 0, 0.15);
     z-index: 10;
   }
 
@@ -84,17 +84,17 @@ const styles = `
     inset: 0;
     border-radius: 2.5rem;
     background: white;
-    border: 1px solid rgba(0,0,0,0.05);
+    border: 0.0625rem solid rgba(0,0,0,0.05);
     transition: transform 0.4s ease;
     transform-origin: bottom center;
   }
-  .group:hover .book-layer-1 { transform: translateY(-6px) scale(0.98); opacity: 0.6; }
-  .group:hover .book-layer-2 { transform: translateY(-12px) scale(0.96); opacity: 0.4; }
+  .group:hover .book-layer-1 { transform: translateY(-0.375rem) scale(0.98); opacity: 0.6; }
+  .group:hover .book-layer-2 { transform: translateY(-0.75rem) scale(0.96); opacity: 0.4; }
 
   /* 社区点阵 */
   .dot-grid {
-    background-image: radial-gradient(rgba(16, 185, 129, 0.2) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: radial-gradient(rgba(16, 185, 129, 0.2) 0.0625rem, transparent 0.0625rem);
+    background-size: 1.25rem 1.25rem;
   }
 
   /* 3. 第一屏：水墨呼吸 (移动端优化) */
@@ -108,10 +108,10 @@ const styles = `
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 650px;
-    height: 650px;
+    width: 40.625rem;
+    height: 40.625rem;
     background: radial-gradient(circle at center, rgba(60, 60, 60, 0.15) 0%, rgba(200, 200, 200, 0) 70%);
-    filter: blur(50px);
+    filter: blur(3.125rem);
     animation: organic-breathe 12s infinite ease-in-out;
     z-index: 0;
     pointer-events: none;
@@ -120,20 +120,20 @@ const styles = `
     position: absolute;
     top: 45%;
     left: 55%;
-    width: 500px;
-    height: 500px;
+    width: 31.25rem;
+    height: 31.25rem;
     background: radial-gradient(circle at center, rgba(220, 50, 50, 0.12) 0%, transparent 70%);
     mix-blend-mode: multiply;
-    filter: blur(60px);
+    filter: blur(3.75rem);
     animation: organic-breathe 15s infinite ease-in-out reverse;
     z-index: 0;
     pointer-events: none;
   }
 
   /* 移动端媒体查询：减小光晕尺寸，防止喧宾夺主 */
-  @media (max-width: 768px) {
-    .ink-aura-main { width: 90vw; height: 90vw; opacity: 0.6; filter: blur(30px); }
-    .ink-aura-sub { width: 70vw; height: 70vw; opacity: 0.5; filter: blur(40px); }
+  @media (max-width: 48rem) {
+    .ink-aura-main { width: 90vw; height: 90vw; opacity: 0.6; filter: blur(1.875rem); }
+    .ink-aura-sub { width: 70vw; height: 70vw; opacity: 0.5; filter: blur(2.5rem); }
     /* 移动端隐藏部分多余粒子 */
     .digital-trigram:nth-child(even) {
         display: none;
@@ -142,10 +142,10 @@ const styles = `
 
   /* 4. 第一屏：浮动卦象 */
   @keyframes float-up {
-    0% { transform: translateY(120px) rotate(0deg) scale(0.8); opacity: 0; }
+    0% { transform: translateY(7.5rem) rotate(0deg) scale(0.8); opacity: 0; }
     20% { opacity: 0.3; }
     80% { opacity: 0.3; }
-    100% { transform: translateY(-120px) rotate(15deg) scale(1.1); opacity: 0; }
+    100% { transform: translateY(-7.5rem) rotate(15deg) scale(1.1); opacity: 0; }
   }
   .digital-trigram {
     position: absolute;
@@ -158,7 +158,7 @@ const styles = `
 
   /* 模糊入场 */
   @keyframes blur-in {
-    0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
+    0% { filter: blur(0.75rem); opacity: 0; transform: translateY(0.625rem); }
     100% { filter: blur(0); opacity: 1; transform: translateY(0); }
   }
   .animate-blur-in {
@@ -170,30 +170,30 @@ const styles = `
   .co-build-card {
     position: relative;
     background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(28, 25, 23, 0.05);
+    backdrop-filter: blur(0.75rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0.25rem 1.25rem -0.125rem rgba(28, 25, 23, 0.05);
     transition: all 0.3s ease;
   }
 
   .co-build-card:hover {
     background: rgba(255, 255, 255, 0.85);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px -5px rgba(28, 25, 23, 0.08);
+    transform: translateY(-0.125rem);
+    box-shadow: 0 0.5rem 1.875rem -0.3125rem rgba(28, 25, 23, 0.08);
   }
 
   /* 脉冲光点 */
   @keyframes pulse-glow {
     0%, 100% { box-shadow: 0 0 0 0 rgba(200, 46, 49, 0.2); transform: scale(1); }
-    50% { box-shadow: 0 0 0 6px rgba(200, 46, 49, 0); transform: scale(1.1); }
+    50% { box-shadow: 0 0 0 0.375rem rgba(200, 46, 49, 0); transform: scale(1.1); }
   }
 
   /* 动态边框遮罩 */
   .gradient-border-mask {
     position: absolute;
-    inset: -1px;
-    border-radius: 9999px;
-    padding: 1px;
+    inset: -0.0625rem;
+    border-radius: 624.9375rem;
+    padding: 0.0625rem;
     background: linear-gradient(90deg, transparent, rgba(200, 46, 49, 0.3), transparent);
     background-size: 200% 100%;
     animation: border-flow 3s linear infinite;
@@ -412,13 +412,13 @@ function LandingPageContent() {
         <div 
             className="fixed inset-0 pointer-events-none z-30"
             style={{
-                background: `radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(200, 46, 49, 0.03), transparent 40%)`
+                background: `radial-gradient(37.5rem circle at var(--mouse-x) var(--mouse-y), rgba(200, 46, 49, 0.03), transparent 40%)`
             }} 
         />
 
         {/* --- Fixed Navigation --- */}
         <header className={`fixed top-0 inset-x-0 z-50 h-20 transition-all duration-500 flex items-center px-6 lg:px-12 ${scrolled ? 'nav-scrolled h-16' : 'bg-transparent'}`}>
-           <div className="max-w-[1440px] mx-auto w-full flex items-center justify-between">
+           <div className="max-w-[90rem] mx-auto w-full flex items-center justify-between">
               <div className="flex items-center gap-3 group cursor-pointer">
                 <Logo />
               </div>
@@ -429,7 +429,7 @@ function LandingPageContent() {
                       { label: '藏经阁', href: '/library', isAnchor: false },
                       { label: '社区', href: '/community', isAnchor: false },
                       { label: '案例库', href: '/cases', isAnchor: false },
-                      { label: '工具', href: '/tools/6yao', isAnchor: false },
+                      { label: '工具', href: '/tools/bazi', isAnchor: false },
                       { label: '关于我们', href: '#', isAnchor: false }
                   ].map((item) => (
                       item.isAnchor ? (
@@ -481,7 +481,7 @@ function LandingPageContent() {
                   ) : (
                     <>
                       <Link href="/login" className="hidden md:block text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors">登录</Link>
-                      <Link href="/register">
+                      <Link href="/login?mode=register">
                           <Button className="bg-[#1c1917] hover:bg-[#333] text-white rounded-full px-6 h-10 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 font-medium">
                               立即注册
                           </Button>
@@ -501,7 +501,7 @@ function LandingPageContent() {
                 {/* Badge */}
                 <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white/40 border border-white/60 backdrop-blur-md shadow-sm mb-8 md:mb-12 hover:bg-white/60 hover:border-[#C82E31]/30 transition-all duration-300 cursor-pointer group">
                     <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#C82E31] group-hover:rotate-12 transition-transform" />
-                    <span className="text-[10px] md:text-xs font-bold text-stone-600 tracking-wide">v2.0 全新上线：大模型辅助研判</span>
+                    <span className="text-[0.625rem] md:text-xs font-bold text-stone-600 tracking-wide">v2.0 全新上线：大模型辅助研判</span>
                     <ChevronRight className="w-3 h-3 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
                 </div>
 
@@ -554,7 +554,7 @@ function LandingPageContent() {
                         {/* Decorative Line (Hidden on mobile to reduce noise) */}
                         <div className="hidden md:block absolute -top-8 left-1/2 -translate-x-1/2 w-px h-8 bg-gradient-to-b from-transparent to-stone-300/50" />
                         
-                        <div className="co-build-card rounded-full p-1.5 md:px-3 md:py-2 pr-4 md:pr-6 flex items-center gap-3 md:gap-4 max-w-[280px] md:max-w-md mx-auto bg-white/50 backdrop-blur-md border border-white/60 shadow-sm">
+                        <div className="co-build-card rounded-full p-1.5 md:px-3 md:py-2 pr-4 md:pr-6 flex items-center gap-3 md:gap-4 max-w-[17.5rem] md:max-w-md mx-auto bg-white/50 backdrop-blur-md border border-white/60 shadow-sm">
                             <div className="gradient-border-mask" />
                             
                             {/* Icon */}
@@ -565,7 +565,7 @@ function LandingPageContent() {
                             
                             {/* Text */}
                             <div className="text-left flex-1 min-w-0">
-                                <div className="text-[10px] md:text-xs text-stone-500 flex items-center gap-1.5">
+                                <div className="text-[0.625rem] md:text-xs text-stone-500 flex items-center gap-1.5">
                                     <span className="font-serif italic text-stone-400">Join Us</span>
                                 </div>
                                 <div className="text-xs md:text-sm text-stone-800 truncate">
@@ -592,7 +592,7 @@ function LandingPageContent() {
                     <div className="absolute left-1/2 -translate-x-1/2 -bottom-12 w-px h-24 bg-gradient-to-b from-stone-300 to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-8 lg:min-h-[700px] items-start">
+                <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-8 lg:min-h-[43.75rem] items-start">
                     
                     {/* Feature 1: AI */}
                     <Link 
@@ -603,7 +603,7 @@ function LandingPageContent() {
                         <Card className="h-full bg-[#0c0a09] border-[#1c1917] shadow-2xl relative overflow-hidden group rounded-[2.5rem] cursor-pointer">
                             <div className="holo-scan" />
                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
-                            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-[#C82E31]/20 to-transparent rounded-full blur-[100px] opacity-50 group-hover:opacity-80 transition-opacity duration-1000" />
+                            <div className="absolute top-0 right-0 w-[31.25rem] h-[31.25rem] bg-gradient-to-br from-[#C82E31]/20 to-transparent rounded-full blur-[6.25rem] opacity-50 group-hover:opacity-80 transition-opacity duration-1000" />
 
                             <CardContent className="h-full p-12 flex flex-col justify-between relative z-10 text-white">
                                 <div className="space-y-6">
@@ -611,7 +611,7 @@ function LandingPageContent() {
                                         <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-[#C82E31] transition-colors duration-500 shadow-inner">
                                             <IconAIChip className="text-[#C82E31] group-hover:text-white transition-colors duration-500" />
                                         </div>
-                                        <span className="font-mono text-[10px] text-stone-500 border border-stone-800 px-2 py-1 rounded-full">MODEL-GEN-3</span>
+                                        <span className="font-mono text-[0.625rem] text-stone-500 border border-stone-800 px-2 py-1 rounded-full">MODEL-GEN-3</span>
                                     </div>
                                     <div>
                                         <h3 className="text-3xl lg:text-4xl font-serif font-bold text-white mb-4 tracking-wide">易知 AI 助手</h3>
@@ -669,9 +669,9 @@ function LandingPageContent() {
                               <div className="relative z-10">
                                   <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center mb-4 border border-orange-500/30 group-hover:bg-orange-500 group-hover:text-white transition-all"><IconCompass className="w-6 h-6" /></div>
                                   <h4 className="font-serif font-bold text-lg mb-1">专业排盘</h4>
-                                  <p className="text-[10px] text-white/50 uppercase tracking-wider">Precision Tools</p>
+                                  <p className="text-[0.625rem] text-white/50 uppercase tracking-wider">Precision Tools</p>
                               </div>
-                              <div className="relative z-10 mt-4 flex gap-2">{['四柱','六爻','奇门'].map(t => <span key={t} className="text-[10px] bg-white/10 px-2 py-1 rounded-md text-white/80">{t}</span>)}</div>
+                              <div className="relative z-10 mt-4 flex gap-2">{['四柱','六爻','奇门'].map(t => <span key={t} className="text-[0.625rem] bg-white/10 px-2 py-1 rounded-md text-white/80">{t}</span>)}</div>
                           </Card>
                           </Link>
                           <Link href="/community" className="block h-full">
@@ -680,9 +680,9 @@ function LandingPageContent() {
                               <div className="relative z-10">
                                   <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm"><IconCommunity className="w-6 h-6" /></div>
                                   <h4 className="font-serif font-bold text-stone-900 text-lg mb-1">易友社区</h4>
-                                  <p className="text-[10px] text-stone-400 uppercase tracking-wider">Global Network</p>
+                                  <p className="text-[0.625rem] text-stone-400 uppercase tracking-wider">Global Network</p>
                               </div>
-                              <div className="relative z-10 mt-4"><div className="flex -space-x-2">{[1,2,3,4].map(i => <Avatar key={i} className="w-6 h-6 border border-white"><AvatarImage src={`https://i.pravatar.cc/100?img=${i+20}`} /></Avatar>)}<div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-[8px] border border-white">+99</div></div></div>
+                              <div className="relative z-10 mt-4"><div className="flex -space-x-2">{[1,2,3,4].map(i => <Avatar key={i} className="w-6 h-6 border border-white"><AvatarImage src={`https://i.pravatar.cc/100?img=${i+20}`} /></Avatar>)}<div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-[0.5rem] border border-white">+99</div></div></div>
                           </Card>
                           </Link>
                       </div>
@@ -717,7 +717,7 @@ function LandingPageContent() {
                             <div className="relative z-10 bg-[#050505]/80 backdrop-blur-sm p-4 rounded-xl border border-white/5 hover:border-[#C82E31]/30 transition-colors">
                                 <div className="text-xl font-bold font-serif text-white mb-1 group-hover:text-[#C82E31] transition-colors">{item.title}</div>
                                 <div className="text-xs text-stone-400 uppercase tracking-widest mb-1">{item.sub}</div>
-                                <div className="text-[10px] font-mono text-stone-600 bg-white/5 px-2 py-0.5 rounded-full inline-block">{item.desc}</div>
+                                <div className="text-[0.625rem] font-mono text-stone-600 bg-white/5 px-2 py-0.5 rounded-full inline-block">{item.desc}</div>
                             </div>
                         </div>
                     ))}

@@ -42,7 +42,7 @@ export function TableOfContents({ content }: { content: string }) {
           }
         })
       },
-      { rootMargin: '0px 0px -80% 0px' }
+      { rootMargin: '0 0 -80% 0' }
     )
 
     headings.forEach((heading) => {

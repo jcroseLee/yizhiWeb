@@ -65,7 +65,7 @@ export default function DivinationForm({
                 onChange={(e) => onQuestionChange(e.target.value)}
                 onFocus={() => setIsQuestionFocused(true)}
                 onBlur={() => setTimeout(() => setIsQuestionFocused(false), 200)}
-                className={`bg-transparent border-0 border-b rounded-none px-0 py-2 min-h-[64px] xl:min-h-[80px] resize-none text-base text-stone-700 placeholder:text-stone-300 placeholder:font-light focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:bg-stone-50/50 transition-colors ${
+                className={`bg-transparent border-0 border-b rounded-none px-0 py-2 min-h-[4rem] xl:min-h-[5rem] resize-none text-base text-stone-700 placeholder:text-stone-300 placeholder:font-light focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:bg-stone-50/50 transition-colors ${
                   questionError 
                     ? 'border-solid border-red-500 focus:border-red-500' 
                     : 'border-dashed border-stone-300 focus:border-[#C82E31]'

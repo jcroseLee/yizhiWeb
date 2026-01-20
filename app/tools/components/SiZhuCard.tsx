@@ -110,7 +110,7 @@ export function SiZhuCard() {
           const kongWang = getKongWangPairForStemBranch(stem.char, branch.char)
           return (
             <div key={index} className="flex flex-col items-center gap-2">
-              <span className="text-[12px] text-stone-400 tracking-widest font-sans">{labels[index]}</span>
+              <span className="text-[0.75rem] text-stone-400 tracking-widest font-sans">{labels[index]}</span>
               <div className="flex flex-col gap-1.5">
                 {/* 天干 */}
                 <div className={`w-8 h-8 xl:w-9 xl:h-9 rounded-full border flex items-center justify-center font-bold text-sm shadow-sm ${getToneClass(stem.tone)}`}>
@@ -122,14 +122,14 @@ export function SiZhuCard() {
                 </div>
               </div>
               {/* 空亡信息 */}
-              <span className="text-[11px] text-stone-400 mt-0.5">{kongWang}</span>
+              <span className="text-[0.6875rem] text-stone-400 mt-0.5">{kongWang}</span>
             </div>
           )
         })}
       </div>
       
       {/* 空亡汇总 */}
-      {/* <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex justify-center gap-6 text-[10px] text-stone-400">
+      {/* <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex justify-center gap-6 text-[0.625rem] text-stone-400">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-stone-300"></span>
           <span className="font-sans">年空: {getKongWangPairForStemBranch(ganZhiData.stems[0].char, ganZhiData.branches[0].char)}</span>

@@ -41,7 +41,7 @@ const styles = `
   }
   .vertical-rl { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.2em; }
   ::selection { background: rgba(200, 46, 49, 0.15); color: #1c1917; }
-  .annotation-block { background: linear-gradient(to right, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.03)); border-left: 3px solid #f59e0b; padding-left: 1.5rem; padding-right: 1rem; padding-top: 0.75rem; padding-bottom: 0.75rem; margin: 1.5rem 0; border-radius: 0 0.375rem 0.375rem 0; position: relative; }
+  .annotation-block { background: linear-gradient(to right, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.03)); border-left: 0.1875rem solid #f59e0b; padding-left: 1.5rem; padding-right: 1rem; padding-top: 0.75rem; padding-bottom: 0.75rem; margin: 1.5rem 0; border-radius: 0 0.375rem 0.375rem 0; position: relative; }
   .annotation-block::before { content: "註"; position: absolute; left: 0.5rem; top: 0.75rem; font-size: 0.875rem; font-weight: bold; color: #d97706; background: rgba(251, 191, 36, 0.2); width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; border-radius: 0.25rem; }
   .annotation-label { font-size: 0.75rem; font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block; }
   .annotation-text { color: #78350f; line-height: 1.8; font-size: 0.95em; }
@@ -49,24 +49,24 @@ const styles = `
   .markdown-content { word-wrap: break-word; word-break: break-word; max-width: 100%; }
   .markdown-content p, .markdown-content .md-p { margin-bottom: 1.5rem; line-height: 1.9; text-align: justify; text-justify: inter-ideograph; color: #2c3e50; font-size: 1em; position: relative; font-feature-settings: "kern" 1, "liga" 1; text-rendering: optimizeLegibility; }
   .markdown-content p:last-child, .markdown-content .md-p:last-child { margin-bottom: 0; }
-  .markdown-content h1 { font-size: 1.75em; font-weight: 700; color: #1a252f; margin-top: 2.5rem; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(200, 46, 49, 0.15); line-height: 1.4; letter-spacing: 0.02em; }
-  .markdown-content h2 { font-size: 1.5em; font-weight: 650; color: #1a252f; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(200, 46, 49, 0.1); line-height: 1.4; letter-spacing: 0.02em; }
-  .markdown-content h3 { font-size: 1.3em; font-weight: 600; color: #2c3e50; margin-top: 2rem; margin-bottom: 1rem; padding-left: 0.75rem; border-left: 3px solid rgba(200, 46, 49, 0.3); line-height: 1.5; letter-spacing: 0.015em; background: linear-gradient(to right, rgba(200, 46, 49, 0.03), transparent); padding-top: 0.5rem; padding-bottom: 0.5rem; padding-right: 0.5rem; }
+  .markdown-content h1 { font-size: 1.75em; font-weight: 700; color: #1a252f; margin-top: 2.5rem; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.125rem solid rgba(200, 46, 49, 0.15); line-height: 1.4; letter-spacing: 0.02em; }
+  .markdown-content h2 { font-size: 1.5em; font-weight: 650; color: #1a252f; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 0.0625rem solid rgba(200, 46, 49, 0.1); line-height: 1.4; letter-spacing: 0.02em; }
+  .markdown-content h3 { font-size: 1.3em; font-weight: 600; color: #2c3e50; margin-top: 2rem; margin-bottom: 1rem; padding-left: 0.75rem; border-left: 0.1875rem solid rgba(200, 46, 49, 0.3); line-height: 1.5; letter-spacing: 0.015em; background: linear-gradient(to right, rgba(200, 46, 49, 0.03), transparent); padding-top: 0.5rem; padding-bottom: 0.5rem; padding-right: 0.5rem; }
   .markdown-content h4 { font-size: 1.15em; font-weight: 600; color: #2c3e50; margin-top: 1.75rem; margin-bottom: 0.875rem; line-height: 1.5; }
   .markdown-content h5, .markdown-content h6 { font-size: 1.05em; font-weight: 600; color: #3d4a5c; margin-top: 1.5rem; margin-bottom: 0.75rem; line-height: 1.5; }
   .markdown-content h1:first-child, .markdown-content h2:first-child, .markdown-content h3:first-child, .markdown-content h4:first-child, .markdown-content h5:first-child, .markdown-content h6:first-child { margin-top: 0; }
   .markdown-content ul, .markdown-content ol { margin-top: 0.75rem; margin-bottom: 1.25rem; padding-left: 1.75rem; line-height: 1.85; }
   .markdown-content li { margin-bottom: 0.5rem; color: #2c3e50; }
   .markdown-content li::marker { color: rgb(148, 163, 184); }
-  .markdown-content blockquote { margin-top: 1.25rem; margin-bottom: 1.25rem; padding-left: 1rem; padding-right: 1rem; padding-top: 0.25rem; padding-bottom: 0.25rem; border-left: 4px solid rgba(245, 158, 11, 0.5); background-color: rgb(255, 251, 235); border-radius: 0 0.375rem 0.375rem 0; font-style: normal; color: rgb(71, 85, 105); line-height: 1.8; }
+  .markdown-content blockquote { margin-top: 1.25rem; margin-bottom: 1.25rem; padding-left: 1rem; padding-right: 1rem; padding-top: 0.25rem; padding-bottom: 0.25rem; border-left: 0.25rem solid rgba(245, 158, 11, 0.5); background-color: rgb(255, 251, 235); border-radius: 0 0.375rem 0.375rem 0; font-style: normal; color: rgb(71, 85, 105); line-height: 1.8; }
   .markdown-content code { font-family: 'Noto Serif SC', 'Songti SC', serif; background: rgb(241, 245, 249); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.9em; color: rgb(30, 41, 59); }
   .markdown-content code::before, .markdown-content code::after { content: none; }
-  .markdown-content pre { margin-top: 1.25rem; margin-bottom: 1.25rem; padding: 1rem; background: rgba(44, 62, 80, 0.05); border-radius: 0.375rem; overflow-x: auto; border: 1px solid rgba(200, 46, 49, 0.1); }
+  .markdown-content pre { margin-top: 1.25rem; margin-bottom: 1.25rem; padding: 1rem; background: rgba(44, 62, 80, 0.05); border-radius: 0.375rem; overflow-x: auto; border: 0.0625rem solid rgba(200, 46, 49, 0.1); }
   .markdown-content pre code { background: transparent; padding: 0; color: #2c3e50; }
   .markdown-content strong { font-weight: 900; color: rgb(180, 83, 9); letter-spacing: 0.01em; }
   .markdown-content em { font-style: italic; color: #3d4a5c; }
   .markdown-content q { font-style: normal; color: #c0392b; background: rgba(200, 46, 49, 0.06); padding: 0.125rem 0.25rem; border-radius: 0.2rem; font-weight: 500; quotes: '"' '"' "'" "'"; }
-  @media (max-width: 768px) {
+  @media (max-width: 48rem) {
     .markdown-content-wrapper { font-size: 0.95em; line-height: 1.8; }
     .markdown-content p, .markdown-content .md-p { margin-bottom: 1.25rem; line-height: 1.85; text-align: left; }
     .markdown-content h1 { font-size: 1.5em; margin-top: 2rem; margin-bottom: 1rem; }
@@ -77,7 +77,7 @@ const styles = `
     .markdown-content blockquote { padding-left: 1rem; margin-top: 1rem; margin-bottom: 1rem; }
     .annotation-block { margin: 1rem 0; padding-left: 1rem; padding-right: 0.75rem; }
   }
-  @media (max-width: 375px) {
+  @media (max-width: 23.4375rem) {
     .markdown-content-wrapper { font-size: 0.9em; }
     .markdown-content h1 { font-size: 1.35em; }
     .markdown-content h2 { font-size: 1.25em; }
@@ -85,11 +85,11 @@ const styles = `
   }
   .markdown-content a { color: #c0392b; text-decoration: underline; text-decoration-color: rgba(200, 46, 49, 0.3); transition: all 0.2s ease; }
   .markdown-content a:hover { color: #a93226; text-decoration-color: rgba(200, 46, 49, 0.6); }
-  .markdown-content hr { margin: 2rem 0; border: none; border-top: 1px solid rgba(200, 46, 49, 0.15); background: none; }
-  .markdown-content table { width: 100%; margin: 1.25rem 0; border-collapse: collapse; border: 1px solid rgba(200, 46, 49, 0.15); }
-  .markdown-content th, .markdown-content td { padding: 0.75rem; border: 1px solid rgba(200, 46, 49, 0.1); text-align: left; }
+  .markdown-content hr { margin: 2rem 0; border: none; border-top: 0.0625rem solid rgba(200, 46, 49, 0.15); background: none; }
+  .markdown-content table { width: 100%; margin: 1.25rem 0; border-collapse: collapse; border: 0.0625rem solid rgba(200, 46, 49, 0.15); }
+  .markdown-content th, .markdown-content td { padding: 0.75rem; border: 0.0625rem solid rgba(200, 46, 49, 0.1); text-align: left; }
   .markdown-content th { background: rgba(200, 46, 49, 0.08); font-weight: 600; color: #1a252f; }
-  .markdown-content img { max-width: 100%; height: auto; margin: 1.5rem 0; border-radius: 0.375rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+  .markdown-content img { max-width: 100%; height: auto; margin: 1.5rem 0; border-radius: 0.375rem; box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1); }
 `
 
 const RELATED_CASES = [
@@ -115,15 +115,15 @@ const RELATED_CASES = [
 const CaseCard = ({ data }: { data: typeof RELATED_CASES[0] }) => (
   <div className="bg-white border border-stone-200 p-4 rounded-lg shadow-sm hover:shadow-md hover:border-[#C82E31]/30 transition-all cursor-pointer group">
     <div className="flex items-center justify-between mb-2">
-      <Badge variant="outline" className="text-[10px] text-stone-500 border-stone-200 bg-stone-50 h-5">
+      <Badge variant="outline" className="text-[0.625rem] text-stone-500 border-stone-200 bg-stone-50 h-5">
         实证案例
       </Badge>
-      <span className="text-[10px] text-[#C82E31] font-bold bg-red-50 px-1.5 rounded">{data.result}</span>
+      <span className="text-[0.625rem] text-[#C82E31] font-bold bg-red-50 px-1.5 rounded">{data.result}</span>
     </div>
     <h4 className="text-sm font-bold text-stone-800 font-serif leading-tight mb-2 group-hover:text-[#C82E31] transition-colors">
       {data.title}
     </h4>
-    <div className="flex items-center justify-between text-[10px] text-stone-400">
+    <div className="flex items-center justify-between text-[0.625rem] text-stone-400">
       <span>{data.author}</span>
       <ArrowUpRight className="w-3 h-3" />
     </div>
@@ -1224,7 +1224,7 @@ export default function BookReaderPage() {
               <Bookmark className="w-3 h-3 text-[#C82E31]" />
               实证案例推荐
             </h3>
-            <p className="text-[10px] text-stone-400 mb-3">
+            <p className="text-[0.625rem] text-stone-400 mb-3">
               根据当前章节内容，为您推荐以下实战卦例：
             </p>
             <div className="space-y-3">
@@ -1246,7 +1246,7 @@ export default function BookReaderPage() {
               <p className="text-xs text-stone-600 font-serif leading-relaxed">
                 “变爻只可生克本位之动爻” —— 这一点非常关键，很多时候容易看错，以为变爻可以去生克世应。
               </p>
-              <div className="mt-2 text-[10px] text-stone-400 text-right">2023-10-24</div>
+              <div className="mt-2 text-[0.625rem] text-stone-400 text-right">2023-10-24</div>
             </div>
           </div>
         </div>
@@ -1297,17 +1297,17 @@ export default function BookReaderPage() {
             
             <div className="flex flex-col overflow-hidden">
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold font-serif text-stone-800 truncate max-w-[150px] md:max-w-xs">{book.title}</h1>
+                <h1 className="text-sm font-bold font-serif text-stone-800 truncate max-w-[9.375rem] md:max-w-xs">{book.title}</h1>
                 <div className="hidden sm:flex gap-1">
-                  <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                  <Badge variant="secondary" className="text-[0.625rem] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
                     {normalizeCategory(book.category)}
                   </Badge>
-                  <Badge variant="secondary" className="text-[10px] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
+                  <Badge variant="secondary" className="text-[0.625rem] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
                     {normalizeStatus(book.status)}
                   </Badge>
                 </div>
               </div>
-              <span className="text-[10px] text-stone-500 truncate max-w-[200px] md:max-w-md">{activeTitle}</span>
+              <span className="text-[0.625rem] text-stone-500 truncate max-w-[12.5rem] md:max-w-md">{activeTitle}</span>
             </div>
           </div>
 
@@ -1396,7 +1396,7 @@ export default function BookReaderPage() {
           */}
           {sidebarOpen && (
             <div 
-              className="absolute inset-0 bg-black/20 z-30 md:hidden backdrop-blur-[1px]" 
+              className="absolute inset-0 bg-black/20 z-30 md:hidden backdrop-blur-[0.0625rem]" 
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -1713,7 +1713,7 @@ export default function BookReaderPage() {
           {mobileRightSidebarOpen && (
             <div className="absolute inset-0 z-50 xl:hidden">
               <div 
-                className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" 
+                className="absolute inset-0 bg-black/20 backdrop-blur-[0.0625rem]" 
                 onClick={() => setMobileRightSidebarOpen(false)}
               />
               <aside className="absolute top-0 right-0 h-full w-80 bg-[#fdfbf7] shadow-xl animate-in slide-in-from-right duration-300">

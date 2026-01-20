@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/lib/components/ui/dropdown-menu'
 import { useToast } from '@/lib/hooks/use-toast'
+import { clearLoginIntent, getCurrentUser, getLoginIntent } from '@/lib/services/auth'
 import { getPosts, type Post } from '@/lib/services/community'
 import {
   ArrowUp,
@@ -22,9 +23,9 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import DailyFortuneCard from './components/DailyFortuneCard'
-import PostCard, { extractHelpBackground, extractTextFromHTML, getGuaInfo, getBaziInfo } from './components/PostCard'
+import PostCard, { extractHelpBackground, extractTextFromHTML, getBaziInfo, getGuaInfo } from './components/PostCard'
 import PostCardSkeleton from './components/PostCardSkeleton'
 import PostComposer from './components/PostComposer'
 import TrendingTopicsCard from './components/TrendingTopicsCard'
@@ -44,14 +45,14 @@ const styles = `
   .tab-active::after {
     content: '';
     position: absolute;
-    bottom: 0px;
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
-    width: 28px;
-    height: 3px;
+    width: 1.75rem;
+    height: 0.1875rem;
     background: linear-gradient(to right, transparent, #C82E31, transparent);
-    border-radius: 2px;
-    box-shadow: 0 1px 2px rgba(200, 46, 49, 0.3);
+    border-radius: 0.125rem;
+    box-shadow: 0 0.0625rem 0.125rem rgba(200, 46, 49, 0.3);
   }
   
   /* 隐藏滚动条 */
@@ -151,6 +152,7 @@ export default function CommunityPage() {
   const [hasMore, setHasMore] = useState(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const { toast } = useToast()
+  const processedIntentRef = useRef(false)
 
   const handleScrollToTop = () => {
     const scrollContainer = document.getElementById('app-scroll-container') as HTMLElement | null
@@ -225,6 +227,54 @@ export default function CommunityPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, activeChannel])
 
+  useEffect(() => {
+    if (processedIntentRef.current) return
+    processedIntentRef.current = true
+
+    const run = async () => {
+      const intent = getLoginIntent()
+      if (!intent) return
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (intent.returnTo !== current) return
+      const user = await getCurrentUser()
+      if (!user) return
+
+      clearLoginIntent()
+
+      try {
+        if (intent.type === 'post_like') {
+          await fetch(`/api/community/posts/${intent.postId}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'set', value: true }),
+          })
+          toast({ title: '已点赞' })
+          await loadPosts(false)
+          return
+        }
+        if (intent.type === 'post_favorite') {
+          await fetch(`/api/community/posts/${intent.postId}/favorite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'set', value: true }),
+          })
+          toast({ title: '已收藏' })
+          await loadPosts(false)
+          return
+        }
+        if (intent.type === 'create_post') {
+          toast({ title: '已登录', description: '继续完成发布即可' })
+          return
+        }
+      } catch {
+        toast({ title: '操作未完成', variant: 'destructive' })
+      }
+    }
+
+    void run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
       loadPosts(true)
@@ -257,7 +307,7 @@ export default function CommunityPage() {
       <style jsx global>{styles}</style>
       <div className="min-h-screen font-sans text-stone-800 paper-texture">
         <main className="max-w-7xl mx-auto w-full">
-          <div className="flex flex-col lg:flex-row gap-0 lg:gap-8 px-0 lg:px-6 py-0 lg:py-8">
+          <div className="flex flex-col lg:flex-row gap-0 lg:gap-8 px-0 lg:px-6 py-0 lg:py-2">
             
             {/* --- 左侧内容区 --- */}
             <div className="flex-1 min-w-0 space-y-2 lg:space-y-6">
@@ -272,7 +322,7 @@ export default function CommunityPage() {
                 <div className="bg-white/90 backdrop-blur-md px-4 lg:px-0 border-b border-stone-200/50 lg:border-none lg:bg-transparent lg:backdrop-blur-none">
                   <div className="flex items-center justify-between lg:bg-white lg:px-6 lg:py-1 lg:rounded-xl lg:border lg:border-stone-100 lg:shadow-sm">
                     {/* Channel List */}
-                    <div className="flex-1 flex gap-2 lg:gap-6 min-w-0 overflow-x-auto scrollbar-hide py-3 lg:py-2">
+                    <div className="flex-1 flex gap-2 lg:gap-6 min-w-0 overflow-x-auto scrollbar-hide py-3 lg:py-2 -mx-4 px-4 lg:mx-0 lg:px-0">
                       {CHANNELS.map(channel => {
                         const Icon = channel.icon;
                         const isActive = activeChannel === channel.id;
@@ -281,7 +331,7 @@ export default function CommunityPage() {
                             key={channel.id}
                             onClick={() => setActiveChannel(channel.id)}
                             className={`
-                              relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-300
+                              relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-300 flex-shrink-0
                               ${isActive 
                                 ? 'text-stone-900 font-bold bg-stone-100' 
                                 : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50'}
@@ -310,7 +360,7 @@ export default function CommunityPage() {
                             </span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="z-30 min-w-[100px] bg-white border border-stone-100 shadow-sm">
+                        <DropdownMenuContent align="end" className="z-30 min-w-[6.25rem] bg-white border border-stone-100 shadow-sm">
                           <DropdownMenuItem onClick={() => setSortBy('newest')} className="text-xs cursor-pointer">最新发布</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setSortBy('hottest')} className="text-xs cursor-pointer">最多点赞</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setSortBy('viewed')} className="text-xs cursor-pointer">最多浏览</DropdownMenuItem>
@@ -386,11 +436,11 @@ export default function CommunityPage() {
                    <div className="absolute -right-3 -bottom-3 opacity-10 group-hover:opacity-20 transition-opacity">
                      <Compass className="w-16 h-16" />
                    </div>
-                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[80px]">
+                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[5rem]">
                      <Compass className="w-6 h-6 mb-2 text-amber-400 group-hover:rotate-12 transition-transform" />
                      <div>
                        <div className="text-sm font-bold">在线排盘</div>
-                       <div className="text-[10px] text-stone-400 mt-0.5">智能起卦工具</div>
+                       <div className="text-[0.625rem] text-stone-400 mt-0.5">智能起卦工具</div>
                      </div>
                    </div>
                  </button>
@@ -401,11 +451,11 @@ export default function CommunityPage() {
                    <div className="absolute -right-3 -bottom-3 text-stone-100 group-hover:text-stone-200 transition-colors">
                      <BookOpen className="w-16 h-16" />
                    </div>
-                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[80px]">
+                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[5rem]">
                      <BookOpen className="w-6 h-6 mb-2 text-[#C82E31] group-hover:scale-110 transition-transform" />
                      <div>
                        <div className="text-sm font-bold">古籍查询</div>
-                       <div className="text-[10px] text-stone-400 mt-0.5">查阅万卷经典</div>
+                       <div className="text-[0.625rem] text-stone-400 mt-0.5">查阅万卷经典</div>
                      </div>
                    </div>
                  </button>

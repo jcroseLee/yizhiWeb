@@ -1,5 +1,5 @@
-import { getSupabaseClient } from './supabaseClient'
 import { getCurrentUser } from './auth'
+import { getSupabaseClient } from './supabaseClient'
 
 /**
  * 用户成长体系服务

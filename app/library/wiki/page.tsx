@@ -55,15 +55,15 @@ const styles = `
   .tree-line::before {
     content: '';
     position: absolute;
-    left: 11px; /* 对齐图标中心 */
+    left: 0.6875rem; /* 对齐图标中心 */
     top: 0;
     bottom: 0;
-    width: 1px;
+    width: 0.0625rem;
     background-color: #e5e5e5;
     z-index: 0;
   }
   .tree-line:last-child::before {
-    height: 16px; /* 最后一项只连到一半 */
+    height: 1rem; /* 最后一项只连到一半 */
   }
   
   /* 子节点水平连接线 */
@@ -73,10 +73,10 @@ const styles = `
   .tree-branch::after {
     content: '';
     position: absolute;
-    left: -12px; /* 连接到父级垂直线 */
+    left: -0.75rem; /* 连接到父级垂直线 */
     top: 50%;
-    width: 12px;
-    height: 1px;
+    width: 0.75rem;
+    height: 0.0625rem;
     background-color: #e5e5e5;
   }
 `
@@ -245,7 +245,7 @@ export default function WikiIndexPage() {
                     {/* Section 1 */}
                     {foundationCats.length > 0 && (
                       <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
-                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                        <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                             <Layout className="w-3 h-3" /> 易学通识
                         </h3>
                         <div className="pl-1">
@@ -257,7 +257,7 @@ export default function WikiIndexPage() {
                     {/* Section 2 */}
                     {schoolCats.length > 0 && (
                       <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
-                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                        <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                             <GitBranch className="w-3 h-3" /> 分门别类
                         </h3>
                         <div className="pl-1">
@@ -269,7 +269,7 @@ export default function WikiIndexPage() {
                     {/* Section 3 (Tags) - Styled as Stamps */}
                     {tags.length > 0 && (
                       <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-300">
-                         <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                         <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                             <Hash className="w-3 h-3" /> 分类占验
                          </h3>
                          <div className="flex flex-wrap gap-2 px-2">
@@ -294,7 +294,7 @@ export default function WikiIndexPage() {
                     
                     {otherCats.length > 0 && (
                       <div>
-                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2">其他</h3>
+                        <h3 className="text-[0.625rem] font-bold text-stone-400 uppercase tracking-widest mb-3 px-2">其他</h3>
                         <div className="pl-1">
                             {renderTree(otherCats)}
                         </div>
@@ -311,7 +311,7 @@ export default function WikiIndexPage() {
            >
               {/* 背景装饰：大水印 */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none">
-                  <Network className="w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] lg:w-[500px] lg:h-[500px] text-stone-800" />
+                  <Network className="w-[18.75rem] h-[18.75rem] sm:w-[25rem] sm:h-[25rem] lg:w-[31.25rem] lg:h-[31.25rem] text-stone-800" />
               </div>
 
               <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12 lg:py-20 flex flex-col items-center justify-center min-h-[80%]">
@@ -340,7 +340,7 @@ export default function WikiIndexPage() {
                                 placeholder="搜索知识点、卦例、技法..." 
                                 className="h-12 sm:h-14 pl-10 sm:pl-12 pr-16 sm:pr-20 bg-white/80 backdrop-blur-sm border-stone-200 focus-visible:ring-[#C82E31]/20 focus-visible:border-[#C82E31] rounded-full shadow-lg shadow-stone-200/50 text-sm sm:text-base transition-all hover:bg-white" 
                             />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 px-2 sm:px-3 py-1 bg-stone-100 rounded-full text-[10px] sm:text-xs text-stone-400 font-medium border border-stone-200 hidden sm:block">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 px-2 sm:px-3 py-1 bg-stone-100 rounded-full text-[0.625rem] sm:text-xs text-stone-400 font-medium border border-stone-200 hidden sm:block">
                                 ⌘ K
                             </div>
                         </div>

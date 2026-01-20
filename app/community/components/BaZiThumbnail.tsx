@@ -34,7 +34,7 @@ export default function BaZiThumbnail({ pillars }: BaZiThumbnailProps) {
   if (!pillars || pillars.length !== 4) return null
 
   return (
-    <div className="w-full h-full min-h-[120px] bg-stone-50 rounded-xl border border-stone-100 flex items-center justify-center p-3 relative overflow-hidden">
+    <div className="w-full h-full min-h-[7.5rem] bg-stone-50 rounded-xl border border-stone-100 flex items-center justify-center p-3 relative overflow-hidden">
       {/* 背景装饰文字 */}
       <div className="opacity-10 absolute -right-2 -bottom-4 text-6xl font-serif select-none pointer-events-none text-stone-400">柱</div>
       
@@ -43,7 +43,7 @@ export default function BaZiThumbnail({ pillars }: BaZiThumbnailProps) {
         {pillars.map((pillar, index) => (
           <div key={index} className="flex flex-col items-center gap-1">
             {/* 标签 */}
-            <span className="text-[9px] sm:text-[10px] text-stone-400 tracking-widest font-sans">
+            <span className="text-[0.5625rem] sm:text-[0.625rem] text-stone-400 tracking-widest font-sans">
               {pillar.label}
             </span>
             

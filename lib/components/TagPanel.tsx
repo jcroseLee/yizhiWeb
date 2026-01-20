@@ -75,8 +75,8 @@ export default function TagPanel({
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
-          title: title.trim(),
-          content: backgroundDesc.trim(),
+          title,
+          content: backgroundDesc,
           method,
         }),
       })

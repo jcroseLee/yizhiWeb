@@ -1,5 +1,5 @@
-import ConditionalLayout from "@/lib/components/ConditionalLayout";
 import { AnalyticsProvider } from "@/lib/components/AnalyticsProvider";
+import ConditionalLayout from "@/lib/components/ConditionalLayout";
 import { ToastProviderWrapper } from "@/lib/components/ToastProviderWrapper";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -28,7 +28,7 @@ export default function RootLayout({
         <ToastProviderWrapper>
           <AnalyticsProvider />
           {/* 背景遮罩层，确保内容可读性（新中式宣纸效果） */}
-          <div className="fixed inset-0 -z-10 bg-white pointer-events-none" />
+          <div className="fixed inset-0 -z-10" />
           
           {/* 条件渲染：登录页面不显示导航栏和侧边栏 */}
           <ConditionalLayout>

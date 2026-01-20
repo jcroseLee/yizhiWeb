@@ -19,6 +19,6 @@ export const ActionButton = ({ icon: Icon, label, onClick, disabled = false, act
     } ${disabled ? 'opacity-50 cursor-not-allowed' : 'shadow-sm'}`}
   >
     <Icon className={`w-5 h-5 ${active ? 'fill-current' : ''}`} />
-    <span className="text-[10px] font-medium">{label}</span>
+    <span className="text-[0.625rem] font-medium">{label}</span>
   </button>
 )

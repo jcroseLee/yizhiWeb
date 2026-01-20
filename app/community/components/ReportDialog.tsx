@@ -158,7 +158,7 @@ export default function ReportDialog({ targetId, targetType, trigger, postTitle 
               placeholder="请详细描述违规情况，以便管理员快速判断..."
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              className="bg-white border-stone-200 focus:border-[#C82E31] focus:ring-[#C82E31]/20 min-h-[80px] text-sm resize-none"
+              className="bg-white border-stone-200 focus:border-[#C82E31] focus:ring-[#C82E31]/20 min-h-[5rem] text-sm resize-none"
               maxLength={200}
             />
             <div className="text-right text-xs text-stone-400">
@@ -176,7 +176,7 @@ export default function ReportDialog({ targetId, targetType, trigger, postTitle 
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !reason}
-            className="bg-[#C82E31] hover:bg-[#A61B1F] text-white shadow-sm font-serif min-w-[100px]"
+            className="bg-[#C82E31] hover:bg-[#A61B1F] text-white shadow-sm font-serif min-w-[6.25rem]"
           >
             {isSubmitting ? '提交中...' : '提交举报'}
           </Button>

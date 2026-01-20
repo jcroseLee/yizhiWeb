@@ -99,7 +99,7 @@ export default function PostDetailSkeleton() {
         </div>
 
         {/* Right Sidebar Skeleton */}
-        <aside className="w-full lg:w-[340px] shrink-0 space-y-6 lg:sticky lg:top-24">
+        <aside className="w-full lg:w-[21.25rem] shrink-0 space-y-6 lg:sticky lg:top-24">
           {/* Author Card */}
           <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
             <div className="flex items-center gap-3 mb-4">

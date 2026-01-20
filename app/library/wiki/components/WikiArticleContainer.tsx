@@ -189,7 +189,7 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
                         <Textarea 
                             value={summary} 
                             onChange={e => setSummary(e.target.value)} 
-                            className="font-serif min-h-[100px] text-lg leading-relaxed bg-[#f5f1e8]/30"
+                            className="font-serif min-h-[6.25rem] text-lg leading-relaxed bg-[#f5f1e8]/30"
                             placeholder="输入词条摘要..."
                         />
                     </div>
@@ -227,7 +227,7 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
                             id="wiki-content-editor"
                             value={content} 
                             onChange={e => setContent(e.target.value)} 
-                            className="font-mono min-h-[600px] leading-relaxed p-4"
+                            className="font-mono min-h-[37.5rem] leading-relaxed p-4"
                             placeholder="# 正文标题..."
                         />
                         <p className="text-xs text-stone-400">在修改处点击上方按钮插入标记，审核通过后将自动转换为序号 [N]。</p>
@@ -270,7 +270,7 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
                                 <span className="font-bold text-stone-700">贡献者与修订历史：</span>
                                 {article.contributors.map((c: any, i: number) => (
                                     <div key={i} id={`contributor-${i + 1}`} className="flex items-start gap-3 bg-stone-50/50 p-2 rounded hover:bg-stone-100/50 transition-colors">
-                                        <span className="font-mono text-[#c0392b] font-bold select-none min-w-[24px]">[{i + 1}]</span>
+                                        <span className="font-mono text-[#c0392b] font-bold select-none min-w-[1.5rem]">[{i + 1}]</span>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 {c.id ? (
@@ -344,7 +344,7 @@ export function WikiArticleContainer({ article, relatedBooks }: WikiArticleConta
                         <Button variant="ghost" onClick={handleCancel} disabled={loading}>
                             <X className="w-4 h-4 mr-2" /> 取消
                         </Button>
-                        <Button onClick={() => handleSubmit()} disabled={loading} className="min-w-[120px]">
+                        <Button onClick={() => handleSubmit()} disabled={loading} className="min-w-[7.5rem]">
                             {loading ? '提交中...' : (
                                 <>
                                     <Save className="w-4 h-4 mr-2" /> 提交修改

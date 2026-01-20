@@ -55,7 +55,7 @@ export function BookUploadCard({ onFileSelect, onUploadClick }: BookUploadCardPr
       />
       <div
         onClick={handleUploadClick}
-        className={`w-full aspect-[2/3] rounded-[4px] border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
+        className={`w-full aspect-[2/3] rounded-[0.25rem] border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-300 group relative overflow-hidden ${
           uploading
             ? 'border-stone-300 bg-stone-100'
             : uploadSuccess
@@ -100,13 +100,13 @@ export function BookUploadCard({ onFileSelect, onUploadClick }: BookUploadCardPr
           ) : uploadSuccess ? (
             <span className="block text-xs text-green-600">成功</span>
           ) : uploadError ? (
-            <span className="block text-[10px] text-red-500 line-clamp-1">失败</span>
+            <span className="block text-[0.625rem] text-red-500 line-clamp-1">失败</span>
           ) : (
             <>
               <span className="block text-xs font-bold font-serif text-stone-700 group-hover:text-[#C5A065] transition-colors">
                 申请收录
               </span>
-              <span className="block text-[9px] text-stone-600 uppercase tracking-wider group-hover:text-[#C5A065]/60">
+              <span className="block text-[0.5625rem] text-stone-600 uppercase tracking-wider group-hover:text-[#C5A065]/60">
                 上传 PDF / 图片
               </span>
             </>

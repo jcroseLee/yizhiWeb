@@ -203,7 +203,7 @@ export default function FilterPanel({
               <Settings className="h-3.5 w-3.5" />
               筛选
               {activeFiltersCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-[#C82E31] text-white text-[10px] rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 bg-[#C82E31] text-white text-[0.625rem] rounded-full">
                   {activeFiltersCount}
                 </span>
               )}

@@ -33,34 +33,34 @@ const songStyles = `
   /* 通用印泥质感 */
   .seal-texture {
     mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.7'/%3E%3C/svg%3E");
-    mask-size: 120px;
+    mask-size: 7.5rem;
     mix-blend-mode: multiply;
   }
 
   /* 1. 葫芦印 (编号) - 实心朱文 */
   .seal-hulu {
     position: relative;
-    width: 28px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    width: 1.75rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
     background-color: #AB3B36;
-    border-radius: 14px;
+    border-radius: 0.875rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     box-shadow: 
-      0 2px 4px rgba(171, 59, 54, 0.25),
-      0 0 12px 2px rgba(171, 59, 54, 0.15);
+      0 0.125rem 0.25rem rgba(171, 59, 54, 0.25),
+      0 0 0.75rem 0.125rem rgba(171, 59, 54, 0.15);
     mix-blend-mode: multiply;
-    filter: blur(0.4px) contrast(1.1);
+    filter: blur(0.025rem) contrast(1.1);
   }
   /* 利用伪元素制作"收腰"效果，让矩形变葫芦 */
   .seal-hulu::before, .seal-hulu::after {
     content: "";
     position: absolute;
-    left: -2px;
-    right: -2px;
+    left: -0.125rem;
+    right: -0.125rem;
     background-color: inherit;
     z-index: -1;
     border-radius: 50%;
@@ -68,55 +68,55 @@ const songStyles = `
   /* 上肚 */
   .seal-hulu::before {
     top: 0;
-    height: 24px;
+    height: 1.5rem;
     transform: scaleX(0.95);
   }
   /* 下肚 */
   .seal-hulu::after {
     bottom: 0;
-    height: 28px;
+    height: 1.75rem;
     transform: scaleX(1.05);
   }
   /* 移除旧的 seal-hulu-shape，不再需要 */
 
   /* 2. 引首章 (顺遂) - 随形椭圆 */
   .seal-oval-solid {
-    padding: 6px 3px;
+    padding: 0.375rem 0.1875rem;
     border-radius: 45% / 50%;
     background-color: #AB3B36;
     color: #FFFFFF;
-    font-size: 10px;
-    box-shadow: 0 1px 3px rgba(171, 59, 54, 0.2);
-    border: 1px solid rgba(0,0,0,0.05);
+    font-size: 0.625rem;
+    box-shadow: 0 0.0625rem 0.1875rem rgba(171, 59, 54, 0.2);
+    border: 0.0625rem solid rgba(0,0,0,0.05);
   }
 
   /* 3. 压角名章 (坤造) */
   .seal-rect-border {
-    padding: 4px 3px;
-    border: 1.5px solid #BA3D38;
+    padding: 0.25rem 0.1875rem;
+    border: 0.0938rem solid #BA3D38;
     color: #BA3D38;
-    border-radius: 3px;
+    border-radius: 0.1875rem;
     background: rgba(186, 61, 56, 0.02);
-    box-shadow: inset 0 0 2px rgba(186, 61, 56, 0.2); 
+    box-shadow: inset 0 0 0.125rem rgba(186, 61, 56, 0.2); 
     position: relative;
   }
   .seal-rect-border::before {
-    content: ""; position: absolute; inset: -1px;
-    border: 1px dashed rgba(242, 240, 235, 0.6);
+    content: ""; position: absolute; inset: -0.0625rem;
+    border: 0.0625rem dashed rgba(242, 240, 235, 0.6);
     pointer-events: none;
   }
 
   /* 4. 禁印 (天机) */
   .seal-circle-outline {
-    width: 40px; height: 40px;
-    border: 2px solid #BA3D38;
+    width: 2.5rem; height: 2.5rem;
+    border: 0.125rem solid #BA3D38;
     color: #BA3D38;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-family: "Ma Shan Zheng", serif;
     background: rgba(255,255,255,0.4);
     transform: rotate(-12deg);
-    filter: drop-shadow(0 1px 1px rgba(186, 61, 56, 0.1));
+    filter: drop-shadow(0 0.0625rem 0.0625rem rgba(186, 61, 56, 0.1));
   }
 
   /* 5. 启封按钮 (高亮强调) */
@@ -124,15 +124,15 @@ const songStyles = `
     background: linear-gradient(135deg, #C2423D 0%, #A6322D 100%);
     color: #FDFBF6;
     box-shadow: 
-      0 4px 12px rgba(166, 50, 45, 0.25), 
-      inset 0 1px 0 rgba(255,255,255,0.2);
+      0 0.25rem 0.75rem rgba(166, 50, 45, 0.25), 
+      inset 0 0.0625rem 0 rgba(255,255,255,0.2);
     position: relative;
     overflow: hidden;
   }
   /* 按钮呼吸光晕 */
   @keyframes breathe {
-    0%, 100% { box-shadow: 0 4px 12px rgba(166, 50, 45, 0.25); transform: scale(1); }
-    50% { box-shadow: 0 4px 16px rgba(166, 50, 45, 0.4); transform: scale(1.02); }
+    0%, 100% { box-shadow: 0 0.25rem 0.75rem rgba(166, 50, 45, 0.25); transform: scale(1); }
+    50% { box-shadow: 0 0.25rem 1rem rgba(166, 50, 45, 0.4); transform: scale(1.02); }
   }
   .animate-breathe {
     animation: breathe 3s infinite ease-in-out;
@@ -143,44 +143,44 @@ const songStyles = `
      ---------------------------------------------------------------- */
   .ink-zen-circle {
     position: absolute;
-    width: 150px; height: 150px;
+    width: 9.375rem; height: 9.375rem;
     background: radial-gradient(circle, rgba(160, 160, 160, 0.06) 0%, rgba(255, 255, 255, 0) 65%);
     border-radius: 50%;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     z-index: 0;
-    filter: blur(10px);
+    filter: blur(0.625rem);
   }
 
   .border-wenwu {
-    border: 1px solid #D6D2C4;
-    position: absolute; inset: 6px;
-    border-radius: 4px;
+    border: 0.0625rem solid #D6D2C4;
+    position: absolute; inset: 0.375rem;
+    border-radius: 0.25rem;
     pointer-events: none;
     z-index: 20;
   }
   .border-wenwu::after {
-    content: ""; position: absolute; inset: 3px;
-    border: 1px solid #EBE8E0; border-radius: 2px;
+    content: ""; position: absolute; inset: 0.1875rem;
+    border: 0.0625rem solid #EBE8E0; border-radius: 0.125rem;
   }
 
   .jade-tablet {
     background: linear-gradient(165deg, #FFFCFA 0%, #F0EBE5 100%);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.03), inset 0 0 0 1px rgba(255,255,255,0.8);
+    box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.03), inset 0 0 0 0.0625rem rgba(255,255,255,0.8);
   }
   
   .sealed-pillar {
     background: rgba(235, 232, 225, 0.4);
-    backdrop-filter: blur(5px);
-    border: 1px solid rgba(0,0,0,0.05);
+    backdrop-filter: blur(0.3125rem);
+    border: 0.0625rem solid rgba(0,0,0,0.05);
   }
 
-  .qr-frame { position: relative; padding: 5px; background-color: #fff; border: 1px solid #DCD6CC; }
-  .qr-corner { position: absolute; width: 6px; height: 6px; border-color: #BA3D38; border-style: solid; opacity: 0.5; }
-  .qr-tl { top: 1px; left: 1px; border-width: 1px 0 0 1px; }
-  .qr-tr { top: 1px; right: 1px; border-width: 1px 1px 0 0; }
-  .qr-bl { bottom: 1px; left: 1px; border-width: 0 0 1px 1px; }
-  .qr-br { bottom: 1px; right: 1px; border-width: 0 1px 1px 0; }
+  .qr-frame { position: relative; padding: 0.3125rem; background-color: #fff; border: 0.0625rem solid #DCD6CC; }
+  .qr-corner { position: absolute; width: 0.375rem; height: 0.375rem; border-color: #BA3D38; border-style: solid; opacity: 0.5; }
+  .qr-tl { top: 0.0625rem; left: 0.0625rem; border-width: 0.0625rem 0 0 0.0625rem; }
+  .qr-tr { top: 0.0625rem; right: 0.0625rem; border-width: 0.0625rem 0.0625rem 0 0; }
+  .qr-bl { bottom: 0.0625rem; left: 0.0625rem; border-width: 0 0 0.0625rem 0.0625rem; }
+  .qr-br { bottom: 0.0625rem; right: 0.0625rem; border-width: 0 0.0625rem 0.0625rem 0; }
 `
 
 // --- 辅助逻辑 ---
@@ -262,13 +262,13 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
       <style dangerouslySetInnerHTML={{ __html: songStyles }} />
       
       {/* 整体容器 */}
-      <div className="w-full max-w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg">
+      <div className="w-full max-w-[23.4375rem] min-h-[41.6875rem] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg">
         
         {/* --- 装饰：文武边框 --- */}
         <div className="border-wenwu"></div>
 
         {/* --- 装饰：背景罗盘 (极致隐形：古铜色 + 极低透明度) --- */}
-        <div className="absolute top-10 right-[-60px] w-[240px] h-[240px] sm:w-[320px] sm:h-[320px] opacity-[0.07] pointer-events-none">
+        <div className="absolute top-10 right-[-3.75rem] w-[15rem] h-[15rem] sm:w-[20rem] sm:h-[20rem] opacity-[0.07] pointer-events-none">
              <svg viewBox="0 0 100 100" className="w-full h-full text-[#8B6D48]">
                  <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="0.3" />
                  <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" strokeWidth="0.2" strokeDasharray="1 3" />
@@ -284,19 +284,19 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
 
         {/* ================= 1. 顶部 Header ================= */}
         <div className="relative z-10 pt-6 sm:pt-12 px-4 sm:px-8 flex justify-between items-start">
-            <Logo width={90} height={22} className="sm:w-[100px] sm:h-[24px] text-[#1A1A1A] opacity-90" />
+            <Logo width={90} height={22} className="sm:w-[6.25rem] sm:h-[1.5rem] text-[#1A1A1A] opacity-90" />
             
             {/* 编号：亚腰葫芦印 */}
             <div className="relative mt-2 mr-2">
                  <div className="seal-hulu seal-texture transform rotate-[-2deg]">
-                    <span className="text-[10px] text-[#F9F8F4] font-song relative z-20 font-bold">命</span>
-                    <span className="text-[9px] writing-vertical font-bold tracking-widest text-[#F9F8F4] relative z-20 leading-none">{recordId}</span>
+                    <span className="text-[0.625rem] text-[#F9F8F4] font-song relative z-20 font-bold">命</span>
+                    <span className="text-[0.5625rem] writing-vertical font-bold tracking-widest text-[#F9F8F4] relative z-20 leading-none">{recordId}</span>
                  </div>
             </div>
         </div>
 
         {/* ================= 2. 核心名帖区域 ================= */}
-        <div className="mt-4 sm:mt-6 mb-6 sm:mb-8 relative z-10 flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px]">
+        <div className="mt-4 sm:mt-6 mb-6 sm:mb-8 relative z-10 flex flex-col items-center justify-center min-h-[8.75rem] sm:min-h-[10rem]">
             
             <div className="ink-zen-circle"></div>
 
@@ -304,18 +304,18 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                 {/* 顺遂 (引首章) */}
                 <div className="absolute -top-1 -left-10 transform -rotate-12">
                     <div className="seal-oval-solid ">
-                        <span className="text-[10px] writing-vertical font-kai tracking-wide block">顺遂</span>
+                        <span className="text-[0.625rem] writing-vertical font-kai tracking-wide block">顺遂</span>
                     </div>
                 </div>
 
-                <h1 className="text-[36px] sm:text-[48px] font-kai text-[#1A1A1A] tracking-widest drop-shadow-sm leading-none">
+                <h1 className="text-[2.25rem] sm:text-[3rem] font-kai text-[#1A1A1A] tracking-widest drop-shadow-sm leading-none">
                     {userName}
                 </h1>
 
                 {/* 坤造 (压角章) */}
                 <div className="absolute -bottom-1 -right-8 opacity-90">
                     <div className="seal-rect-border">
-                        <span className="text-[9px] writing-vertical font-song tracking-widest block">{gender}</span>
+                        <span className="text-[0.5625rem] writing-vertical font-song tracking-widest block">{gender}</span>
                     </div>
                 </div>
             </div>
@@ -323,7 +323,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
             {/* 隐私日期：年柱 + 生肖 */}
             <div className="flex items-center gap-2 sm:gap-3 z-10 mt-2 sm:mt-3 opacity-70">
                 <div className="h-px w-4 sm:w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
-                <div className="text-[12px] sm:text-[14px] text-[#555] font-song tracking-[0.2em] font-bold">
+                <div className="text-[0.75rem] sm:text-[0.875rem] text-[#555] font-song tracking-[0.2em] font-bold">
                     {yearInfo}
                 </div>
                 <div className="h-px w-4 sm:w-6 bg-gradient-to-r from-transparent via-[#BA3D38] to-transparent opacity-40"></div>
@@ -337,7 +337,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                      {pillarsData.map((p, i) => (
                          <div key={i} className="flex flex-col items-center w-[22%] relative group">
                              {/* 标签 */}
-                             <span className="text-[11px] text-[#555] font-song mb-3 tracking-[0.3em] border-b border-[#E0Dcd0] pb-1 opacity-70">
+                             <span className="text-[0.6875rem] text-[#555] font-song mb-3 tracking-[0.3em] border-b border-[#E0Dcd0] pb-1 opacity-70">
                                  {p.label}
                              </span>
                              
@@ -352,7 +352,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                                  
                                  <div className={cn(
                                      "flex flex-col items-center gap-2 sm:gap-4",
-                                     p.isHidden ? "opacity-20 blur-[3px] scale-90 grayscale" : "opacity-100"
+                                     p.isHidden ? "opacity-20 blur-[0.1875rem] scale-90 grayscale" : "opacity-100"
                                  )}>
                                      <span className={cn("text-2xl sm:text-3xl font-kai", p.color)}>{p.gan}</span>
                                      <span className={cn("text-2xl sm:text-3xl font-kai", p.color)}>{p.zhi}</span>
@@ -364,7 +364,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                                          <div className="seal-circle-outline seal-texture">
                                              <span className="text-lg pt-0">封</span>
                                          </div>
-                                         <span className="text-[9px] text-[#BA3D38] font-song mt-2 tracking-[0.3em] opacity-80">天机</span>
+                                         <span className="text-[0.5625rem] text-[#BA3D38] font-song mt-2 tracking-[0.3em] opacity-80">天机</span>
                                      </div>
                                  )}
                              </div>
@@ -382,11 +382,11 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
         {aiContent && (
             <div className="px-6 sm:px-10 mt-4 sm:mt-6 flex-1 relative z-10 flex flex-col items-center">
                 {/* 装饰短线 */}
-                <div className="w-8 h-[2px] bg-[#BA3D38]/10 mb-4 rounded-full"></div>
+                <div className="w-8 h-[0.125rem] bg-[#BA3D38]/10 mb-4 rounded-full"></div>
                 
                 {/* 文本内容 (去Emoji, 首字高亮) */}
                 <div className="relative w-full">
-                    <p className="text-[12px] sm:text-[13px] text-[#444] leading-[2.2] font-song text-justify tracking-wide opacity-90 h-[96px] overflow-hidden mask-image-b-fade first-letter:text-xl sm:first-letter:text-2xl first-letter:font-kai first-letter:float-left first-letter:mr-1 first-letter:text-[#BA3D38]">
+                    <p className="text-[0.75rem] sm:text-[0.8125rem] text-[#444] leading-[2.2] font-song text-justify tracking-wide opacity-90 h-[6rem] overflow-hidden mask-image-b-fade first-letter:text-xl sm:first-letter:text-2xl first-letter:font-kai first-letter:float-left first-letter:mr-1 first-letter:text-[#BA3D38]">
                         {aiContent}
                     </p>
                 </div>
@@ -395,7 +395,7 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
                 <div className="mt-5 mb-2 cursor-pointer group">
                      <div className="btn-unseal seal-texture px-6 py-2 rounded-full flex items-center gap-2 border border-[#EAE6DD]/30">
                         <Fingerprint className="w-4 h-4 text-white opacity-90" />
-                        <span className="text-[12px] font-song tracking-[0.3em] font-bold text-white">长按启封</span>
+                        <span className="text-[0.75rem] font-song tracking-[0.3em] font-bold text-white">长按启封</span>
                      </div>
                 </div>
             </div>
@@ -413,16 +413,16 @@ export default function ShareImageCard({ result, payload, aiResult }: ShareImage
             <div className="px-4 sm:px-8 pb-6 sm:pb-8 pt-3 sm:pt-4 flex items-end justify-between relative">
                 <div className="flex flex-col gap-1.5">
                     <div className="text-[#BA3D38] font-kai text-sm tracking-[0.3em]">知命·顺势</div>
-                    <div className="text-[8px] text-[#999] font-song scale-90 origin-left opacity-60 uppercase tracking-widest">
+                    <div className="text-[0.5rem] text-[#999] font-song scale-90 origin-left opacity-60 uppercase tracking-widest">
                         Yizhi AI Monitoring
                     </div>
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    <div className="text-[9px] writing-vertical text-[#999] opacity-50 tracking-widest font-song h-8 border-r border-[#E0Dcd0] pr-2">
+                    <div className="text-[0.5625rem] writing-vertical text-[#999] opacity-50 tracking-widest font-song h-8 border-r border-[#E0Dcd0] pr-2">
                         扫码详批
                     </div>
-                    <div className="qr-frame shadow-sm bg-white/80 backdrop-blur-[2px]">
+                    <div className="qr-frame shadow-sm bg-white/80 backdrop-blur-[0.125rem]">
                         <div className="qr-corner qr-tl"></div>
                         <div className="qr-corner qr-tr"></div>
                         <div className="qr-corner qr-bl"></div>

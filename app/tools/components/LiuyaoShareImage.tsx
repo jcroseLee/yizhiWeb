@@ -28,7 +28,7 @@ const liuyaoStyles = `
 
   /* 墨迹笔触 */
   .ink-stroke {
-    border-radius: 2px;
+    border-radius: 0.125rem;
     background-color: #2C2C2C;
     mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 10' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 5 Q 20 0, 50 5 Q 80 10, 100 5 L 100 10 L 0 10 Z' fill='black'/%3E%3C/svg%3E");
     mask-size: 100% 100%;
@@ -38,7 +38,7 @@ const liuyaoStyles = `
   
   .moving-line {
     background-color: #BA3D38 !important;
-    box-shadow: 0 0 8px rgba(186, 61, 56, 0.4);
+    box-shadow: 0 0 0.5rem rgba(186, 61, 56, 0.4);
   }
   
   /* 水印 - 卦象 */
@@ -48,7 +48,7 @@ const liuyaoStyles = `
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 160px;
+    font-size: 10rem;
     color: rgba(0,0,0,0.03);
     pointer-events: none;
     z-index: 0;
@@ -61,7 +61,7 @@ const liuyaoStyles = `
   /* 1. 印泥纹理 */
   .seal-texture {
     mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.85'/%3E%3C/svg%3E");
-    mask-size: 100px;
+    mask-size: 6.25rem;
   }
   
   /* 2. 朱砂色 */
@@ -73,30 +73,30 @@ const liuyaoStyles = `
   /* 3. 葫芦形状构造 */
   .seal-hulu {
     position: relative;
-    width: 28px;  /* 宽度 */
-    padding-top: 6px;
-    padding-bottom: 6px;
+    width: 1.75rem;  /* 宽度 */
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
     
     /* 核心：利用 border-radius 模拟葫芦/花生/随形石的形状 */
     /* 上半部分稍窄，下半部分稍宽，中间收腰 */
-    border-radius: 14px 14px 14px 14px; 
+    border-radius: 0.875rem 0.875rem 0.875rem 0.875rem; 
     
     /* 阴影：模拟油墨晕染 (Bloom) */
     box-shadow: 
-      0 2px 4px rgba(171, 59, 54, 0.25),
-      0 0 12px 2px rgba(171, 59, 54, 0.15); /* 边缘光晕 */
+      0 0.125rem 0.25rem rgba(171, 59, 54, 0.25),
+      0 0 0.75rem 0.125rem rgba(171, 59, 54, 0.15); /* 边缘光晕 */
       
     mix-blend-mode: multiply;
     
     /* 模拟边缘的自然磨损和不规则 */
-    filter: blur(0.4px) contrast(1.1);
+    filter: blur(0.025rem) contrast(1.1);
   }
 
   /* 利用伪元素制作"收腰"效果，让矩形变葫芦 */
   .seal-hulu::before, .seal-hulu::after {
     content: "";
     position: absolute;
-    left: -2px; right: -2px;
+    left: -0.125rem; right: -0.125rem;
     background-color: inherit;
     z-index: -1;
     border-radius: 50%;
@@ -105,22 +105,22 @@ const liuyaoStyles = `
   /* 上肚 */
   .seal-hulu::before {
     top: 0;
-    height: 24px;
+    height: 1.5rem;
     transform: scaleX(0.95); /* 上面稍小 */
   }
   /* 下肚 */
   .seal-hulu::after {
     bottom: 0;
-    height: 28px;
+    height: 1.75rem;
     transform: scaleX(1.05); /* 下面稍大 */
   }
 
   /* 内部虚线刻痕 (仅在中间显示一部分) */
   .seal-inner-mark {
     position: absolute;
-    inset: 3px;
-    border: 1px dashed rgba(255,255,255,0.4);
-    border-radius: 12px;
+    inset: 0.1875rem;
+    border: 0.0625rem dashed rgba(255,255,255,0.4);
+    border-radius: 0.75rem;
     opacity: 0.6;
     pointer-events: none;
     z-index: 10;
@@ -131,10 +131,10 @@ const liuyaoStyles = `
     font-family: "Noto Serif SC", serif; 
     font-weight: 700; 
     line-height: 1.1; 
-    text-shadow: 0 0 2px rgba(255,255,255,0.3); 
+    text-shadow: 0 0 0.125rem rgba(255,255,255,0.3); 
     position: relative;
     z-index: 20;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 
   /* ----------------------------------------------------
@@ -142,23 +142,23 @@ const liuyaoStyles = `
      ---------------------------------------------------- */
   .qr-frame {
     position: relative;
-    padding: 6px;
+    padding: 0.375rem;
     background-color: #fff;
-    border: 1px solid #DCD6CC;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    border: 0.0625rem solid #DCD6CC;
+    box-shadow: 0 0.25rem 0.375rem rgba(0,0,0,0.05);
   }
   .qr-corner {
     position: absolute;
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
     border-color: #BA3D38;
     border-style: solid;
     opacity: 0.6;
   }
-  .qr-tl { top: 2px; left: 2px; border-width: 1.5px 0 0 1.5px; }
-  .qr-tr { top: 2px; right: 2px; border-width: 1.5px 1.5px 0 0; }
-  .qr-bl { bottom: 2px; left: 2px; border-width: 0 0 1.5px 1.5px; }
-  .qr-br { bottom: 2px; right: 2px; border-width: 0 1.5px 1.5px 0; }
+  .qr-tl { top: 0.125rem; left: 0.125rem; border-width: 0.0938rem 0 0 0.0938rem; }
+  .qr-tr { top: 0.125rem; right: 0.125rem; border-width: 0.0938rem 0.0938rem 0 0; }
+  .qr-bl { bottom: 0.125rem; left: 0.125rem; border-width: 0 0 0.0938rem 0.0938rem; }
+  .qr-br { bottom: 0.125rem; right: 0.125rem; border-width: 0 0.0938rem 0.0938rem 0; }
 
   .bg-compass-fade {
     mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
@@ -169,13 +169,13 @@ const liuyaoStyles = `
   .divider-decorative {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     opacity: 0.4;
-    margin-top: 12px;
-    margin-bottom: 4px;
+    margin-top: 0.75rem;
+    margin-bottom: 0.25rem;
   }
-  .divider-line { flex: 1; h-px; background: linear-gradient(90deg, transparent, #BA3D38, transparent); height: 1px; }
-  .divider-dot { width: 4px; height: 4px; background-color: #BA3D38; transform: rotate(45deg); }
+  .divider-line { flex: 1; h-px; background: linear-gradient(90deg, transparent, #BA3D38, transparent); height: 0.0625rem; }
+  .divider-dot { width: 0.25rem; height: 0.25rem; background-color: #BA3D38; transform: rotate(45deg); }
 `
 
 // ... (YaoLine, cleanMarkdown, formatDateString, getGuaSymbol 等辅助函数保持不变)
@@ -305,10 +305,10 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
       <style dangerouslySetInnerHTML={{ __html: liuyaoStyles }} />
       
       {/* 画布容器 */}
-      <div className="w-full max-w-[375px] min-h-[667px] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg border border-[#E8E4D8]">
+      <div className="w-full max-w-[23.4375rem] min-h-[41.6875rem] song-paper-bg text-[#2C2C2C] font-song relative flex flex-col mx-auto my-4 sm:my-10 shadow-2xl overflow-hidden rounded-lg border border-[#E8E4D8]">
         
         {/* 背景罗盘装饰 */}
-        <div className="absolute top-[-40px] right-[-60px] w-48 h-48 sm:w-64 sm:h-64 bg-compass-fade z-0 rotate-12">
+        <div className="absolute top-[-2.5rem] right-[-3.75rem] w-48 h-48 sm:w-64 sm:h-64 bg-compass-fade z-0 rotate-12">
              <svg viewBox="0 0 100 100" className="w-full h-full text-[#2C2C2C]">
                  <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="0.5" />
                  <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="4 2" />
@@ -320,9 +320,9 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
         <div className="relative z-10 pt-6 sm:pt-10 px-4 sm:px-8 flex justify-between items-start">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center">
-                     <Logo width={100} height={28} className="sm:w-[120px] sm:h-[32px] text-[#1A1A1A]" />
+                     <Logo width={100} height={28} className="sm:w-[7.5rem] sm:h-[2rem] text-[#1A1A1A]" />
                 </div>
-                <span className="text-[9px] text-[#888] tracking-[0.2em] uppercase pl-1 opacity-70">
+                <span className="text-[0.5625rem] text-[#888] tracking-[0.2em] uppercase pl-1 opacity-70">
                     Liuyao Divination
                 </span>
             </div>
@@ -335,15 +335,15 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                 <div className="seal-hulu cinnabar-red seal-texture flex flex-col items-center justify-center gap-1 transform rotate-[-3deg] transition-transform duration-500 hover:rotate-0">
                     <div className="seal-inner-mark"></div>
                     {/* 拆分文字：上卦 下号 */}
-                    <span className="text-[10px] seal-text opacity-95 scale-90">
+                    <span className="text-[0.625rem] seal-text opacity-95 scale-90">
                         卦
                     </span>
-                    <span className="text-[10px] seal-text writing-vertical tracking-widest block opacity-95 h-12">
+                    <span className="text-[0.625rem] seal-text writing-vertical tracking-widest block opacity-95 h-12">
                         {recordId}
                     </span>
                 </div>
                 {/* 装饰：印泥残留点 */}
-                <div className="absolute -bottom-1 -left-1 w-0.5 h-0.5 bg-[#B23A36] opacity-30 rounded-full blur-[0.5px]"></div>
+                <div className="absolute -bottom-1 -left-1 w-0.5 h-0.5 bg-[#B23A36] opacity-30 rounded-full blur-[0.0313rem]"></div>
             </div>
         </div>
 
@@ -363,7 +363,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                     {displayData.question}
                 </h2>
             </div>
-            <div className="text-[10px] text-[#888] pl-2.5 font-mono flex items-center gap-2">
+            <div className="text-[0.625rem] text-[#888] pl-2.5 font-mono flex items-center gap-2">
                 <Compass className="w-3 h-3 text-[#BA3D38]" />
                 {displayData.date}
             </div>
@@ -376,7 +376,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                 
                 <div className="flex justify-between items-center mb-6 border-b border-[#E0Dcd0]/60 pb-2">
                     <div className="flex flex-col">
-                        <span className="text-[10px] text-[#999] tracking-widest mb-0.5">本卦</span>
+                        <span className="text-[0.625rem] text-[#999] tracking-widest mb-0.5">本卦</span>
                         <div className="flex items-baseline gap-2">
                             <span className="text-2xl font-bold font-kai text-[#1A1A1A]">{displayData.benGua.name}</span>
                             <span className="text-xs text-[#666]">{displayData.benGua.symbol}</span>
@@ -388,7 +388,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                                 <MoveRight className="w-4 h-4 text-[#BA3D38]" />
                             </div>
                             <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-[#999] tracking-widest mb-0.5">变卦</span>
+                                <span className="text-[0.625rem] text-[#999] tracking-widest mb-0.5">变卦</span>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-xs text-[#666]">{displayData.bianGua.symbol}</span>
                                     <span className="text-xl font-song text-[#555]">{displayData.bianGua.name}</span>
@@ -404,13 +404,13 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                     {displayData.lines.length > 0 ? (
                         displayData.lines.slice().reverse().map((line, index) => (
                             <div key={`line-${line.position}-${index}`} className="flex items-center justify-between h-8 relative group">
-                                <div className="w-8 text-[10px] text-[#888] font-song text-left opacity-80 pt-0.5">
+                                <div className="w-8 text-[0.625rem] text-[#888] font-song text-left opacity-80 pt-0.5">
                                     {line.beast || ''}
                                 </div>
-                                <div className="flex-1 mx-2 sm:mx-3 max-w-[140px] relative">
+                                <div className="flex-1 mx-2 sm:mx-3 max-w-[8.75rem] relative">
                                     <YaoLine isYang={line.yinYang === 1} isMoving={line.moving} />
                                     {line.moving && (
-                                        <span className="absolute right-[-14px] top-1/2 transform -translate-y-1/2 text-[#BA3D38] text-xs font-bold leading-none">
+                                        <span className="absolute right-[-0.875rem] top-1/2 transform -translate-y-1/2 text-[#BA3D38] text-xs font-bold leading-none">
                                             {line.yinYang === 1 ? '○' : '✕'}
                                         </span>
                                     )}
@@ -418,7 +418,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                                 <div className="w-20 flex items-center justify-end gap-2">
                                     {line.shiYing && (
                                         <div className={cn(
-                                            "text-[9px] w-4 h-4 rounded-full flex items-center justify-center border shrink-0",
+                                            "text-[0.5625rem] w-4 h-4 rounded-full flex items-center justify-center border shrink-0",
                                             line.shiYing === '世' 
                                                 ? "bg-[#BA3D38] text-white border-[#BA3D38]" 
                                                 : "border-[#BA3D38] text-[#BA3D38] bg-transparent"
@@ -427,10 +427,10 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                                         </div>
                                     )}
                                     <div className="flex flex-col items-end leading-none">
-                                        <span className="text-[11px] text-[#444] font-bold">{line.relative || ''}</span>
-                                        <span className="text-[9px] text-[#999] scale-90 origin-right mt-0.5">{line.najia || ''}</span>
+                                        <span className="text-[0.6875rem] text-[#444] font-bold">{line.relative || ''}</span>
+                                        <span className="text-[0.5625rem] text-[#999] scale-90 origin-right mt-0.5">{line.najia || ''}</span>
                                         {line.fuShen && (
-                                            <span className="text-[8px] text-[#BA3D38] scale-85 origin-right mt-0.5 font-song">
+                                            <span className="text-[0.5rem] text-[#BA3D38] scale-85 origin-right mt-0.5 font-song">
                                                 伏神:{line.fuShen}
                                             </span>
                                         )}
@@ -447,7 +447,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
 
         {/* --- 解卦区域 --- */}
         <div className="px-4 sm:px-6 mt-4 sm:mt-6 flex-1 relative z-10 flex flex-col">
-            <div className="bg-white/50 border border-[#E8E4D8] rounded-lg p-4 sm:p-5 shadow-sm flex-1 backdrop-blur-[2px] relative overflow-hidden">
+            <div className="bg-white/50 border border-[#E8E4D8] rounded-lg p-4 sm:p-5 shadow-sm flex-1 backdrop-blur-[0.125rem] relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-3">
                      <Sparkles className="w-3.5 h-3.5 text-[#BA3D38]" />
                      <span className="text-xs font-bold text-[#555] tracking-[0.2em]">天机预言</span>
@@ -466,7 +466,7 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                         <div className="mt-auto flex justify-center pt-2">
                             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#BA3D38]/5 border border-[#BA3D38]/10">
                                 <ScanLine className="w-3 h-3 text-[#BA3D38]" />
-                                <span className="text-[10px] text-[#BA3D38] tracking-widest opacity-80">
+                                <span className="text-[0.625rem] text-[#BA3D38] tracking-widest opacity-80">
                                     扫码阅览全篇
                                 </span>
                             </div>
@@ -489,14 +489,14 @@ export default function LiuyaoShareCard(props: LiuyaoShareCardProps) {
                     <div className="text-[#BA3D38] font-kai text-sm tracking-wide">
                         知命 · 顺势 · 有为
                     </div>
-                    <p className="text-[10px] text-[#999] font-song leading-relaxed opacity-80">
+                    <p className="text-[0.625rem] text-[#999] font-song leading-relaxed opacity-80">
                         易知 AI 监制<br/>
                         探索你的命运图谱
                     </p>
                 </div>
                 
                 <div className="flex items-end gap-3">
-                    <div className="text-[9px] writing-vertical text-[#999] h-12 leading-none opacity-60 tracking-widest font-song">
+                    <div className="text-[0.5625rem] writing-vertical text-[#999] h-12 leading-none opacity-60 tracking-widest font-song">
                         扫码 · 详批
                     </div>
                     <div className="qr-frame">

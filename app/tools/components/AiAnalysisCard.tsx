@@ -3,12 +3,12 @@
 import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/lib/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/lib/components/ui/dialog";
 import { useToast } from "@/lib/hooks/use-toast";
 import { getCurrentUser } from "@/lib/services/auth";
@@ -21,12 +21,12 @@ import { IconAISparkle } from "../../../lib/components/IconAISparkle";
 export type DivinationType = "bazi" | "liuyao" | "qimen" | "general";
 
 interface AiAnalysisCardProps {
-  aiResult?: string;
+  aiStage: "none" | "preview" | "full";
   isSaved: boolean;
   isAuthor: boolean;
   saving: boolean;
   divinationType?: DivinationType;
-  onStartAnalysis: () => void;
+  onStartAnalysis: (mode: "preview" | "full") => void;
   onSaveToCloud: (showToast?: boolean) => Promise<string | null>;
   onLoginRedirect: () => void;
   onResetIdempotencyKey?: () => void;
@@ -84,7 +84,7 @@ const styles = `
     );
     animation: border-spin 4s linear infinite;
     /* 增加滤镜使光效更柔和 */
-    filter: blur(10px); 
+    filter: blur(0.625rem); 
     opacity: 0.8; 
   }
 
@@ -111,7 +111,7 @@ const styles = `
 `;
 
 export function AiAnalysisCard({
-  aiResult,
+  aiStage,
   isSaved,
   isAuthor,
   saving,
@@ -128,6 +128,9 @@ export function AiAnalysisCard({
   const [showAiCostConfirm, setShowAiCostConfirm] = useState(false);
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [aiBalanceChecking, setAiBalanceChecking] = useState(false);
+  const [aiNotOwnerIntent, setAiNotOwnerIntent] = useState<"preview" | "unlock">(
+    "preview",
+  );
   const [pendingSaveAction, setPendingSaveAction] = useState<
     "ai" | "note" | "title" | null
   >(null);
@@ -146,7 +149,7 @@ export function AiAnalysisCard({
       divination_type: divinationType,
       user_balance: growth?.yiCoins ?? null,
     });
-    if (aiResult) {
+    if (aiStage !== "none") {
       if (isSaved && !isAuthor)
         toast({
           title: "提示",
@@ -161,11 +164,38 @@ export function AiAnalysisCard({
       return;
     }
     if (!isAuthor) {
+      setAiNotOwnerIntent("preview");
+      setShowAiNotOwnerConfirm(true);
+      return;
+    }
+    onStartAnalysis("preview");
+    if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
+  }, [aiStage, isAuthor, isSaved, toast, onLoginRedirect, onScrollToResult, divinationType, onStartAnalysis]);
+
+  const handleUnlockFullClick = useCallback(async () => {
+    const user = await getCurrentUser();
+    if (!user) {
+      onLoginRedirect();
+      return;
+    }
+    const growth = await getUserGrowth().catch(() => null)
+    trackEvent("ai_unlock_click", {
+      source: "result_page",
+      divination_type: divinationType,
+      user_balance: growth?.yiCoins ?? null,
+    });
+    if (!isSaved) {
+      setPendingSaveAction("ai");
+      setShowAiSaveConfirm(true);
+      return;
+    }
+    if (!isAuthor) {
+      setAiNotOwnerIntent("unlock");
       setShowAiNotOwnerConfirm(true);
       return;
     }
     setShowAiCostConfirm(true);
-  }, [aiResult, isAuthor, isSaved, toast, onLoginRedirect, onScrollToResult, divinationType]);
+  }, [divinationType, isAuthor, isSaved, onLoginRedirect]);
 
   const handleConfirmSaveForAi = useCallback(async () => {
     const action = pendingSaveAction;
@@ -188,8 +218,13 @@ export function AiAnalysisCard({
 
   const handleConfirmAiNotOwner = useCallback(() => {
     setShowAiNotOwnerConfirm(false);
+    if (aiNotOwnerIntent === "preview") {
+      onStartAnalysis("preview");
+      if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
+      return;
+    }
     setShowAiCostConfirm(true);
-  }, []);
+  }, [aiNotOwnerIntent, onScrollToResult, onStartAnalysis]);
 
   const handleCancelAiPay = useCallback(() => {
     setShowAiCostConfirm(false);
@@ -257,12 +292,13 @@ export function AiAnalysisCard({
         user_balance: balance,
         divination_type: divinationType,
       });
-      onStartAnalysis();
+      if (onResetIdempotencyKey) onResetIdempotencyKey();
+      onStartAnalysis("full");
       if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
     } finally {
       setAiBalanceChecking(false);
     }
-  }, [isSaved, onLoginRedirect, onStartAnalysis, onScrollToResult, toast, divinationType]);
+  }, [isSaved, onLoginRedirect, onResetIdempotencyKey, onScrollToResult, toast, divinationType, onStartAnalysis]);
 
   const handleConfirmReanalyze = useCallback(() => {
     setShowReanalyzeConfirm(false);
@@ -272,7 +308,7 @@ export function AiAnalysisCard({
       is_reanalyze: true,
       divination_type: divinationType,
     });
-    onStartAnalysis();
+    onStartAnalysis("full");
     if (onScrollToResult) setTimeout(() => onScrollToResult(), 100);
   }, [onResetIdempotencyKey, onStartAnalysis, onScrollToResult, divinationType]);
 
@@ -290,15 +326,15 @@ export function AiAnalysisCard({
         {/* 这个 div 旋转产生流光效果 */}
         <div className="animate-border-spin z-0" />
 
-        {/* 2. 背景遮罩层 (inset-[1.5px] 露出边框) */}
+        {/* 2. 背景遮罩层 (inset-[0.0938rem] 露出边框) */}
         {/* 使用深色渐变背景，遮住中间的流光，只留下边缘 */}
-        <div className="absolute inset-[1.5px] rounded-[10px] bg-gradient-to-br from-[#121212] via-[#1a1a1a] to-[#2b0a0a] z-10" />
+        <div className="absolute inset-[0.0938rem] rounded-[0.625rem] bg-gradient-to-br from-[#121212] via-[#1a1a1a] to-[#2b0a0a] z-10" />
 
         {/* 3. 内容层 (位于最上层) */}
         <div className="relative z-20 p-6 h-full flex flex-col">
           {/* 内部纹理装饰 */}
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none rounded-[10px]" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#C82E31] rounded-full blur-[60px] opacity-20 group-hover:opacity-40 transition-opacity anim-glow-soft" />
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none rounded-[0.625rem]" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#C82E31] rounded-full blur-[3.75rem] opacity-20 group-hover:opacity-40 transition-opacity anim-glow-soft" />
 
           {/* 头部：图标与标题 */}
           <div className="flex items-start justify-between mb-5 relative">
@@ -310,7 +346,7 @@ export function AiAnalysisCard({
                 <h3 className="text-white font-serif font-bold text-xl tracking-wide leading-none mb-1.5">
                   {copy.title}
                 </h3>
-                <p className="text-[10px] text-white/50 font-mono tracking-wider uppercase bg-white/5 px-2 py-0.5 rounded inline-block">
+                <p className="text-[0.625rem] text-white/50 font-mono tracking-wider uppercase bg-white/5 px-2 py-0.5 rounded inline-block">
                   {copy.subtitle}
                 </p>
               </div>
@@ -328,19 +364,29 @@ export function AiAnalysisCard({
 
           {/* 按钮 */}
           <Button
-            onClick={aiResult ? handleReanalyzeClick : handleAiAnalyzeClick}
+            onClick={
+              aiStage === "full"
+                ? handleReanalyzeClick
+                : aiStage === "preview"
+                  ? handleUnlockFullClick
+                  : handleAiAnalyzeClick
+            }
             className="w-full relative overflow-hidden bg-white hover:bg-stone-100 text-[#1c1917] border-none font-bold shadow-[0_0_15px_rgba(255,255,255,0.15)] h-10 text-xs tracking-wide group/btn transition-all active:scale-95"
           >
             {/* 按钮内部流光 */}
             <div className="anim-btn-shimmer opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300" />
 
             <div className="relative flex items-center justify-center gap-2 z-10">
-              {aiResult ? (
+              {aiStage === "full" ? (
                 <RotateCcwIcon />
               ) : (
                 <IconAISparkle className="w-8 h-8 text-[#C82E31]" />
               )}
-              {aiResult ? "重新推演 (50易币)" : "开始智能推演"}
+              {aiStage === "full"
+                ? "重新推演 (50易币)"
+                : aiStage === "preview"
+                  ? "解锁完整内容 (50易币)"
+                  : "开始智能推演"}
             </div>
           </Button>
         </div>
@@ -408,13 +454,13 @@ export function AiAnalysisCard({
             <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-4">
               <Zap className="w-6 h-6 text-orange-500 fill-current" />
             </div>
-            <DialogTitle className="mb-2">确认 AI 分析</DialogTitle>
+            <DialogTitle className="mb-2">解锁完整内容</DialogTitle>
             <DialogDescription>
               本次操作将扣除{" "}
               <span className="font-bold text-[#C82E31] text-base">50</span>{" "}
               易币
               <br />
-              用于调用大模型进行深度推理。
+              以查看完整 AI 分析内容。
             </DialogDescription>
           </div>
           <DialogFooter className="mt-4 sm:justify-center">

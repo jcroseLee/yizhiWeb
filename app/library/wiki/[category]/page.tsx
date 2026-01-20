@@ -140,7 +140,7 @@ export default async function WikiCategoryPage(
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator />
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage className="font-bold text-stone-800 font-serif truncate max-w-[200px]">
+                                    <BreadcrumbPage className="font-bold text-stone-800 font-serif truncate max-w-[12.5rem]">
                                         {article.title}
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>

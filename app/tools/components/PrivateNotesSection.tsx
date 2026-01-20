@@ -272,7 +272,7 @@ export const PrivateNotesSection = forwardRef<PrivateNotesSectionRef, PrivateNot
         <h4 className="font-serif font-bold text-stone-800 text-base lg:text-lg tracking-wide">
           私密笔记
         </h4>
-        <span className="text-[10px] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
+        <span className="text-[0.625rem] sm:text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
           仅自己可见
         </span>
       </div>
@@ -295,7 +295,7 @@ export const PrivateNotesSection = forwardRef<PrivateNotesSectionRef, PrivateNot
                     <Textarea
                       value={editNoteContent}
                       onChange={(e) => setEditNoteContent(e.target.value)}
-                      className="min-h-[80px] bg-white"
+                      className="min-h-[5rem] bg-white"
                     />
                     <div className="flex justify-end gap-2">
                       <Button
@@ -364,7 +364,7 @@ export const PrivateNotesSection = forwardRef<PrivateNotesSectionRef, PrivateNot
         <div className="space-y-2 pt-2 border-t border-stone-100">
           <Textarea
             placeholder="写下新的笔记..."
-            className="min-h-[80px] bg-white border-stone-200 resize-none focus:border-[#C82E31]/30 transition-colors font-serif text-stone-700"
+            className="min-h-[5rem] bg-white border-stone-200 resize-none focus:border-[#C82E31]/30 transition-colors font-serif text-stone-700"
             value={newNoteContent}
             onChange={(e) => setNewNoteContent(e.target.value)}
           />

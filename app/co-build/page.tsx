@@ -32,30 +32,30 @@ const styles = `
   }
   .ink-blob {
     animation: ink-breathe 10s infinite ease-in-out;
-    filter: blur(80px);
+    filter: blur(5rem);
     mix-blend-mode: multiply;
   }
 
   /* 3. 玻璃态卡片 */
   .glass-card {
     background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    backdrop-filter: blur(0.75rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.02);
     transition: all 0.3s ease;
   }
   .glass-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-0.25rem);
     background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 0.75rem 1.5rem -0.5rem rgba(0, 0, 0, 0.08);
     border-color: rgba(200, 46, 49, 0.1);
   }
 
   /* 4. 暗黑权益卡片 */
   .dark-glass-card {
     background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border: 0.0625rem solid rgba(255, 255, 255, 0.05);
     transition: all 0.3s ease;
   }
   .dark-glass-card:hover {
@@ -85,7 +85,7 @@ const styles = `
 
   /* 6. 入场动画 */
   @keyframes fade-up {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(1.25rem); }
     to { opacity: 1; transform: translateY(0); }
   }
   .animate-fade-up {
@@ -97,8 +97,8 @@ const styles = `
 // --- 组件：水墨背景 ---
 const InkBackground = () => (
   <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-    <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-stone-200/50 rounded-full ink-blob" />
-    <div className="absolute top-[10%] right-[10%] w-[400px] h-[400px] bg-red-50/60 rounded-full ink-blob" style={{ animationDelay: '-2s' }} />
+    <div className="absolute top-[-10%] left-[20%] w-[37.5rem] h-[37.5rem] bg-stone-200/50 rounded-full ink-blob" />
+    <div className="absolute top-[10%] right-[10%] w-[25rem] h-[25rem] bg-red-50/60 rounded-full ink-blob" style={{ animationDelay: '-2s' }} />
   </div>
 )
 
@@ -242,7 +242,7 @@ export default function CoBuildPlanPage() {
         <section className="mt-20 py-24 bg-[#1c1917] relative overflow-hidden text-white">
             {/* 装饰背景 */}
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#C82E31]/20 rounded-full blur-[100px] opacity-30" />
+            <div className="absolute top-0 right-0 w-[31.25rem] h-[31.25rem] bg-[#C82E31]/20 rounded-full blur-[6.25rem] opacity-30" />
 
             <div className="max-w-6xl mx-auto px-6 relative z-10">
                 <div className="text-center mb-16">

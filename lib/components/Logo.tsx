@@ -2,18 +2,23 @@ interface LogoProps {
   className?: string
   width?: number | string
   height?: number | string
+  variant?: 'full' | 'icon'
 }
 
 export default function Logo({ 
   className = 'block',
-  width = 180,
-  height = 40
+  width,
+  height,
+  variant = 'full'
 }: LogoProps) {
+  const resolvedWidth = width ?? (variant === 'icon' ? 40 : 180)
+  const resolvedHeight = height ?? 40
+
   return (
     <svg 
-      width={width} 
-      height={height} 
-      viewBox="0 0 180 40" 
+      width={resolvedWidth} 
+      height={resolvedHeight} 
+      viewBox={variant === 'icon' ? "0 0 42 40" : "0 0 180 40"} 
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-label="易知 YiZhi Logo"
@@ -51,46 +56,48 @@ export default function Logo({
       </g>
 
       {/* 文字部分 */}
-      <g transform="translate(52, 0)">
-        {/* 中文：易知 - 具有金石刻印感的定制字形结构 */}
-        <text 
-          x="0" 
-          y="30" 
-          fontFamily="'Noto Serif SC', 'Songti SC', serif" 
-          fontWeight="900" 
-          fontSize="28" 
-          fill="#1c1917" 
-          letterSpacing="2"
-        >
-          易知
-        </text>
-        
-        {/* 英文：YIZHI AI - 极简现代科技感 */}
-        <text 
-          x="68" 
-          y="18" 
-          fontFamily="system-ui, -apple-system, sans-serif" 
-          fontWeight="600" 
-          fontSize="9" 
-          fill="#C82E31" 
-          letterSpacing="1"
-          opacity="0.8"
-        >
-          AI
-        </text>
-        <text 
-          x="68" 
-          y="29" 
-          fontFamily="system-ui, -apple-system, sans-serif" 
-          fontWeight="500" 
-          fontSize="9" 
-          fill="#1c1917" 
-          letterSpacing="1"
-          opacity="0.4"
-        >
-          YIZHI
-        </text>
-      </g>
+      {variant === 'full' && (
+        <g transform="translate(52, 0)">
+          {/* 中文：易知 - 具有金石刻印感的定制字形结构 */}
+          <text 
+            x="0" 
+            y="30" 
+            fontFamily="'Noto Serif SC', 'Songti SC', serif" 
+            fontWeight="900" 
+            fontSize="28" 
+            fill="#1c1917" 
+            letterSpacing="2"
+          >
+            易知
+          </text>
+          
+          {/* 英文：YIZHI AI - 极简现代科技感 */}
+          <text 
+            x="68" 
+            y="18" 
+            fontFamily="system-ui, -apple-system, sans-serif" 
+            fontWeight="600" 
+            fontSize="9" 
+            fill="#C82E31" 
+            letterSpacing="1"
+            opacity="0.8"
+          >
+            AI
+          </text>
+          <text 
+            x="68" 
+            y="29" 
+            fontFamily="system-ui, -apple-system, sans-serif" 
+            fontWeight="500" 
+            fontSize="9" 
+            fill="#1c1917" 
+            letterSpacing="1"
+            opacity="0.4"
+          >
+            YIZHI
+          </text>
+        </g>
+      )}
     </svg>
   )
 }

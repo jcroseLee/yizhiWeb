@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "登录 - 易经摇卦",
+  title: "登录 - 易知",
   description: "登录您的账户，继续探索易学智慧",
 };
 

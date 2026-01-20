@@ -6,11 +6,11 @@ import TagPanel from '@/lib/components/TagPanel'
 import { Button } from '@/lib/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/lib/components/ui/card'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
@@ -21,22 +21,22 @@ import { getCurrentUser } from '@/lib/services/auth'
 import { createPost, getPost, getPostTags, publishDraft, saveDraft, setPostTags, updateDraft, updatePost, uploadPostCover, type DivinationMethodType, type Tag } from '@/lib/services/community'
 import { getDivinationRecordById, getUserDivinationRecords, type DivinationRecord as ProfileDivinationRecord } from '@/lib/services/profile'
 import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    CircleDashed,
-    Coins,
-    FileText,
-    History,
-    Image as ImageIcon,
-    LayoutGrid,
-    Loader2,
-    PenTool,
-    Save,
-    ScrollText,
-    Send,
-    Sparkles,
-    X
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  CircleDashed,
+  Coins,
+  FileText,
+  History,
+  Image as ImageIcon,
+  LayoutGrid,
+  Loader2,
+  PenTool,
+  Save,
+  ScrollText,
+  Send,
+  Sparkles,
+  X
 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -57,9 +57,9 @@ const styles = `
     outline: none;
   }
   
-  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar { width: 0.375rem; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 20px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 1.25rem; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #d6d3d1; }
 
   /* 核心修复：强制编辑器高度自适应（写文章模式） */
@@ -73,18 +73,18 @@ const styles = `
   /* 移动端工具栏调整 */
   .rich-text-content > div:first-child {
     position: sticky !important;
-    top: 56px !important; /* 移动端 Navbar 高度通常稍小 */
+    top: 3.5rem !important; /* 移动端 Navbar 高度通常稍小 */
     z-index: 30 !important;
     background-color: rgba(255, 255, 255, 0.98) !important;
-    border-bottom: 1px solid #e7e5e4 !important;
+    border-bottom: 0.0625rem solid #e7e5e4 !important;
     margin: 0 !important;
-    padding: 8px 4px !important;
+    padding: 0.5rem 0.25rem !important;
     overflow-x: auto !important; /* 允许工具栏横向滚动 */
   }
   
-  @media (min-width: 1024px) {
+  @media (min-width: 64rem) {
     .rich-text-content > div:first-child {
-      top: 64px !important;
+      top: 4rem !important;
     }
   }
 
@@ -100,7 +100,7 @@ const styles = `
     height: auto !important; 
     overflow: visible !important;
     outline: none !important;
-    padding-bottom: 200px !important;
+    padding-bottom: 12.5rem !important;
   }
   
   .rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
@@ -175,9 +175,9 @@ const RecordCard = ({ data, onClick, isSelected = false, compact = false }: { da
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${isSelected ? 'bg-[#C82E31] text-white border-[#C82E31]' : 'bg-stone-100 text-stone-500 border-stone-200 group-hover:border-red-200 group-hover:text-red-600 group-hover:bg-red-50'}`}>{data.gua}</span>
-            <span className="text-[10px] text-stone-400 font-mono">{data.date}</span>
+            <span className="text-[0.625rem] text-stone-400 font-mono">{data.date}</span>
           </div>
-          <h4 className={`font-serif font-bold truncate ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
+          <h4 className={`font-serif font-bold break-words whitespace-normal ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
           <div className="mt-2 flex items-center text-xs text-stone-400 gap-2">
             <span className="flex items-center gap-1"><ScrollText className="w-3 h-3" /> {data.gua}</span>
           </div>
@@ -323,7 +323,6 @@ function PublishPageContent() {
                 .replace(/\*\*问题[^*]*\*\*/g, '')
                 .replace(/关联排盘[:：][^\n]*/g, '')
                 .replace(/问题[:：][^\n]*/g, '')
-                .trim()
               setBackgroundDesc(cleanedContent || '')
             } else {
               setActiveTab('article')
@@ -396,17 +395,19 @@ function PublishPageContent() {
     
     try {
       setIsSubmitting(true)
-      let content = backgroundDesc
       if (activeTab === 'divination' && selectedRecord) {
-        const guaInfo = selectedRecord.record.question 
-          ? `**关联排盘：${selectedRecord.gua}**\n**问题：${selectedRecord.record.question}**\n\n${backgroundDesc}`
-          : `**关联排盘：${selectedRecord.gua}**\n\n${backgroundDesc}`
-        content = guaInfo
+        const record = await getDivinationRecordById(selectedRecord.record.id, true)
+        if (!record) {
+          toast({ title: '排盘记录不存在', description: '该排盘可能未保存或已删除，请重新选择', variant: 'destructive' })
+          setSelectedRecord(null)
+          return
+        }
       }
+      const content = backgroundDesc
       
       const postData = {
-        title: title.trim(),
-        content: content.trim(),
+        title,
+        content,
         type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
         bounty: bounty > 0 ? bounty : 0,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
@@ -460,17 +461,19 @@ function PublishPageContent() {
     
     try {
       setIsSavingDraft(true)
-      let content = backgroundDesc
       if (activeTab === 'divination' && selectedRecord) {
-        const guaInfo = selectedRecord.record.question 
-          ? `**关联排盘：${selectedRecord.gua}**\n**问题：${selectedRecord.record.question}**\n\n${backgroundDesc}`
-          : `**关联排盘：${selectedRecord.gua}**\n\n${backgroundDesc}`
-        content = guaInfo
+        const record = await getDivinationRecordById(selectedRecord.record.id, true)
+        if (!record) {
+          toast({ title: '排盘记录不存在', description: '该排盘可能未保存或已删除，请重新选择', variant: 'destructive' })
+          setSelectedRecord(null)
+          return
+        }
       }
+      const content = backgroundDesc
       
       const draftData = {
-        title: title.trim() || '未命名草稿',
-        content: content.trim() || '',
+        title: title || '未命名草稿',
+        content: content || '',
         type: (activeTab === 'divination' ? 'help' : 'theory') as 'help' | 'theory' | 'debate' | 'chat',
         bounty: bounty > 0 ? bounty : 0,
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
@@ -517,7 +520,7 @@ function PublishPageContent() {
               >
                 <ArrowLeft className="h-5 w-5 text-stone-600" />
               </Button>
-              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[120px] lg:max-w-none">
+              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[7.5rem] lg:max-w-none">
                 {isEditMode ? '编辑帖子' : '发布内容'}
               </h1>
             </div>
@@ -658,7 +661,7 @@ function PublishPageContent() {
                         )}
                       </div>
                       
-                      <div className="space-y-3 flex-1 flex flex-col min-h-[300px]">
+                      <div className="space-y-3 flex-1 flex flex-col min-h-[18.75rem]">
                         <Label className="text-sm font-bold text-stone-700 flex items-center gap-2">
                           <FileText className="w-4 h-4 text-stone-400" />{" "}
                           背景详情
@@ -668,7 +671,7 @@ function PublishPageContent() {
                             content={backgroundDesc}
                             onChange={(content) => setBackgroundDesc(content)}
                             placeholder="请详细描述事情起因、现状以及您最担心的点..."
-                            className="w-full h-full flex-1 border-none min-h-[200px]"
+                            className="w-full h-full flex-1 border-none min-h-[12.5rem]"
                           />
                         </div>
                       </div>
@@ -683,7 +686,7 @@ function PublishPageContent() {
                               </div>
                               <div>
                                 <div className="text-xs lg:text-sm font-bold text-stone-800">悬赏易币</div>
-                                <div className="text-[10px] lg:text-xs text-stone-500 hidden sm:block">
+                                <div className="text-[0.625rem] lg:text-xs text-stone-500 hidden sm:block">
                                   {bounty > 0 ? "提高悬赏可加快回复速度" : "设置悬赏吸引更多大师解卦"}
                                 </div>
                               </div>
@@ -753,7 +756,7 @@ function PublishPageContent() {
                                   alt="文章封面"
                                   fill
                                   className="object-cover group-hover:opacity-90 transition-opacity pointer-events-none"
-                                  sizes="(max-width: 768px) 100vw, 100%"
+                                  sizes="(max-width: 48rem) 100vw, 100%"
                                 />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
                                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-white text-sm font-medium">
@@ -901,7 +904,7 @@ function PublishPageContent() {
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[60vh] lg:max-h-[500px] overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-3 lg:p-4 min-h-[300px]">
+            <div className="max-h-[60vh] lg:max-h-[31.25rem] overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-3 lg:p-4 min-h-[18.75rem]">
               {loadingRecords ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[#C82E31]" />

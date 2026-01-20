@@ -1,11 +1,11 @@
 'use client'
 
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from '@/lib/components/ui/dialog'
 import { getCurrentUser } from '@/lib/services/auth'
 import { getSupabaseClient } from '@/lib/services/supabaseClient'
@@ -24,28 +24,28 @@ import Underline from '@tiptap/extension-underline'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  Bold,
-  ChevronDown,
-  Code as CodeIcon,
-  Heading1,
-  Image as ImageIcon,
-  Italic,
-  Link as LinkIcon,
-  List,
-  ListOrdered,
-  Loader2,
-  Plus,
-  Redo,
-  Strikethrough,
-  Underline as UnderlineIcon,
-  Undo,
-  Upload,
-  X,
+    AlignCenter,
+    AlignLeft,
+    AlignRight,
+    Bold,
+    ChevronDown,
+    Code as CodeIcon,
+    Heading1,
+    Image as ImageIcon,
+    Italic,
+    Link as LinkIcon,
+    List,
+    ListOrdered,
+    Loader2,
+    Plus,
+    Redo,
+    Strikethrough,
+    Underline as UnderlineIcon,
+    Undo,
+    Upload,
+    X,
 } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface RichTextEditorProps {
   content: string
@@ -122,6 +122,18 @@ export default function RichTextEditor({
     },
     immediatelyRender: false,
   })
+
+  const lastAppliedExternalContentRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!editor) return
+    const nextContent = content ?? ''
+    const currentContent = editor.getHTML()
+    if (nextContent === currentContent) return
+    if (lastAppliedExternalContentRef.current === nextContent) return
+    lastAppliedExternalContentRef.current = nextContent
+    editor.commands.setContent(nextContent, { emitUpdate: false })
+  }, [content, editor])
 
   // 显示输入对话框的辅助函数
   const showPrompt = useCallback((title: string, defaultValue: string = '', callback: (value: string | null) => void) => {
@@ -796,4 +808,3 @@ export default function RichTextEditor({
     </div>
   )
 }
-

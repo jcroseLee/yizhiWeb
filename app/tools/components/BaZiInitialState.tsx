@@ -28,26 +28,26 @@ const initialStateStyles = `
 
 /* 3. 灵柱呼吸悬浮 */
 @keyframes pillar-float {
-  0%, 100% { transform: translateY(0); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1); }
-  50% { transform: translateY(-10px); box-shadow: 0 20px 40px -10px rgba(200, 46, 49, 0.15); }
+  0%, 100% { transform: translateY(0); box-shadow: 0 0.625rem 1.875rem -0.625rem rgba(0,0,0,0.1); }
+  50% { transform: translateY(-0.625rem); box-shadow: 0 1.25rem 2.5rem -0.625rem rgba(200, 46, 49, 0.15); }
 }
 .spirit-pillar {
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(0.75rem);
   background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
-  border: 1px solid rgba(255,255,255,0.5);
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
+  border: 0.0625rem solid rgba(255,255,255,0.5);
+  box-shadow: 0 0.625rem 1.875rem -0.625rem rgba(0,0,0,0.1);
   transition: all 0.5s ease;
 }
 .spirit-pillar:hover {
   background: linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 100%);
   border-color: rgba(200, 46, 49, 0.3);
-  box-shadow: 0 0 30px rgba(200, 46, 49, 0.2);
+  box-shadow: 0 0 1.875rem rgba(200, 46, 49, 0.2);
 }
 
 /* 4. 底部聚光灯 */
 .pillar-spotlight {
   background: radial-gradient(ellipse at center, rgba(200, 46, 49, 0.15) 0%, transparent 70%);
-  filter: blur(20px);
+  filter: blur(1.25rem);
   opacity: 0.5;
   animation: pulse-opacity 4s infinite;
 }
@@ -129,7 +129,7 @@ export function BaZiInitialState() {
                 </div>
 
                 {/* 底部标签 */}
-                <div className="z-10 text-[10px] text-stone-400 uppercase tracking-widest font-sans transform -rotate-90 origin-bottom translate-y-6">
+                <div className="z-10 text-[0.625rem] text-stone-400 uppercase tracking-widest font-sans transform -rotate-90 origin-bottom translate-y-6">
                   {pillar.sub}
                 </div>
               </div>

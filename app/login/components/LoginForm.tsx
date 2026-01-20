@@ -1,13 +1,14 @@
 'use client'
 
+import { AlipayIcon, FacebookIcon, GoogleIcon, InstagramIcon, WeChatIcon, XIcon } from '@/lib/components/icons/SocialIcons'
 import { Button } from '@/lib/components/ui/button'
-import { Checkbox } from '@/lib/components/ui/checkbox'
 import { Input } from '@/lib/components/ui/input'
-import { Label } from '@/lib/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 import { getCurrentUser } from '@/lib/services/auth'
 import { syncProfileFromAuthUser } from '@/lib/services/profile'
 import { createClient } from '@/lib/supabase/client'
-import { Github } from 'lucide-react'
+import type { Session, User } from '@supabase/supabase-js'
+import { Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -16,378 +17,549 @@ interface LoginFormProps {
   onSwitchToRegister?: () => void
 }
 
+type AuthProvider = 'google' | 'github' | 'twitter' | 'facebook' | 'notion' | 'linkedin' | 'alipay' | 'wechat' | 'instagram'
+
 export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
+  
+  // Tab states
+  const [loginMethod, setLoginMethod] = useState<'code' | 'password'>('code')
+  // Inputs
+  const [phone, setPhone] = useState('')
+  const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  
+  // UI states
+  const [countdown, setCountdown] = useState(0)
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resetRequired, setResetRequired] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
+  const [pendingAuthData, setPendingAuthData] = useState<{ user: User | null; session: Session | null } | null>(null)
+  const [pendingSupabase, setPendingSupabase] = useState<ReturnType<typeof createClient> | null>(null)
 
-  // 检查是否已登录，如果已登录则重定向
+  const isInvalidCredentialsError = (err: unknown) => {
+    const message = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+    return message.includes('Invalid login credentials')
+  }
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
   useEffect(() => {
     const checkAuth = async () => {
       const user = await getCurrentUser()
       if (user) {
         const redirect = searchParams.get('redirect') || '/'
-        // 使用 window.location 确保完全刷新，让所有状态正确初始化
         window.location.href = redirect
       }
     }
     checkAuth()
   }, [router, searchParams])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const err = searchParams.get('error')
+    if (!err) return
+    const map: Record<string, string> = {
+      alipay_not_configured: '支付宝登录暂不可用，请稍后重试',
+      insecure_base_url: '当前环境回调地址不安全，请使用HTTPS访问',
+      alipay_invalid_callback: '支付宝登录回调参数异常，请重试',
+      alipay_csrf: '登录状态校验失败，请重试',
+      alipay_token_exchange_failed: '支付宝授权失败，请重试',
+      alipay_token_invalid: '支付宝授权信息无效，请重试',
+      alipay_login_failed: '支付宝登录失败，请稍后重试',
+      supabase_not_configured: '认证服务未配置',
+      supabase_link_failed: '登录初始化失败，请重试',
+      supabase_session_failed: '登录会话建立失败，请重试',
+      too_many_attempts: '登录异常次数过多，请稍后再试',
+    }
+    setError(map[err] || '登录失败，请稍后重试')
+  }, [searchParams])
+
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [countdown])
+
+  const formatE164 = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    const digits = trimmed.replace(/\D/g, '')
+    if (digits.length === 13 && digits.startsWith('86')) {
+      return `+${digits}`
+    }
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `+86${digits}`
+    }
+    return ''
+  }
+
+  const getPhoneCandidates = (value: string) => {
+    const digits = value.replace(/\D/g, '')
+    const local = digits.length === 11 ? digits : digits.length === 13 && digits.startsWith('86') ? digits.slice(2) : ''
+    const candidates = new Set<string>()
+    if (value) candidates.add(value)
+    if (local) candidates.add(local)
+    if (digits) candidates.add(digits)
+    if (local) candidates.add(`86${local}`)
+    return Array.from(candidates)
+  }
+
+  const signInWithPasswordForPhone = async (
+    supabase: NonNullable<ReturnType<typeof createClient>>,
+    phoneE164: string,
+    passwordToUse: string
+  ) => {
+    const candidates = getPhoneCandidates(phoneE164)
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      for (const candidate of candidates) {
+        const response = await supabase.auth.signInWithPassword({
+          phone: candidate,
+          password: passwordToUse,
+        })
+        const signInData = response.data as { user: User | null; session: Session | null }
+        const signInError = response.error as Error | null
+        if (!signInError) {
+          return { data: signInData, error: null as Error | null }
+        }
+        lastError = signInError
+        if (!isInvalidCredentialsError(signInError)) {
+          return { data: null as { user: User | null; session: Session | null } | null, error: signInError }
+        }
+      }
+
+      if (lastError && isInvalidCredentialsError(lastError) && attempt < 3) {
+        await sleep(250 * (attempt + 1))
+        continue
+      }
+      break
+    }
+
+    return { data: null as { user: User | null; session: Session | null } | null, error: lastError }
+  }
+
+  const handleSendCode = async () => {
+    setError('')
+    if (!phone) {
+      setError('请输入手机号')
+      return
+    }
+
+    const fullPhone = formatE164(phone)
+    if (!/^\+\d{6,15}$/.test(fullPhone)) {
+      setError('请输入有效的手机号')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch('/api/sms/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: fullPhone }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || '发送验证码失败，请稍后重试')
+      } else {
+        setCountdown(60)
+      }
+    } catch (err) {
+      console.error('Send code error:', err)
+      setError('发送验证码失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    // 基本验证
-    if (!email.trim()) {
-      setError('请输入邮箱地址')
+    const supabase = createClient()
+    if (!supabase) {
+      setError('认证服务未配置')
       setLoading(false)
       return
     }
 
-    if (!password) {
-      setError('请输入密码')
-      setLoading(false)
-      return
-    }
-
-    // 邮箱格式验证
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email.trim())) {
-      setError('请输入有效的邮箱地址')
-      setLoading(false)
-      return
-    }
+    let authData
+    let authError
 
     try {
-      const supabase = createClient()
-      if (!supabase) {
-        setError('认证服务未配置，请联系管理员')
-        setLoading(false)
-        return
-      }
-
-      // 规范化邮箱地址（去除空格并转为小写）
-      const normalizedEmail = email.trim().toLowerCase()
-      
-      // 调试信息：记录使用的邮箱（不记录密码）
-      console.log('🔵 Attempting login with email:', normalizedEmail)
-      
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      })
-
-      if (signInError) {
-        // 记录详细错误信息用于调试
-        const errorDetails = {
-          message: signInError.message,
-          status: signInError.status,
-          name: signInError.name,
-          email: normalizedEmail,
+      if (loginMethod === 'code') {
+        if (!phone || !code) {
+          throw new Error('请填写完整信息')
         }
-        console.error('🔴 Login error details:', errorDetails)
 
-        // 提供更友好的错误提示
-        let errorMessage = '登录失败，请检查邮箱和密码'
-        const errorMsg = signInError.message.toLowerCase()
-        
-        // 根据错误状态码和消息提供更具体的错误提示
-        if (signInError.status === 400) {
-          if (errorMsg.includes('invalid login credentials') || 
-              errorMsg.includes('invalid_credentials') ||
-              errorMsg.includes('invalid_grant')) {
-            // "Invalid login credentials" 可能表示：
-            // 1. 用户不存在
-            // 2. 密码错误
-            // 3. 邮箱未验证（如果启用了邮箱验证）
-            // 
-            // 注意：Supabase 出于安全考虑，不会明确区分这些情况
-            errorMessage = '邮箱或密码错误。请检查：\n\n• 邮箱地址是否正确（注意大小写和空格）\n• 密码是否正确（注意大小写）\n• 该邮箱是否已注册\n• 如果已注册，请检查邮箱是否已验证'
-          } else if (errorMsg.includes('email not confirmed') ||
-                     errorMsg.includes('email_not_confirmed')) {
-            errorMessage = '请先验证您的邮箱。\n\n我们已向您的邮箱发送了验证链接，请：\n1. 查收您的邮箱（包括垃圾邮件文件夹）\n2. 点击验证链接完成邮箱验证\n3. 验证后再尝试登录'
-          } else if (errorMsg.includes('user not found')) {
-            errorMessage = '该邮箱未注册，请先注册账户'
-          } else if (errorMsg.includes('invalid email')) {
-            errorMessage = '邮箱格式不正确，请检查后重试。邮箱格式应为：username@domain.com'
-          } else if (errorMsg.includes('password')) {
-            errorMessage = '密码错误，请检查后重试。如果忘记密码，可以使用"忘记密码"功能重置。'
-          } else {
-            errorMessage = `登录失败：${signInError.message || '请检查邮箱和密码'}`
-          }
-        } else if (signInError.status === 429) {
-          errorMessage = '登录尝试次数过多，为了保护您的账户安全，请等待几分钟后再试。'
-        } else if (signInError.status === 500 || signInError.status === 502 || signInError.status === 503) {
-          errorMessage = '服务器暂时不可用，请稍后重试。如果问题持续存在，请联系技术支持。'
-        } else if (signInError.status === 0) {
-          errorMessage = '网络连接错误，请检查您的网络连接后重试。'
-        } else {
-          errorMessage = signInError.message || errorMessage
+        const fullPhone = formatE164(phone)
+        if (!/^\+\d{6,15}$/.test(fullPhone)) {
+          throw new Error('请输入有效的手机号')
         }
-        
-        setError(errorMessage)
-        setLoading(false)
-        return
-      }
 
-      if (data?.user) {
-        try {
-          await syncProfileFromAuthUser(
-            { user: data.user, defaultNickname: data.user.email?.split('@')[0] || '用户', role: 'user' },
-            supabase
+        const loginResponse = await fetch('/api/sms/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ phone: fullPhone, code }),
+        })
+
+        const loginData = await loginResponse.json()
+
+        if (!loginResponse.ok) {
+          throw new Error(loginData.error || '登录失败')
+        }
+
+        if (loginData.tempPassword) {
+          const { data: signInData, error: signInError } = await signInWithPasswordForPhone(
+            supabase,
+            fullPhone,
+            loginData.tempPassword
           )
-        } catch (err) {
-          console.warn('Error ensuring profile:', err)
-          // 不阻止登录流程
+
+          if (signInError) throw signInError
+          if (!signInData) throw new Error('登录失败，请重试')
+
+          if (loginData.requiresPasswordReset) {
+            setPendingAuthData(signInData)
+            setPendingSupabase(supabase)
+            setResetRequired(true)
+            setLoading(false)
+            return
+          }
+
+          authData = signInData
+          authError = null
+        } else {
+          throw new Error('登录失败，未返回会话信息')
         }
 
-        // 等待 session 完全建立（给 Supabase 时间保存 session 到 storage）
-        await new Promise(resolve => setTimeout(resolve, 200))
-
-        // 再次确认 session 存在
-        const { data: { session: finalSession } } = await supabase.auth.getSession()
-        if (!finalSession) {
-          setError('登录状态未正确建立，请重试')
-          setLoading(false)
-          return
+      } else {
+        // 密码登录 (账号+密码)
+        // 自动判断是手机号还是邮箱 (简单判断：含@为邮箱，数字为手机)
+        const normalizedAccount = account.trim()
+        const isEmailInput = normalizedAccount.includes('@')
+        const normalizedEmail = normalizedAccount.toLowerCase()
+        const normalizedPhone = formatE164(normalizedAccount)
+        
+        if (!normalizedAccount || !password) {
+          throw new Error('请填写完整信息')
+        }
+        if (!isEmailInput && !/^\+\d{6,15}$/.test(normalizedPhone)) {
+          throw new Error('请输入有效的手机号')
         }
 
-        // 登录成功，跳转到指定页面或首页
-        const redirect = searchParams.get('redirect') || '/'
-        // 使用 window.location 确保完全刷新页面，让中间件能正确识别 session
-        // 这样可以确保所有状态（包括 cookie）都正确设置
-        window.location.href = redirect
+        let data: { user: User | null; session: Session | null } | null = null
+        let error: Error | null = null
+        if (isEmailInput) {
+          const response = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
+          })
+          data = response.data as { user: User | null; session: Session | null }
+          error = response.error as Error | null
+        } else {
+          const result = await signInWithPasswordForPhone(supabase, normalizedPhone, password)
+          data = result.data
+          error = result.error
+        }
+        authData = data
+        authError = error
       }
+
+      if (authError) throw authError
+      await handleLoginSuccess(authData, supabase)
+
     } catch (err) {
-      console.error('Unexpected login error:', err)
-      const errorMessage = err instanceof Error 
-        ? `登录失败：${err.message}` 
-        : '登录失败，请稍后重试'
-      setError(errorMessage)
+      const rawMessage = err instanceof Error ? err.message : '登录失败，请检查输入'
+      if (!isInvalidCredentialsError(err)) {
+        console.error('Login error:', err)
+      }
+      if (loginMethod === 'code' && isInvalidCredentialsError(err)) {
+        setError('登录失败，请稍后重试')
+      } else if (isInvalidCredentialsError(err)) {
+        setError('账号或密码错误')
+      } else {
+        setError(rawMessage)
+      }
       setLoading(false)
     }
   }
 
-  const handleGoogleLogin = async () => {
+  const handleResetPassword = async () => {
+    setError('')
+
+    if (!resetPassword || resetPassword.length < 6) {
+      setError('密码长度至少6位')
+      return
+    }
+
+    if (resetPassword !== resetPasswordConfirm) {
+      setError('两次输入的密码不一致')
+      return
+    }
+
+    if (!pendingSupabase || !pendingAuthData) {
+      setError('登录状态异常，请重新登录')
+      return
+    }
+
+    setLoading(true)
+    const { error: updateError } = await pendingSupabase.auth.updateUser({
+      password: resetPassword,
+    })
+
+    if (updateError) {
+      setError(updateError.message || '设置密码失败，请稍后重试')
+      setLoading(false)
+      return
+    }
+
+    const authData = pendingAuthData
+    const supabase = pendingSupabase
+    setResetRequired(false)
+    setResetPassword('')
+    setResetPasswordConfirm('')
+    setPendingAuthData(null)
+    setPendingSupabase(null)
+    await handleLoginSuccess(authData, supabase)
+  }
+
+  const handleLoginSuccess = async (data: { user: User | null; session: Session | null } | null, supabase: ReturnType<typeof createClient>) => {
+    if (!data?.user || !supabase) {
+      setError('登录失败，请重试')
+      setLoading(false)
+      return
+    }
+
     try {
+      await syncProfileFromAuthUser(
+        { 
+          user: data.user, 
+          defaultNickname: data.user.phone ? `用户${data.user.phone.slice(-4)}` : (data.user.email?.split('@')[0] || '用户'), 
+          role: 'user' 
+        },
+        supabase
+      )
+    } catch (err) {
+      console.warn('Error ensuring profile:', err)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    const { data: { session: finalSession } } = await supabase.auth.getSession()
+    if (!finalSession) {
+      setError('登录状态未正确建立，请重试')
+      setLoading(false)
+      return
+    }
+
+    const redirect = searchParams.get('redirect') || '/'
+    window.location.href = redirect
+  }
+
+  const handleSocialLogin = async (provider: AuthProvider | string) => {
+    try {
+      if (provider === 'alipay') {
+        const redirect = searchParams.get('redirect') || '/'
+        const url = new URL('/api/auth/alipay/start', window.location.origin)
+        url.searchParams.set('redirect', redirect)
+        window.location.href = url.toString()
+        return
+      }
+
       const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
         return
       }
 
-      console.log('🔵 触发 Google 登录')
-      const { data, error: signInError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+      // 映射一些自定义 provider string 到 Supabase 支持的
+      const providerMap: Record<string, string> = {
+        'twitter': 'twitter',
+        'alipay': 'alipay',
+        'wechat': 'wechat',
+        'instagram': 'instagram',
+      }
+
+      const mappedProvider = providerMap[provider] || provider
+
+      await supabase.auth.signInWithOAuth({
+        provider: mappedProvider as 'google' | 'github' | 'twitter' | 'facebook' | 'notion' | 'linkedin',
+        options: { 
+          redirectTo: `${window.location.origin}/auth/callback` 
         },
       })
-
-      if (signInError) {
-        console.error('Google 登录错误:', signInError)
-        setError(signInError.message || 'Google登录失败')
-      } else {
-        console.log('Google 登录成功，等待重定向:', data)
-      }
     } catch (err) {
-      console.error('Google 登录异常:', err)
-      setError(err instanceof Error ? err.message : 'Google登录失败，请稍后重试')
+      console.error(`${provider} 登录异常:`, err)
+      setError(err instanceof Error ? err.message : `${provider}登录失败，请稍后重试`)
     }
   }
 
-  const handleGitHubLogin = async () => {
-    try {
-      const supabase = createClient()
-      if (!supabase) {
-        setError('认证服务未配置，请联系管理员')
-        return
-      }
-
-      console.log('⚫ 触发 GitHub 登录')
-      const { data, error: signInError } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (signInError) {
-        console.error('GitHub 登录错误:', signInError)
-        setError(signInError.message || 'GitHub登录失败')
-      } else {
-        console.log('GitHub 登录成功，等待重定向:', data)
-      }
-    } catch (err) {
-      console.error('GitHub 登录异常:', err)
-      setError(err instanceof Error ? err.message : 'GitHub登录失败，请稍后重试')
-    }
-  }
+  const socialButtons = [
+    { name: 'Google', icon: <GoogleIcon className="w-5 h-5" />, provider: 'google', bg: 'hover:bg-white/10' },
+    { name: 'X', icon: <XIcon className="w-5 h-5" />, provider: 'twitter', bg: 'hover:bg-white/10' },
+    { name: 'Facebook', icon: <FacebookIcon className="w-5 h-5" />, provider: 'facebook', bg: 'hover:bg-blue-600/20' },
+    { name: 'Instagram', icon: <InstagramIcon className="w-5 h-5" />, provider: 'instagram', bg: 'hover:bg-pink-600/20' },
+    { name: '支付宝', icon: <AlipayIcon className="w-5 h-5 text-[#1677FF]" />, provider: 'alipay', bg: 'hover:bg-blue-500/10' },
+    { name: '微信', icon: <WeChatIcon className="w-5 h-5 text-[#07C160]" />, provider: 'wechat', bg: 'hover:bg-green-500/10' },
+  ]
 
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 邮箱输入 */}
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-xs text-white/60 uppercase tracking-widest pl-1">
-            邮箱地址
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="name@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:bg-white/10 focus:border-white/30 focus:ring-0 transition-all duration-300 h-11"
-          />
-        </div>
+    <div className="space-y-6">
+      <Tabs value={loginMethod} onValueChange={(v) => setLoginMethod(v as 'code' | 'password')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-transparent border-b border-white/10 mb-6 p-0 h-auto rounded-none">
+          <TabsTrigger value="password" className="rounded-none border-b-2 border-transparent data-[state=active]:border-white data-[state=active]:text-white text-white/50 pb-3 transition-all cursor-pointer">
+            账号登录
+          </TabsTrigger>
+          <TabsTrigger value="code" className="rounded-none border-b-2 border-transparent data-[state=active]:border-white data-[state=active]:text-white text-white/50 pb-3 transition-all cursor-pointer">
+            手机号登录
+          </TabsTrigger>
+        </TabsList>
 
-        {/* 密码输入 */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-xs text-white/60 uppercase tracking-widest pl-1">
-              密码
-            </Label>
+        <form onSubmit={handleLogin} className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* 输入区域 */}
+          <div className="space-y-4">
+            {resetRequired ? (
+              <>
+                <Input
+                  type="password"
+                  placeholder="设置新密码（至少6位）"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11"
+                />
+                <Input
+                  type="password"
+                  placeholder="确认新密码"
+                  value={resetPasswordConfirm}
+                  onChange={(e) => setResetPasswordConfirm(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11"
+                />
+              </>
+            ) : loginMethod === 'code' ? (
+              <>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-white/40 text-sm border-r border-white/10 pr-2">+86</span>
+                  <Input
+                    type="tel"
+                    placeholder="请输入手机号"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11 pl-14"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="6位验证码"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSendCode}
+                    disabled={countdown > 0 || loading}
+                    className="bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white min-w-[6.25rem] h-11 border-dashed"
+                  >
+                    {countdown > 0 ? `${countdown}s` : '获取验证码'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Input
+                  placeholder="手机号 / 邮箱"
+                  value={account}
+                  onChange={(e) => setAccount(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11"
+                />
+                <Input
+                  type="password"
+                  placeholder="登录密码"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:bg-white/10 focus:border-white/30 focus:ring-0 h-11"
+                />
+              </>
+            )}
           </div>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:bg-white/10 focus:border-white/30 focus:ring-0 transition-all duration-300 h-11"
-          />
-        </div>
 
-        {/* 记住我和忘记密码 */}
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remember"
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked === true)}
-              className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
-            />
-            <Label
-              htmlFor="remember"
-              className="text-white/60 font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              记住我
-            </Label>
+          <div className="flex justify-end text-xs text-white/50">
+            <Link href="/forgot-password" className="hover:text-white transition-colors">忘记密码？</Link>
           </div>
-          <Link
-            href="/forgot-password"
-            className="text-white/60 hover:text-white transition-colors font-light"
-          >
-            忘记密码？
-          </Link>
-        </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <div className="space-y-2">
-            <div className="text-sm text-red-300 bg-red-500/20 backdrop-blur-sm border border-red-500/30 p-3 rounded whitespace-pre-line">
+          {error && (
+            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-2.5 rounded text-center">
               {error}
             </div>
-            {error.includes('未注册') || error.includes('尚未注册') ? (
-              <div className="text-xs text-white/60 bg-white/5 backdrop-blur-sm border border-white/10 p-2 rounded">
-                <p className="mb-1">💡 该邮箱尚未注册，请先完成注册：</p>
-                <button
-                  type="button"
-                  onClick={onSwitchToRegister}
-                  className="text-white/80 hover:text-white underline underline-offset-2 font-medium"
-                >
-                  点击这里立即注册 →
-                </button>
-              </div>
-            ) : error.includes('验证您的邮箱') || error.includes('email_not_confirmed') ? (
-              <div className="text-xs text-white/60 bg-white/5 backdrop-blur-sm border border-white/10 p-3 rounded">
-                <p className="mb-2">💡 邮箱验证帮助：</p>
-                <ul className="list-disc list-inside space-y-1 mb-2 text-white/80">
-                  <li>检查您的邮箱收件箱和垃圾邮件文件夹</li>
-                  <li>验证邮件可能在几分钟后到达</li>
-                  <li>如果未收到邮件，可以尝试重新注册</li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={onSwitchToRegister}
-                  className="text-white/80 hover:text-white underline underline-offset-2 font-medium text-xs"
-                >
-                  需要重新注册？点击这里 →
-                </button>
-              </div>
-            ) : null}
-          </div>
-        )}
+          )}
 
-        {/* 登录按钮 - 半透明白色，柔和不刺眼 */}
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 hover:border-white/40 h-11 font-medium tracking-wide transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)]"
-        >
-          {loading ? '登录中...' : '登 录'}
-        </Button>
-      </form>
+          {resetRequired ? (
+            <Button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={loading}
+              className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:bg-white/30 hover:border-white/40 h-11 tracking-wide transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)]"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '设置密码并继续'}
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 hover:bg-white/30 hover:border-white/40 h-11 tracking-wide transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)]"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '登 录'}
+            </Button>
+          )}
+        </form>
+      </Tabs>
 
-      {/* 分割线 */}
+      {/* 第三方登录分割线 */}
       <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-white/10" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-transparent px-2 text-white/40">
-            或使用以下方式
-          </span>
-        </div>
+        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5" /></div>
+        <div className="relative flex justify-center"><span className="bg-transparent px-2 text-[0.625rem] text-white/20 uppercase tracking-widest">其他方式登录</span></div>
       </div>
 
-      {/* 第三方登录 - 幽灵按钮风格 */}
-      <div className="space-y-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleGoogleLogin}
-          className="w-full bg-transparent border-white/10 text-white/80 hover:bg-white/5 hover:text-white hover:border-white/30 h-11 transition-all"
-        >
-          <svg className="mr-1 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-          </svg>
-          使用Google账号登录
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleGitHubLogin}
-          className="w-full bg-transparent border-white/10 text-white/80 hover:bg-white/5 hover:text-white hover:border-white/30 h-11 transition-all"
-        >
-          <Github className="mr-2 h-4 w-4" />
-          使用 GitHub 登录
-        </Button>
+      {/* 第三方登录 Grid */}
+      <div className="grid grid-cols-6 gap-2">
+        {socialButtons.map((btn) => (
+          <Button
+            key={btn.name}
+            type="button"
+            variant="outline"
+            onClick={() => handleSocialLogin(btn.provider)}
+            title={`使用 ${btn.name} 登录`}
+            className={`h-10 px-0 bg-white/5 border-white/5 text-white/70 ${btn.bg} transition-all duration-300 rounded-lg`}
+          >
+            {btn.icon}
+          </Button>
+        ))}
       </div>
-
-      {/* 注册链接 */}
-      <div className="mt-6 text-center text-sm text-white/40 font-light">
-        还没有账号？
-        <button
-          type="button"
-          onClick={onSwitchToRegister}
-          className="text-white hover:underline underline-offset-4 ml-1 font-normal"
-        >
-          立即注册
-        </button>
+      
+      <div className="text-center mt-6">
+        <p className="text-white/30 text-xs">
+          还没有账号？ 
+          <button onClick={onSwitchToRegister} className="text-white hover:text-white/80 ml-1 hover:underline underline-offset-4 cursor-pointer">
+            立即注册
+          </button>
+        </p>
       </div>
-    </>
+    </div>
   )
 }

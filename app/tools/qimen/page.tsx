@@ -26,7 +26,7 @@ const styles = `
   /* 3. 排盘表格样式 */
   .bazi-grid {
     display: grid;
-    grid-template-columns: 80px repeat(4, 1fr);
+    grid-template-columns: 5rem repeat(4, 1fr);
     width: 100%;
   }
   .bazi-cell {
@@ -62,7 +62,7 @@ const styles = `
     opacity: 0;
   }
   @keyframes blur-in {
-    0% { filter: blur(12px); opacity: 0; transform: translateY(10px); }
+    0% { filter: blur(0.75rem); opacity: 0; transform: translateY(0.625rem); }
     100% { filter: blur(0); opacity: 1; transform: translateY(0); }
   }
 
@@ -84,8 +84,8 @@ const styles = `
 
 /* 2. 核心呼吸 */
 @keyframes core-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.5; box-shadow: 0 0 30px rgba(200, 46, 49, 0.1); }
-  50% { transform: scale(1.1); opacity: 0.8; box-shadow: 0 0 60px rgba(200, 46, 49, 0.3); }
+  0%, 100% { transform: scale(1); opacity: 0.5; box-shadow: 0 0 1.875rem rgba(200, 46, 49, 0.1); }
+  50% { transform: scale(1.1); opacity: 0.8; box-shadow: 0 0 3.75rem rgba(200, 46, 49, 0.3); }
 }
 .ai-core {
   animation: core-pulse 4s ease-in-out infinite;
@@ -235,10 +235,10 @@ export default function BaZiPage() {
                     {/* 1. 氛围背景层 */}
                     <div className="absolute inset-0 pointer-events-none">
                         {/* 中心光晕 */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-linear-to-br from-stone-200/20 to-transparent rounded-full blur-3xl" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[37.5rem] h-[37.5rem] bg-linear-to-br from-stone-200/20 to-transparent rounded-full blur-3xl" />
                         {/* 扫描光线 */}
                         <div className="absolute inset-0 overflow-hidden opacity-30">
-                            <div className="w-[200%] h-[20px] bg-linear-to-r from-transparent via-stone-100 to-transparent absolute top-1/2 left-[-50%] -rotate-45 blur-md animate-[scan-sweep_8s_infinite]" />
+                            <div className="w-[200%] h-[1.25rem] bg-linear-to-r from-transparent via-stone-100 to-transparent absolute top-1/2 left-[-50%] -rotate-45 blur-md animate-[scan-sweep_8s_infinite]" />
                         </div>
                     </div>
 
@@ -257,7 +257,7 @@ export default function BaZiPage() {
                     </div>
 
                     {/* 2. 核心罗盘系统 (SVG) */}
-                    <div className="relative w-[500px] h-[500px] md:w-[600px] md:h-[600px] flex items-center justify-center scale-90 md:scale-100 transition-transform duration-700">
+                    <div className="relative w-[31.25rem] h-[31.25rem] md:w-[37.5rem] md:h-[37.5rem] flex items-center justify-center scale-90 md:scale-100 transition-transform duration-700">
                         
                         {/* 外环：二十四山/刻度 */}
                         <div className="absolute inset-0 ring-outer opacity-20 text-stone-400">
@@ -376,7 +376,7 @@ export default function BaZiPage() {
                                         {p.cangGan.map((cg, idx) => (
                                             <div key={idx} className="flex gap-1 items-center">
                                                 <span className={`${getTextColor(cg.wuxing)} font-ganzhi font-medium`}>{cg.char}</span>
-                                                <span className="text-[10px] text-stone-400 scale-90">{p.fuXing[idx] || ''}</span>
+                                                <span className="text-[0.625rem] text-stone-400 scale-90">{p.fuXing[idx] || ''}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -409,7 +409,7 @@ export default function BaZiPage() {
                                 {MOCK_DATA.pillars.map((p,i) => (
                                     <div key={i} className="bazi-cell flex-col gap-1.5 pt-3">
                                         {p.shenSha.map((s, idx) => (
-                                            <span key={idx} className="text-[10px] text-stone-500 bg-stone-100/50 px-2 py-0.5 rounded-full border border-stone-100 whitespace-nowrap">
+                                            <span key={idx} className="text-[0.625rem] text-stone-500 bg-stone-100/50 px-2 py-0.5 rounded-full border border-stone-100 whitespace-nowrap">
                                                 {s}
                                             </span>
                                         ))}
@@ -426,13 +426,13 @@ export default function BaZiPage() {
                     <CardContent className="p-5">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xs font-bold text-stone-500 uppercase tracking-widest">大运流年</h3>
-                            <div className="text-[10px] text-stone-400">起运：5岁</div>
+                            <div className="text-[0.625rem] text-stone-400">起运：5岁</div>
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                             {MOCK_DATA.daYun.map((yun, i) => (
                                 <div key={i} className={`flex flex-col items-center p-2 rounded-lg min-w-[3.5rem] cursor-pointer transition-all border ${yun.isCurrent ? 'bg-stone-800 text-white border-stone-800 shadow-md' : 'bg-white border-stone-100 text-stone-600 hover:border-stone-300'}`}>
                                     <div className="text-sm font-bold font-ganzhi mb-1">{yun.gan}{yun.zhi}</div>
-                                    <div className={`text-[9px] ${yun.isCurrent ? 'text-stone-400' : 'text-stone-300'}`}>{yun.year}</div>
+                                    <div className={`text-[0.5625rem] ${yun.isCurrent ? 'text-stone-400' : 'text-stone-300'}`}>{yun.year}</div>
                                 </div>
                             ))}
                         </div>
@@ -445,7 +445,7 @@ export default function BaZiPage() {
           </div>
           
           {/* 底部版权/提示 */}
-          <div className="text-center pb-4 opacity-30 text-[10px] text-stone-500 font-serif">
+          <div className="text-center pb-4 opacity-30 text-[0.625rem] text-stone-500 font-serif">
             易知 · 实证易学平台
           </div>
         </main>

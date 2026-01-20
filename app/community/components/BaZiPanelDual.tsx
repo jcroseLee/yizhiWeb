@@ -51,7 +51,7 @@ const BAZI_PANEL_STYLES = `
   
   .bazi-panel-grid {
     display: grid;
-    grid-template-columns: 60px repeat(4, 1fr);
+    grid-template-columns: 3.75rem repeat(4, 1fr);
     width: 100%;
   }
   .bazi-panel-cell {
@@ -118,9 +118,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
         <div className="p-3">
           {/* 表头 */}
           <div className="bazi-panel-grid bg-stone-50/50 border-b border-stone-100/50 py-2.5 mb-1">
-            <div className="bazi-panel-cell bazi-panel-header font-serif text-[10px]"></div>
+            <div className="bazi-panel-cell bazi-panel-header font-serif text-[0.625rem]"></div>
             {pillars.map((p, i) => (
-              <div key={i} className="bazi-panel-cell bazi-panel-header font-serif text-[10px]">
+              <div key={i} className="bazi-panel-cell bazi-panel-header font-serif text-[0.625rem]">
                 {p.label}
               </div>
             ))}
@@ -131,9 +131,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 1. 主星 */}
             {pillars[0]?.zhuXing && (
               <div className="bazi-panel-grid">
-                <div className="bazi-panel-cell text-[10px] text-stone-400">主星</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400">主星</div>
                 {pillars.map((p, i) => (
-                  <div key={i} className="bazi-panel-cell text-stone-600 font-medium text-[11px]">
+                  <div key={i} className="bazi-panel-cell text-stone-600 font-medium text-[0.6875rem]">
                     {p.zhuXing || '--'}
                   </div>
                 ))}
@@ -142,7 +142,7 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
 
             {/* 2. 天干 */}
             <div className="bazi-panel-grid bg-white">
-              <div className="bazi-panel-cell text-[10px] text-stone-400">天干</div>
+              <div className="bazi-panel-cell text-[0.625rem] text-stone-400">天干</div>
               {pillars.map((p, i) => (
                 <div key={i} className="bazi-panel-cell py-3 flex items-center justify-center">
                   <span className={cn(
@@ -157,7 +157,7 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
 
             {/* 3. 地支 */}
             <div className="bazi-panel-grid bg-white border-t border-stone-100/50">
-              <div className="bazi-panel-cell text-[10px] text-stone-400">地支</div>
+              <div className="bazi-panel-cell text-[0.625rem] text-stone-400">地支</div>
               {pillars.map((p, i) => (
                 <div key={i} className="bazi-panel-cell py-3 flex items-center justify-center">
                   <span className={cn(
@@ -173,19 +173,19 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 4. 藏干 */}
             {pillars[0]?.cangGan && pillars[0].cangGan.length > 0 && (
               <div className="bazi-panel-grid border-t border-dashed border-stone-200/50">
-                <div className="bazi-panel-cell text-[10px] text-stone-400 pt-2 items-start">藏干</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400 pt-2 items-start">藏干</div>
                 {pillars.map((p, i) => (
                   <div key={i} className="bazi-panel-cell flex-col gap-1 pt-2">
                     {p.cangGan?.map((cg, idx) => (
                       <div key={idx} className="flex gap-1 items-center justify-center">
                         <span className={cn(
-                          "font-ganzhi font-medium text-[11px]",
+                          "font-ganzhi font-medium text-[0.6875rem]",
                           getWuxingColor(cg.wuxing)
                         )}>
                           {cg.char}
                         </span>
                         {p.fuXing?.[idx] && (
-                          <span className="text-[9px] text-stone-400 scale-90">{p.fuXing[idx]}</span>
+                          <span className="text-[0.5625rem] text-stone-400 scale-90">{p.fuXing[idx]}</span>
                         )}
                       </div>
                     ))}
@@ -197,9 +197,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 5. 纳音 */}
             {pillars[0]?.naYin && (
               <div className="bazi-panel-grid">
-                <div className="bazi-panel-cell text-[10px] text-stone-400">纳音</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400">纳音</div>
                 {pillars.map((p, i) => (
-                  <div key={i} className="bazi-panel-cell text-stone-600 text-[11px]">
+                  <div key={i} className="bazi-panel-cell text-stone-600 text-[0.6875rem]">
                     {p.naYin || '--'}
                   </div>
                 ))}
@@ -209,9 +209,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 6. 行运 */}
             {pillars[0]?.xingYun && (
               <div className="bazi-panel-grid">
-                <div className="bazi-panel-cell text-[10px] text-stone-400">行运</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400">行运</div>
                 {pillars.map((p, i) => (
-                  <div key={i} className="bazi-panel-cell text-stone-600 text-[11px]">
+                  <div key={i} className="bazi-panel-cell text-stone-600 text-[0.6875rem]">
                     {p.xingYun || '--'}
                   </div>
                 ))}
@@ -221,9 +221,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 7. 自坐 */}
             {pillars[0]?.ziZuo && (
               <div className="bazi-panel-grid">
-                <div className="bazi-panel-cell text-[10px] text-stone-400">自坐</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400">自坐</div>
                 {pillars.map((p, i) => (
-                  <div key={i} className="bazi-panel-cell text-stone-600 text-[11px]">
+                  <div key={i} className="bazi-panel-cell text-stone-600 text-[0.6875rem]">
                     {p.ziZuo || '--'}
                   </div>
                 ))}
@@ -233,9 +233,9 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 8. 空亡 */}
             {pillars[0]?.kongWang && (
               <div className="bazi-panel-grid">
-                <div className="bazi-panel-cell text-[10px] text-stone-400">空亡</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400">空亡</div>
                 {pillars.map((p, i) => (
-                  <div key={i} className="bazi-panel-cell text-stone-600 text-[11px]">
+                  <div key={i} className="bazi-panel-cell text-stone-600 text-[0.6875rem]">
                     {p.kongWang || '--'}
                   </div>
                 ))}
@@ -245,20 +245,20 @@ export default function BaZiPanelDual({ data, recordId }: BaZiPanelDualProps) {
             {/* 9. 神煞 */}
             {pillars[0]?.shenSha && (
               <div className="bazi-panel-grid pb-3">
-                <div className="bazi-panel-cell text-[10px] text-stone-400 pt-2 items-start">神煞</div>
+                <div className="bazi-panel-cell text-[0.625rem] text-stone-400 pt-2 items-start">神煞</div>
                 {pillars.map((p, i) => (
                   <div key={i} className="bazi-panel-cell flex-col gap-1 pt-2">
                     {p.shenSha && p.shenSha.length > 0 ? (
                       p.shenSha.map((s, idx) => (
                         <span 
                           key={idx} 
-                          className="text-[10px] text-stone-500 bg-stone-100/50 px-1.5 py-0.5 rounded-full border border-stone-100 whitespace-nowrap"
+                          className="text-[0.625rem] text-stone-500 bg-stone-100/50 px-1.5 py-0.5 rounded-full border border-stone-100 whitespace-nowrap"
                         >
                           {s}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[9px] text-stone-400">--</span>
+                      <span className="text-[0.5625rem] text-stone-400">--</span>
                     )}
                   </div>
                 ))}

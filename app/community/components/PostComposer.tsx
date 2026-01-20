@@ -2,6 +2,7 @@
 
 import { Textarea } from '@/lib/components/ui/textarea'
 import { useToast } from '@/lib/hooks/use-toast'
+import { getCurrentPathWithSearchAndHash, getCurrentUser, redirectToLogin, setLoginIntent } from '@/lib/services/auth'
 import { createPost } from '@/lib/services/community'
 import { BookOpen, Coffee, Coins, Compass, HelpCircle, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
@@ -28,14 +29,14 @@ const styles = `
   }
 
   .textarea-container.focused {
-    min-height: 120px;
+    min-height: 7.5rem;
   }
 
   /* 分类按钮组动画 */
   .category-group {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-0.5rem);
     pointer-events: none;
   }
 
@@ -63,6 +64,7 @@ const CATEGORIES = [
 const TITLE_MAX_LENGTH = 50
 const CONTENT_MAX_LENGTH = 300
 const CONTENT_MIN_LENGTH = 100
+const POST_COMPOSER_DRAFT_KEY = 'yi_post_composer_draft_v1'
 
 // -----------------------------------------------------------------------------
 // CategoryTag 组件
@@ -116,6 +118,36 @@ export default function PostComposer() {
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(POST_COMPOSER_DRAFT_KEY)
+    if (!raw) return
+    try {
+      const draft = JSON.parse(raw) as { title?: string; content?: string; selectedCategory?: string | null }
+      if (typeof draft.title === 'string') setTitle(draft.title)
+      if (typeof draft.content === 'string') setContent(draft.content)
+      if (typeof draft.selectedCategory === 'string' || draft.selectedCategory === null) {
+        setSelectedCategory(draft.selectedCategory ?? null)
+      }
+      if ((draft.title && draft.title.trim()) || (draft.content && draft.content.trim())) {
+        setIsFocused(true)
+      }
+    } catch {
+      window.localStorage.removeItem(POST_COMPOSER_DRAFT_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    const hasAny = !!title.trim() || !!content.trim() || !!selectedCategory
+    if (!hasAny) {
+      window.localStorage.removeItem(POST_COMPOSER_DRAFT_KEY)
+      return
+    }
+    window.localStorage.setItem(
+      POST_COMPOSER_DRAFT_KEY,
+      JSON.stringify({ title, content, selectedCategory })
+    )
+  }, [title, content, selectedCategory])
   
   // 输入框提示文案轮播
   const placeholders = [
@@ -252,6 +284,17 @@ export default function PostComposer() {
     if (hasError) {
       return
     }
+
+    const user = await getCurrentUser()
+    if (!user) {
+      window.localStorage.setItem(
+        POST_COMPOSER_DRAFT_KEY,
+        JSON.stringify({ title: trimmedTitle, content: trimmedContent, selectedCategory })
+      )
+      setLoginIntent({ type: 'create_post', returnTo: getCurrentPathWithSearchAndHash() })
+      redirectToLogin()
+      return
+    }
     
     // 发布帖子
     try {
@@ -272,6 +315,7 @@ export default function PostComposer() {
       setContent('')
       setSelectedCategory(null)
       setIsFocused(false)
+      window.localStorage.removeItem(POST_COMPOSER_DRAFT_KEY)
       
       // 跳转到帖子详情页
       router.push(`/community/${post.id}`)
@@ -313,7 +357,7 @@ export default function PostComposer() {
                 // 占位符模式
                 <div 
                   onClick={handlePlaceholderClick}
-                  className="bg-stone-50 hover:bg-stone-100 transition-colors rounded-lg p-3 cursor-text text-stone-500 text-sm mb-3 shadow-inner border border-stone-100 min-h-[44px] flex items-center"
+                  className="bg-stone-50 hover:bg-stone-100 transition-colors rounded-lg p-3 cursor-text text-stone-500 text-sm mb-3 shadow-inner border border-stone-100 min-h-[2.75rem] flex items-center"
                 >
               <span className="italic input-placeholder-rotate">
                 {placeholders[placeholderIndex]}
@@ -357,11 +401,11 @@ export default function PostComposer() {
                             ? 'text-red-600 placeholder:text-red-400' 
                             : 'text-stone-900'
                         }`}
-                        style={{ height: '28px', minHeight: '28px' }}
+                        style={{ height: '1.75rem', minHeight: '1.75rem' }}
                         rows={1}
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement
-                          target.style.height = '28px'
+                          target.style.height = '1.75rem'
                           target.style.height = `${Math.min(target.scrollHeight, 28)}px`
                         }}
                       />
@@ -423,7 +467,7 @@ export default function PostComposer() {
                           ? 'text-red-600 placeholder:text-red-400' 
                           : 'text-stone-900'
                       }`}
-                      style={{ minHeight: '38px' }}
+                      style={{ minHeight: '2.375rem' }}
                       rows={1}
                       onInput={(e) => {
                         const target = e.target as HTMLTextAreaElement
@@ -505,4 +549,3 @@ export default function PostComposer() {
     </>
   )
 }
-

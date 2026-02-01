@@ -285,7 +285,7 @@ export function RechargeDialog({ open, onOpenChange, onSuccess }: RechargeDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#FDFBF7] sm:max-w-[26.5625rem]">
+      <DialogContent className="bg-[#FDFBF7] sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Coins className="w-6 h-6 text-amber-500" />
@@ -301,7 +301,7 @@ export function RechargeDialog({ open, onOpenChange, onSuccess }: RechargeDialog
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-stone-700">微信扫码支付</h4>
               <div className="rounded-xl border border-stone-100 bg-white p-4 flex flex-col items-center gap-3">
-                <img src={wechatQrDataUrl} alt="WeChat Pay QR" className="w-[15rem] h-[15rem]" />
+                <img src={wechatQrDataUrl} alt="WeChat Pay QR" className="w-60 h-60" />
                 <div className="text-xs text-stone-500">订单号：{wechatOutTradeNo}</div>
                 <Button
                   onClick={async () => {

@@ -28,6 +28,22 @@ function maskPhone(value: string) {
   return digits.slice(0, 3) + '****' + digits.slice(-4)
 }
 
+/**
+ * @swagger
+ * /api/sms/reset-password:
+ *   post:
+ *     summary: POST /api/sms/reset-password
+ *     description: Auto-generated description for POST /api/sms/reset-password
+ *     tags:
+ *       - Sms
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()
   try {

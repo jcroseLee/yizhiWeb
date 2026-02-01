@@ -1,6 +1,22 @@
 import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
 import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * @swagger
+ * /api/library/cases/{id}:
+ *   get:
+ *     summary: GET /api/library/cases/{id}
+ *     description: Auto-generated description for GET /api/library/cases/{id}
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params

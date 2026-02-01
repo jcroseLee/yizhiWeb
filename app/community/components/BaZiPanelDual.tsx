@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils/cn'
 // 类型定义
 // -----------------------------------------------------------------------------
 
-interface BaZiPanelDualData {
+export interface BaZiPanelDualData {
   pillars: Array<{
     label: string
     gan: { char: string; wuxing: string }

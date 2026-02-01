@@ -47,6 +47,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/content-moderation-check:
+ *   post:
+ *     summary: POST /api/content-moderation-check
+ *     description: Auto-generated description for POST /api/content-moderation-check
+ *     tags:
+ *       - Content-moderation-check
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL

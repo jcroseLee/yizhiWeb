@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/sms/verify-code:
+ *   post:
+ *     summary: POST /api/sms/verify-code
+ *     description: Auto-generated description for POST /api/sms/verify-code
+ *     tags:
+ *       - Sms
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

@@ -4,29 +4,30 @@ import { trackEvent } from '@/lib/analytics'
 import { Badge } from '@/lib/components/ui/badge'
 import { Button } from '@/lib/components/ui/button'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/lib/components/ui/popover"
 import { ScrollArea } from '@/lib/components/ui/scroll-area'
 import { Separator } from '@/lib/components/ui/separator'
 import { Slider } from '@/lib/components/ui/slider'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ArrowUpRight,
-  Bookmark,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Highlighter,
-  Loader2,
-  Menu,
-  PanelRight,
-  Search,
-  Settings,
-  Share2,
-  X
+    ArrowUpRight,
+    Bookmark,
+    BookOpen,
+    ChevronLeft,
+    ChevronRight,
+    Highlighter,
+    Loader2,
+    Menu,
+    PanelRight,
+    Search,
+    Settings,
+    Share2,
+    X
 } from 'lucide-react'
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -187,16 +188,6 @@ const getSlicesManifestUrl = (payload: unknown) => {
   return typeof url === 'string' && url.trim() ? url.trim() : null
 }
 
-const getOriginalPageCount = (payload: unknown): number | null => {
-  if (!payload || !isRecord(payload)) return null
-  const slices = payload.slices
-  if (!slices || !isRecord(slices)) return null
-  const pageCount = slices.page_count
-  return typeof pageCount === 'number' && Number.isFinite(pageCount) && pageCount > 0 
-    ? Math.floor(pageCount) 
-    : null
-}
-
 // -----------------------------------------------------------------------------
 // 主页面
 // -----------------------------------------------------------------------------
@@ -221,7 +212,6 @@ export default function BookReaderPage() {
   const [chapters, setChapters] = useState<BookContentRow[]>([])
   const [chaptersLoading, setChaptersLoading] = useState(false)
   const [currentTocItemIndex, setCurrentTocItemIndex] = useState<number | null>(null)
-  const [currentPageIndex, setCurrentPageIndex] = useState<number>(0)
   const [userId, setUserId] = useState<string | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<{ viewMode: 'slices' | 'text'; pageIndex: number } | null>(null)
   const restoreAppliedRef = useRef(false)
@@ -248,7 +238,6 @@ export default function BookReaderPage() {
   const bookSourceUrl = book?.source_url ? String(book.source_url) : null
   const bookSourcePayload = book?.source_payload ?? null
   const slicesManifestUrl = useMemo(() => getSlicesManifestUrl(bookSourcePayload), [bookSourcePayload])
-  const originalPageCount = useMemo(() => getOriginalPageCount(bookSourcePayload), [bookSourcePayload])
   const hasText = typeof book?.content_text === 'string' && book.content_text.trim().length > 0
   const isTextPreparing = !hasText && !!book?.id && !!slicesManifestUrl
   const ocrSourcePdfUrl = useMemo(() => {
@@ -370,7 +359,6 @@ export default function BookReaderPage() {
         setBook(bookTyped)
         setActiveIndex(0)
         setCurrentTocItemIndex(null) 
-        setCurrentPageIndex(0) 
       } catch (e: unknown) {
         setError(getErrorMessage(e, '加载失败'))
       } finally {
@@ -429,7 +417,7 @@ export default function BookReaderPage() {
         const json = (await res.json().catch(() => null)) as unknown
         if (!res.ok) throw new Error(`切片清单加载失败 (${res.status})`)
         if (!isRecord(json)) throw new Error('切片清单格式错误')
-        const rawPages = Array.isArray((json as any).pages) ? ((json as any).pages as unknown[]) : []
+        const rawPages = Array.isArray((json as Record<string, unknown>).pages) ? ((json as Record<string, unknown>).pages as unknown[]) : []
         const pages: SlicePage[] = rawPages
           .map((p) => {
             if (!isRecord(p)) return null
@@ -446,10 +434,11 @@ export default function BookReaderPage() {
           })
           .filter((x): x is SlicePage => !!x)
         if (!pages.length) throw new Error('切片清单为空')
+        const jsonRecord = json as Record<string, unknown>
         setSlicesManifest({
-          bucket: typeof (json as any).bucket === 'string' ? (json as any).bucket : null,
-          prefix: typeof (json as any).prefix === 'string' ? (json as any).prefix : null,
-          page_count: typeof (json as any).page_count === 'number' ? (json as any).page_count : pages.length,
+          bucket: typeof jsonRecord.bucket === 'string' ? (jsonRecord.bucket as string) : null,
+          prefix: typeof jsonRecord.prefix === 'string' ? (jsonRecord.prefix as string) : null,
+          page_count: typeof jsonRecord.page_count === 'number' ? (jsonRecord.page_count as number) : pages.length,
           pages,
         })
       } catch (e: unknown) {
@@ -475,7 +464,7 @@ export default function BookReaderPage() {
       if (!book?.id) return
 
       const { data } = await supabase.from('library_books').select('content_text').eq('id', book.id).maybeSingle()
-      const next = isRecord(data) && typeof (data as any).content_text === 'string' ? String((data as any).content_text) : ''
+      const next = isRecord(data) && typeof (data as Record<string, unknown>).content_text === 'string' ? String((data as Record<string, unknown>).content_text) : ''
       if (next.trim()) {
         setBook((prev) => (prev && prev.id === book.id ? { ...prev, content_text: next } : prev))
       }
@@ -492,50 +481,48 @@ export default function BookReaderPage() {
     if (viewMode === 'text') {
       setActiveIndex(0)
       setCurrentTocItemIndex(null) 
-      setCurrentPageIndex(0) 
     } else {
       setCurrentTocItemIndex(null)
-      setCurrentPageIndex(0) 
     }
   }, [viewMode])
 
   const MarkdownComponents = useMemo(() => ({
     // ... (Markdown components omitted for brevity, keeping same styling)
-    h1: ({node, ...props}: any) => (
+    h1: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h1 className="font-serif font-bold text-slate-900 mb-6 mt-8 tracking-widest" style={{ fontSize: `${fontSize[0] * 1.4}px`, lineHeight: '1.4' }} {...props} />
     ),
-    h2: ({node, ...props}: any) => (
+    h2: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h2 className="font-serif font-bold text-slate-900 mb-5 mt-7 border-b border-slate-200 pb-2 tracking-widest" style={{ fontSize: `${fontSize[0] * 1.25}px`, lineHeight: '1.4' }} {...props} />
     ),
-    h3: ({node, ...props}: any) => (
+    h3: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h3 className="font-serif font-semibold text-slate-900 mb-4 mt-8 pl-3 border-b border-slate-200 pb-2 tracking-wide" style={{ fontSize: `${fontSize[0] * 1.15}px`, lineHeight: '1.5', letterSpacing: '0.015em' }} {...props} />
     ),
-    h4: ({node, ...props}: any) => (
+    h4: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h4 className="font-serif font-bold text-[#34495e] mb-3 mt-5" style={{ fontSize: `${fontSize[0] * 1.05}px`, lineHeight: '1.5' }} {...props} />
     ),
-    h5: ({node, ...props}: any) => (
+    h5: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h5 className="font-serif font-bold text-[#34495e] mb-2 mt-4" style={{ fontSize: `${fontSize[0]}px`, lineHeight: '1.5' }} {...props} />
     ),
-    h6: ({node, ...props}: any) => (
+    h6: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <h6 className="font-serif font-bold text-[#34495e] mb-2 mt-4" style={{ fontSize: `${fontSize[0] * 0.95}px`, lineHeight: '1.5' }} {...props} />
     ),
-    p: ({node, children, ...props}: any) => {
+    p: ({node: _node, children, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => {
       return (
         <div className="md-p leading-loose text-slate-700 mb-6 text-justify font-serif" style={{ fontSize: `${fontSize[0]}px`, lineHeight: '1.9', letterSpacing: '0.01em' }} {...props}>
           {children}
         </div>
       )
     },
-    strong: ({node, ...props}: any) => (
+    strong: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <strong className="font-black text-amber-700" style={{ fontSize: 'inherit', fontWeight: 900 }} {...props} />
     ),
-    em: ({node, ...props}: any) => (
+    em: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <em className="italic text-stone-600" style={{ fontSize: 'inherit', fontStyle: 'italic' }} {...props} />
     ),
-    blockquote: ({node, ...props}: any) => (
-      <blockquote className="border-l-4 border-amber-500/50 bg-amber-50 px-4 py-1 my-6 rounded-r not-italic text-slate-600 font-serif" style={{ fontSize: `${fontSize[0] * 0.95}px`, lineHeight: '1.8' }} {...props} />
+    blockquote: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
+      <blockquote className="border-l-4 border-amber-500/50 bg-amber-50 px-4 py-1 my-6 rounded-r-lg not-italic text-slate-600 font-serif" style={{ fontSize: `${fontSize[0] * 0.95}px`, lineHeight: '1.8' }} {...props} />
     ),
-    code: ({node, inline, className, children, ...props}: any) => {
+    code: ({node: _node, inline, className, children, ...props}: {node?: unknown, inline?: boolean} & React.HTMLAttributes<HTMLElement>) => {
       if (inline) {
         return (
           <code className="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-serif before:content-none after:content-none" style={{ fontSize: `${fontSize[0] * 0.9}px` }} {...props}>
@@ -545,7 +532,7 @@ export default function BookReaderPage() {
       } else {
         return (
           <div className="my-6">
-            <pre className="bg-[#2c3e50] text-stone-100 p-4 rounded-lg overflow-x-auto font-mono shadow-inner" style={{ fontSize: `${fontSize[0] * 0.85}px`, lineHeight: '1.6' }} {...props}>
+            <pre className="bg-ink-800 text-stone-100 p-4 rounded-lg overflow-x-auto font-mono shadow-inner" style={{ fontSize: `${fontSize[0] * 0.85}px`, lineHeight: '1.6' }} {...props}>
               <code className={className} {...props}>
                 {children}
               </code>
@@ -554,39 +541,39 @@ export default function BookReaderPage() {
         )
       }
     },
-    ul: ({node, ...props}: any) => (
-      <ul className="list-disc list-outside ml-6 mb-6 space-y-2 text-[#2c3e50] font-serif marker:text-slate-400" style={{ fontSize: `${fontSize[0]}px` }} {...props} />
+    ul: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
+      <ul className="list-disc list-outside ml-6 mb-6 space-y-2 text-ink-800 font-serif marker:text-slate-400" style={{ fontSize: `${fontSize[0]}px` }} {...props} />
     ),
-    ol: ({node, ...props}: any) => (
-      <ol className="list-decimal list-outside ml-6 mb-6 space-y-2 text-[#2c3e50] font-serif marker:text-slate-400" style={{ fontSize: `${fontSize[0]}px` }} {...props} />
+    ol: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
+      <ol className="list-decimal list-outside ml-6 mb-6 space-y-2 text-ink-800 font-serif marker:text-slate-400" style={{ fontSize: `${fontSize[0]}px` }} {...props} />
     ),
-    li: ({node, ...props}: any) => (
+    li: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <li className="leading-relaxed" style={{ fontSize: 'inherit', lineHeight: '1.8' }} {...props} />
     ),
-    a: ({node, ...props}: any) => (
-      <a className="text-[#c0392b] hover:text-[#a93226] underline underline-offset-4 decoration-stone-300 transition-colors" style={{ fontSize: 'inherit' }} {...props} />
+    a: ({node: _node, ...props}: {node?: unknown} & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+      <a className="text-cinnabar-500 hover:text-cinnabar-600 underline underline-offset-4 decoration-stone-300 transition-colors" style={{ fontSize: 'inherit' }} {...props} />
     ),
-    hr: ({node, ...props}: any) => (
+    hr: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <hr className="my-8 border-stone-200" {...props} />
     ),
-    table: ({node, ...props}: any) => (
+    table: ({node: _node, ...props}: {node?: unknown} & React.TableHTMLAttributes<HTMLTableElement>) => (
       <div className="overflow-x-auto my-6 rounded-lg border border-stone-200">
         <table className="w-full text-sm text-left text-stone-600 font-serif" style={{ fontSize: `${fontSize[0] * 0.9}px` }} {...props} />
       </div>
     ),
-    thead: ({node, ...props}: any) => (
-      <thead className="text-xs text-stone-700 uppercase bg-[#f5f1e8]" {...props} />
+    thead: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
+      <thead className="text-xs text-stone-700 uppercase bg-paper-100" {...props} />
     ),
-    th: ({node, ...props}: any) => (
+    th: ({node: _node, ...props}: {node?: unknown} & React.ThHTMLAttributes<HTMLTableCellElement>) => (
       <th className="px-6 py-3 font-serif font-bold" {...props} />
     ),
-    tbody: ({node, ...props}: any) => (
+    tbody: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <tbody {...props} />
     ),
-    tr: ({node, ...props}: any) => (
+    tr: ({node: _node, ...props}: {node?: unknown} & React.HTMLAttributes<HTMLElement>) => (
       <tr className="bg-white border-b border-stone-100 hover:bg-stone-50" {...props} />
     ),
-    td: ({node, ...props}: any) => (
+    td: ({node: _node, ...props}: {node?: unknown} & React.TdHTMLAttributes<HTMLTableCellElement>) => (
       <td className="px-6 py-4" {...props} />
     ),
   }), [fontSize])
@@ -669,7 +656,7 @@ export default function BookReaderPage() {
     const items: Array<{ title: string; chapterIndex: number; tocIndex: number }> = []
     chapters.forEach((chapter, index) => {
       const parsed = parseOcrContent(chapter.content)
-      parsed.toc.forEach((title, tocIdx) => {
+      parsed.toc.forEach((title) => {
         items.push({ title, chapterIndex: index, tocIndex: items.length })
       })
     })
@@ -725,7 +712,7 @@ export default function BookReaderPage() {
         }
       }
     }
-  }, [safeActiveIndex, chapters])
+  }, [safeActiveIndex, chapters, currentTocItemIndex, tocItems])
   
   const activeTocItem = currentTocItemIndex !== null && currentTocItemIndex >= 0 && currentTocItemIndex < tocItems.length
     ? tocItems[currentTocItemIndex]
@@ -759,7 +746,7 @@ export default function BookReaderPage() {
       })
       readStartAtRef.current = null
     }
-  }, [book?.id])
+  }, [book?.id, book?.title])
 
   useEffect(() => {
     if (!book?.id) return
@@ -777,7 +764,7 @@ export default function BookReaderPage() {
     return () => {
       document.removeEventListener('copy', handler)
     }
-  }, [book?.id])
+  }, [book?.id, book?.title])
   
   useEffect(() => {
     if (viewMode === 'text' && tocItems.length > 0) {
@@ -790,71 +777,16 @@ export default function BookReaderPage() {
     } else if (viewMode === 'slices') {
       setCurrentTocItemIndex(null)
     }
-  }, [viewMode, tocItems.length, safeActiveIndex])
+  }, [viewMode, tocItems.length, safeActiveIndex, currentTocItemIndex, tocItems])
 
   useEffect(() => {
     if (viewMode === 'slices' && activeSlicePage?.no) {
       setImageLoading((prev) => ({ ...prev, [activeSlicePage.no]: true }))
     }
   }, [viewMode, activeSlicePage?.no])
-  const { toc: currentToc, mainText: currentMainText } = useMemo(() => {
+  const { mainText: currentMainText } = useMemo(() => {
     return parseOcrContent(activeChapter?.content || null)
   }, [activeChapter?.content])
-
-  const filteredMainText = useMemo(() => {
-    if (!currentMainText || !activeTocTitle || allTocItems.length === 0) return currentMainText
-    
-    const chapterTocItems = allTocItems.filter(item => item.chapterIndex === safeActiveIndex)
-    const currentTocIndex = chapterTocItems.findIndex(item => item.title === activeTocTitle)
-    
-    if (currentTocIndex < 0 || chapterTocItems.length <= 1) return currentMainText
-    
-    const lines = currentMainText.split('\n')
-    let startIndex = -1
-    let endIndex = lines.length
-    
-    const normalizeTitle = (title: string) => title.trim().replace(/^#+\s+/, '')
-    const currentTitleNormalized = normalizeTitle(activeTocTitle)
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim()
-      const normalizedLine = normalizeTitle(line)
-      
-      if (normalizedLine === currentTitleNormalized || 
-          (normalizedLine.includes(currentTitleNormalized) && 
-           Math.abs(normalizedLine.length - currentTitleNormalized.length) <= 5)) {
-        startIndex = i
-        break
-      }
-    }
-    
-    if (startIndex >= 0 && currentTocIndex < chapterTocItems.length - 1) {
-      const nextTocTitle = chapterTocItems[currentTocIndex + 1].title
-      const nextTitleNormalized = normalizeTitle(nextTocTitle)
-      
-      for (let i = startIndex + 1; i < lines.length; i++) {
-        const line = lines[i].trim()
-        const normalizedLine = normalizeTitle(line)
-        
-        if (normalizedLine === nextTitleNormalized || 
-            (normalizedLine.includes(nextTitleNormalized) && 
-             Math.abs(normalizedLine.length - nextTitleNormalized.length) <= 5)) {
-          endIndex = i
-          break
-        }
-      }
-    }
-    
-    if (startIndex >= 0) {
-      const filteredLines = lines.slice(startIndex, endIndex)
-      const cleanedLines = filteredLines.length > 0
-        ? [filteredLines[0].replace(/^#+\s+/, '').trim(), ...filteredLines.slice(1)]
-        : filteredLines
-      return cleanedLines.join('\n').trim()
-    }
-    
-    return currentMainText
-  }, [currentMainText, activeTocTitle, allTocItems, safeActiveIndex])
 
   const parseParagraphs = useMemo(() => {
     return (text: string | null) => {
@@ -881,8 +813,6 @@ export default function BookReaderPage() {
       })
     }
   }, [])
-
-  const paragraphsPerPage = 10
 
   const textSegments = useMemo(() => {
     if (viewMode === 'slices') return []
@@ -1001,7 +931,6 @@ export default function BookReaderPage() {
       if (safeTarget < pageBase + seg.pages) {
         setActiveIndex(seg.chapterIndex)
         setCurrentTocItemIndex(seg.tocGlobalIndex)
-        setCurrentPageIndex(0)
         return
       }
       pageBase += seg.pages
@@ -1011,7 +940,6 @@ export default function BookReaderPage() {
     if (!last) return
     setActiveIndex(last.chapterIndex)
     setCurrentTocItemIndex(last.tocGlobalIndex)
-    setCurrentPageIndex(0)
   }, [textSegments, totalPages, viewMode])
 
   useEffect(() => {
@@ -1034,9 +962,9 @@ export default function BookReaderPage() {
       if (cancelled) return
       if (!data) return
 
-      const rawViewMode = typeof (data as any).view_mode === 'string' ? String((data as any).view_mode) : 'text'
+      const rawViewMode = typeof (data as Record<string, unknown>).view_mode === 'string' ? String((data as Record<string, unknown>).view_mode) : 'text'
       const viewMode = rawViewMode === 'slices' ? 'slices' : 'text'
-      const pageIndexRaw = (data as any).page_index
+      const pageIndexRaw = (data as Record<string, unknown>).page_index
       const pageIndex =
         typeof pageIndexRaw === 'number' && Number.isFinite(pageIndexRaw) ? Math.max(0, Math.floor(pageIndexRaw)) : 0
 
@@ -1115,7 +1043,7 @@ export default function BookReaderPage() {
             },
             { onConflict: 'user_id,book_id' }
           )
-        } catch (e) {}
+        } catch {}
       }
       void write()
     }, 800)
@@ -1153,8 +1081,8 @@ export default function BookReaderPage() {
         throw new Error(msg)
       }
       const manifestUrl =
-        isRecord(json) && isRecord((json as any).slices) && typeof (json as any).slices.manifest_url === 'string'
-          ? String((json as any).slices.manifest_url).trim()
+        isRecord(json) && isRecord((json as Record<string, unknown>).slices) && typeof ((json as Record<string, unknown>).slices as Record<string, unknown>).manifest_url === 'string'
+          ? String(((json as Record<string, unknown>).slices as Record<string, unknown>).manifest_url).trim()
           : ''
       if (!manifestUrl) throw new Error('切片服务未返回 manifest_url')
       setBook((prev) => {
@@ -1166,7 +1094,7 @@ export default function BookReaderPage() {
             ...prevPayload,
             slices: {
               ...(isRecord(prevPayload.slices) ? (prevPayload.slices as Record<string, unknown>) : {}),
-              ...(isRecord((json as any).slices) ? ((json as any).slices as Record<string, unknown>) : {}),
+              ...(isRecord((json as Record<string, unknown>).slices) ? ((json as Record<string, unknown>).slices as Record<string, unknown>) : {}),
               manifest_url: manifestUrl,
             },
           },
@@ -1289,15 +1217,15 @@ export default function BookReaderPage() {
       <div className="flex flex-col h-full paper-texture overflow-hidden text-stone-800 relative">
         
         {/* 1. 顶部导航栏 */}
-        <header className="flex-none h-14 border-b border-stone-200/60 bg-[#fdfbf7]/90 backdrop-blur-md px-3 md:px-4 flex items-center justify-between z-20 relative">
+        <header className="flex-none h-14 border-b border-stone-200/60 bg-paper-50/90 backdrop-blur-md px-3 md:px-4 flex items-center justify-between z-20 relative">
           <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
-            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600 flex-shrink-0" onClick={() => router.push('/library/books')}>
+            <Button variant="ghost" size="icon" className="hover:bg-stone-100 text-stone-600 shrink-0" onClick={() => router.push('/library/books')}>
               <ChevronLeft className="w-5 h-5" />
             </Button>
             
             <div className="flex flex-col overflow-hidden">
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold font-serif text-stone-800 truncate max-w-[9.375rem] md:max-w-xs">{book.title}</h1>
+                <h1 className="text-sm font-bold font-serif text-stone-800 truncate max-w-40 md:max-w-xs">{book.title}</h1>
                 <div className="hidden sm:flex gap-1">
                   <Badge variant="secondary" className="text-[0.625rem] h-5 bg-white/60 backdrop-blur-sm border-stone-200 text-stone-500 px-1.5 shadow-none">
                     {normalizeCategory(book.category)}
@@ -1307,11 +1235,11 @@ export default function BookReaderPage() {
                   </Badge>
                 </div>
               </div>
-              <span className="text-[0.625rem] text-stone-500 truncate max-w-[12.5rem] md:max-w-md">{activeTitle}</span>
+              <span className="text-[0.625rem] text-stone-500 truncate max-w-50 md:max-w-md">{activeTitle}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 md:gap-2 shrink-0">
             {sliceEnabled && (
               <Button
                 variant="ghost"
@@ -1470,7 +1398,6 @@ export default function BookReaderPage() {
                               onClick={() => {
                                 setActiveIndex(item.chapterIndex)
                                 setCurrentTocItemIndex(idx)
-                                setCurrentPageIndex(0)
                                 // 移动端点击后自动收起
                                 if (window.innerWidth < 768) setSidebarOpen(false)
                               }}
@@ -1564,10 +1491,13 @@ export default function BookReaderPage() {
                             </Button>
                           </div>
                         ) : (
-                          <img
+                          <Image
                             src={activeSlicePage.url}
                             alt={activeSliceTitle || 'page'}
                             className="w-full h-auto block"
+                            width={activeSlicePage.width || 800}
+                            height={activeSlicePage.height || 1200}
+                            unoptimized
                             onLoad={() => {
                               setImageLoading((prev) => {
                                 const next = { ...prev }
@@ -1614,7 +1544,7 @@ export default function BookReaderPage() {
                             return (
                               <div
                                 key={idx}
-                                className="annotation-block border-l-4 border-[#8c7b75] bg-[#f5f1e8]/50 px-4 md:px-6 py-4 my-6 rounded-r"
+                                className="annotation-block border-l-4 border-[#8c7b75] bg-paper-100/50 px-4 md:px-6 py-4 my-6 rounded-r-lg"
                                 style={{ fontSize: `${fontSize[0] * 0.9}px` }}
                               >
                                 <span className="annotation-label text-[#8c7b75] font-bold text-sm uppercase tracking-wider block mb-2">注释</span>
@@ -1716,7 +1646,7 @@ export default function BookReaderPage() {
                 className="absolute inset-0 bg-black/20 backdrop-blur-[0.0625rem]" 
                 onClick={() => setMobileRightSidebarOpen(false)}
               />
-              <aside className="absolute top-0 right-0 h-full w-80 bg-[#fdfbf7] shadow-xl animate-in slide-in-from-right duration-300">
+              <aside className="absolute top-0 right-0 h-full w-80 bg-paper-50 shadow-xl animate-in slide-in-from-right duration-300">
                 {renderRightSidebarContent()}
               </aside>
             </div>

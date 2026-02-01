@@ -148,6 +148,10 @@ export interface Post {
   divination_record?: DivinationRecord | null
   // 文章封面图URL
   cover_image_url?: string | null
+  // 置顶截止时间
+  sticky_until?: string | null
+  // 是否加急
+  is_urgent?: boolean
 }
 
 export interface Comment {
@@ -155,7 +159,7 @@ export interface Comment {
   post_id: string
   user_id: string
   parent_id: string | null
-  content: string
+  content: string | null
   like_count: number
   created_at: string
   updated_at: string
@@ -172,6 +176,10 @@ export interface Comment {
   } | null
   // 是否已点赞
   is_liked?: boolean
+  // 内容是否模糊（未解锁）
+  is_blurred?: boolean
+  is_paywalled?: boolean
+  unlock_count?: number
   // 子评论（保留用于向后兼容，但平铺模式下不使用）
   replies?: Comment[]
   // 被回复的评论信息（用于微博模式）
@@ -194,12 +202,14 @@ export interface CreatePostInput {
   divination_record_id?: string | null
   cover_image_url?: string | null
   method?: DivinationMethodType | null
+  is_urgent?: boolean
 }
 
 export interface CreateCommentInput {
   post_id: string
   content: string
   parent_id?: string | null
+  is_paywalled?: boolean
 }
 
 export interface PostRow {
@@ -221,6 +231,8 @@ export interface PostRow {
   divination_records?: DivinationRecord | DivinationRecord[] | null
   cover_image_url?: string | null
   type?: 'theory' | 'help' | 'debate' | 'chat'
+  sticky_until?: string | null
+  is_urgent?: boolean
 }
 
 export interface ProfileRow {
@@ -263,11 +275,6 @@ export async function getPosts(options?: {
   orderDirection?: 'asc' | 'desc'
   followed?: boolean
 }): Promise<Post[]> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
   const {
     limit = 20,
     offset = 0,
@@ -277,139 +284,34 @@ export async function getPosts(options?: {
     followed = false,
   } = options || {}
 
-  // 如果是关注列表，先获取关注的用户ID
-  let followedUserIds: string[] = []
-  if (followed) {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return []
-    }
-    
-    const { data: follows } = await supabase
-      .from('user_follows')
-      .select('following_id')
-      .eq('follower_id', currentUser.id)
-      
-    if (!follows || follows.length === 0) {
-      return []
-    }
-    
-    followedUserIds = follows.map(f => f.following_id)
-  }
+  const params = new URLSearchParams()
+  params.set('limit', limit.toString())
+  params.set('offset', offset.toString())
+  if (type) params.set('type', type)
+  params.set('orderBy', orderBy)
+  params.set('orderDirection', orderDirection)
+  if (followed) params.set('followed', 'true')
 
-  // 查询帖子，同时获取关联的排盘记录
-  // 只查询已发布的帖子（status = 'published'），排除草稿
-  let query = supabase
-    .from('posts')
-    .select(`
-      *,
-      divination_records (
-        id,
-        original_key,
-        changed_key,
-        lines,
-        changing_flags,
-        method,
-        original_json
-      )
-    `)
-    .in('status', ['published', 'hidden', 'archived'])  // 显示发布、隐藏和已结案的帖子
-    .order(orderBy, { ascending: orderDirection === 'asc' })
-    .range(offset, offset + limit - 1)
+  const res = await fetch(`/api/community/posts?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
 
-  // 如果指定了类型，添加过滤
-  if (type) {
-    query = query.eq('type', type)
-  }
-
-  // 如果是关注列表，过滤用户ID
-  if (followed) {
-    query = query.in('user_id', followedUserIds)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    const error = new Error(errorData.error || 'Failed to fetch posts')
     logError('Error fetching posts:', error)
     throw error
   }
 
-  if (!data || data.length === 0) {
-    return []
-  }
-
-  // 获取所有唯一的 user_id
-  const userIds = [...new Set(data.map((post) => post.user_id).filter(Boolean))]
-
-  // 批量查询用户信息
-  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
-  if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .in('id', userIds)
-
-    if (profiles) {
-      profiles.forEach((profile) => {
-        profilesMap.set(profile.id, profile)
-      })
-    }
-  }
-
-  // 获取当前用户ID，用于检查是否已点赞
-  const currentUser = await getCurrentUser()
-  const userId = currentUser?.id
-
-  // 获取用户点赞的帖子ID列表
-  let likedPostIds: string[] = []
-  // 获取用户收藏的帖子ID列表
-  let favoritedPostIds: string[] = []
-  if (userId) {
-    const [likesResult, favoritesResult] = await Promise.all([
-      supabase
-        .from('post_likes')
-        .select('post_id')
-        .eq('user_id', userId)
-        .in('post_id', data.map((p) => p.id)),
-      supabase
-        .from('post_favorites')
-        .select('post_id')
-        .eq('user_id', userId)
-        .in('post_id', data.map((p) => p.id))
-    ])
-
-    likedPostIds = likesResult.data?.map(l => l.post_id) || []
-    favoritedPostIds = favoritesResult.data?.map(f => f.post_id) || []
-  }
-
-  // 格式化数据并合并用户信息
-  // 注意：divination_records 可能是数组，需要处理
-  return data.map((post) => {
-    // 处理 divination_records：如果是数组且只有一个元素，取第一个；如果是对象，直接使用
-    let divinationRecord: DivinationRecord | null = null
-    if (post.divination_records) {
-      if (Array.isArray(post.divination_records)) {
-        divinationRecord = post.divination_records.length > 0 ? (post.divination_records[0] as DivinationRecord) : null
-      } else {
-        divinationRecord = post.divination_records as DivinationRecord
-      }
-    }
-
-    return {
-      ...post,
-      author: profilesMap.get(post.user_id) || null,
-      is_liked: likedPostIds.includes(post.id),
-      is_favorited: favoritedPostIds.includes(post.id),
-      divination_record: divinationRecord,
-    }
-  })
+  return res.json()
 }
 
 /**
  * 获取相关文章列表（排除求测类帖子）
  */
-export async function getRelatedPosts(currentPostId: string, limit = 5): Promise<Post[]> {
-  const supabase = getSupabaseClient()
+export async function getRelatedPosts(currentPostId: string, limit = 5, options?: { supabase?: SupabaseClient }): Promise<Post[]> {
+  const supabase = options?.supabase || getSupabaseClient()
   if (!supabase) {
     throw new Error('Supabase client not initialized')
   }
@@ -417,7 +319,7 @@ export async function getRelatedPosts(currentPostId: string, limit = 5): Promise
   // 获取不包含 help 类型的帖子，且不包含当前帖子
   const { data, error } = await supabase
     .from('posts')
-    .select('*')
+    .select('*, author:profiles!posts_user_id_profiles_fkey(id, nickname, avatar_url)')
     .neq('type', 'help') // 排除求测类
     .neq('id', currentPostId) // 排除当前帖子
     .in('status', ['published']) // 只显示已发布
@@ -433,26 +335,9 @@ export async function getRelatedPosts(currentPostId: string, limit = 5): Promise
     return []
   }
 
-  // 获取用户信息
-  const userIds = [...new Set(data.map((post) => post.user_id).filter(Boolean))]
-  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
-  
-  if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .in('id', userIds)
-
-    if (profiles) {
-      profiles.forEach((profile) => {
-        profilesMap.set(profile.id, profile)
-      })
-    }
-  }
-
-  return data.map((post) => ({
+  return data.map((post: any) => ({
     ...post,
-    author: profilesMap.get(post.user_id) || null,
+    author: post.author || null,
     // 相关文章列表不需要点赞/收藏状态，简化处理
     is_liked: false,
     is_favorited: false,
@@ -462,13 +347,13 @@ export async function getRelatedPosts(currentPostId: string, limit = 5): Promise
 /**
  * 获取单个帖子详情
  */
-export async function getPost(postId: string): Promise<Post | null> {
+export async function getPost(postId: string, options?: { supabase?: SupabaseClient; signal?: AbortSignal }): Promise<Post | null> {
   if (!postId) {
     console.warn('getPost called with empty postId')
     return null
   }
 
-  const supabase = getSupabaseClient()
+  const supabase = options?.supabase || getSupabaseClient()
   if (!supabase) {
     throw new Error('Supabase client not initialized')
   }
@@ -489,7 +374,14 @@ export async function getPost(postId: string): Promise<Post | null> {
 
   // 浏览帖子时自动增加修业值（防刷机制：每个帖子每天只能获得一次EXP）
   try {
-    const currentUser = await getCurrentUser()
+    let currentUser = null
+    if (options?.supabase) {
+      const { data } = await supabase.auth.getUser()
+      currentUser = data.user
+    } else {
+      currentUser = await getCurrentUser()
+    }
+
     if (currentUser) {
       const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD格式
       
@@ -534,13 +426,24 @@ export async function getPost(postId: string): Promise<Post | null> {
     console.error('Failed to add exp for post view:', error)
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('posts')
-    .select('*')
+    .select('*, author:profiles!posts_user_id_profiles_fkey(id, nickname, avatar_url)')
     .eq('id', postId)
     .single()
 
+  if (options?.signal) {
+    // @ts-expect-error - abortSignal is available in newer versions of supabase-js but types might not be updated
+    query = query.abortSignal(options.signal)
+  }
+
+  const { data, error } = await query
+
   if (error) {
+    if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+      return null // Or rethrow, but for getPost returning null is often acceptable if not critical
+    }
+    
     // 如果是帖子不存在（PGRST116），返回 null 而不是抛出错误
     if (error.code === 'PGRST116') {
       console.debug(`Post ${postId} not found (may have been deleted)`)
@@ -569,20 +472,6 @@ export async function getPost(postId: string): Promise<Post | null> {
 
   if (!data) {
     return null
-  }
-
-  // 查询用户信息
-  let author = null
-  if (data.user_id) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .eq('id', data.user_id)
-      .single()
-
-    if (profile) {
-      author = profile
-    }
   }
 
   // 检查是否已点赞和已收藏
@@ -640,7 +529,7 @@ export async function getPost(postId: string): Promise<Post | null> {
 
   return {
     ...data,
-    author,
+    author: data.author || null,
     is_liked: isLiked,
     is_favorited: isFavorited,
     divination_record: divinationRecord,
@@ -720,6 +609,7 @@ export async function updatePost(
   if ('bounty' in updates) updateData.bounty = updates.bounty
   if ('divination_record_id' in updates) updateData.divination_record_id = updates.divination_record_id
   if ('method' in updates) updateData.method = updates.method
+  if ('is_urgent' in updates) updateData.is_urgent = updates.is_urgent
 
   const { data, error } = await supabase
     .from('posts')
@@ -765,6 +655,7 @@ export async function getUserPosts(options?: {
   offset?: number
   orderBy?: 'created_at' | 'like_count' | 'comment_count' | 'view_count'
   orderDirection?: 'asc' | 'desc'
+  signal?: AbortSignal
 }): Promise<Post[]> {
   const supabase = getSupabaseClient()
   if (!supabase) {
@@ -789,6 +680,10 @@ export async function getUserPosts(options?: {
     orderBy = 'created_at',
     orderDirection = 'desc',
   } = options || {}
+
+  if (options?.signal?.aborted) {
+    return []
+  }
 
   // 查询用户的帖子，同时获取关联的排盘记录
   // 如果查看的是当前用户的帖子，包括草稿；否则只显示已发布的
@@ -821,9 +716,16 @@ export async function getUserPosts(options?: {
     query = query.in('status', ['published', 'draft', 'pending', 'hidden', 'rejected', 'archived'])
   }
 
+  if (options?.signal) {
+    query = query.abortSignal(options.signal)
+  }
+
   const { data, error } = await query
 
   if (error) {
+    if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+      return []
+    }
     console.error('Error fetching user posts:', error)
     throw error
   }
@@ -849,17 +751,30 @@ export async function getUserPosts(options?: {
   let likedPostIds: string[] = []
   let favoritedPostIds: string[] = []
   if (currentUser) {
+    let likesQuery = supabase
+      .from('post_likes')
+      .select('post_id')
+      .eq('user_id', currentUser.id)
+      .in('post_id', data.map((p) => p.id))
+
+    let favoritesQuery = supabase
+      .from('post_favorites')
+      .select('post_id')
+      .eq('user_id', currentUser.id)
+      .in('post_id', data.map((p) => p.id))
+
+    if (options?.signal) {
+      likesQuery = likesQuery.abortSignal(options.signal)
+      favoritesQuery = favoritesQuery.abortSignal(options.signal)
+    }
+
+    if (options?.signal?.aborted) {
+      return []
+    }
+
     const [likesResult, favoritesResult] = await Promise.all([
-      supabase
-        .from('post_likes')
-        .select('post_id')
-        .eq('user_id', currentUser.id)
-        .in('post_id', data.map((p) => p.id)),
-      supabase
-        .from('post_favorites')
-        .select('post_id')
-        .eq('user_id', currentUser.id)
-        .in('post_id', data.map((p) => p.id))
+      likesQuery,
+      favoritesQuery
     ])
 
     likedPostIds = likesResult.data?.map(l => l.post_id) || []
@@ -894,6 +809,7 @@ export async function getUserPosts(options?: {
 export async function getUserFavoritePosts(options?: {
   limit?: number
   offset?: number
+  signal?: AbortSignal
 }): Promise<Post[]> {
   const supabase = getSupabaseClient()
   if (!supabase) {
@@ -911,14 +827,23 @@ export async function getUserFavoritePosts(options?: {
   } = options || {}
 
   // 先获取用户收藏的帖子ID列表
-  const { data: favorites, error: favoritesError } = await supabase
+  let query = supabase
     .from('post_favorites')
     .select('post_id')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
+  if (options?.signal) {
+    query = query.abortSignal(options.signal)
+  }
+
+  const { data: favorites, error: favoritesError } = await query
+
   if (favoritesError) {
+    if (favoritesError.message?.includes('AbortError') || favoritesError.details?.includes('AbortError')) {
+      return []
+    }
     console.error('Error fetching favorite posts:', favoritesError)
     throw favoritesError
   }
@@ -931,7 +856,7 @@ export async function getUserFavoritePosts(options?: {
 
   // 查询帖子详情，同时获取关联的排盘记录
   // 只查询已发布的帖子，排除草稿
-  const { data: posts, error: postsError } = await supabase
+  let postsQuery = supabase
     .from('posts')
     .select(`
       *,
@@ -949,7 +874,16 @@ export async function getUserFavoritePosts(options?: {
     .in('status', ['published', 'archived'])  // 只显示已发布和已结案的帖子
     .order('created_at', { ascending: false })
 
+  if (options?.signal) {
+    postsQuery = postsQuery.abortSignal(options.signal)
+  }
+
+  const { data: posts, error: postsError } = await postsQuery
+
   if (postsError) {
+    if (postsError.message?.includes('AbortError') || postsError.details?.includes('AbortError')) {
+      return []
+    }
     console.error('Error fetching posts:', postsError)
     throw postsError
   }
@@ -964,10 +898,16 @@ export async function getUserFavoritePosts(options?: {
   // 批量查询用户信息
   const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
   if (userIds.length > 0) {
-    const { data: profiles } = await supabase
+    let profilesQuery = supabase
       .from('profiles')
       .select('id, nickname, avatar_url')
       .in('id', userIds)
+
+    if (options?.signal) {
+      profilesQuery = profilesQuery.abortSignal(options.signal)
+    }
+
+    const { data: profiles } = await profilesQuery
 
     if (profiles) {
       profiles.forEach((profile: ProfileRow) => {
@@ -979,13 +919,24 @@ export async function getUserFavoritePosts(options?: {
   // 获取当前用户点赞的帖子ID列表
   let likedPostIds: string[] = []
   const favoritedPostIds: string[] = postIds
-  const [likesResult] = await Promise.all([
-    supabase
-      .from('post_likes')
-      .select('post_id')
-      .eq('user_id', currentUser.id)
-      .in('post_id', postIds),
-  ])
+  
+  let likesQuery = supabase
+    .from('post_likes')
+    .select('post_id')
+    .eq('user_id', currentUser.id)
+    .in('post_id', postIds)
+
+  if (options?.signal) {
+    likesQuery = likesQuery.abortSignal(options.signal)
+  }
+
+  if (options?.signal?.aborted) {
+      return []
+    }
+
+    const [likesResult] = await Promise.all([
+      likesQuery
+    ])
 
   likedPostIds = likesResult.data?.map(l => l.post_id) || []
 
@@ -1017,6 +968,7 @@ export async function getUserFavoritePosts(options?: {
 export async function getUserLikedPosts(options?: {
   limit?: number
   offset?: number
+  signal?: AbortSignal
 }): Promise<Post[]> {
   const supabase = getSupabaseClient()
   if (!supabase) {
@@ -1034,14 +986,23 @@ export async function getUserLikedPosts(options?: {
   } = options || {}
 
   // 先获取用户点赞的帖子ID列表
-  const { data: likes, error: likesError } = await supabase
+  let query = supabase
     .from('post_likes')
     .select('post_id')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
+  if (options?.signal) {
+    query = query.abortSignal(options.signal)
+  }
+
+  const { data: likes, error: likesError } = await query
+
   if (likesError) {
+    if (likesError.message?.includes('AbortError') || likesError.details?.includes('AbortError')) {
+      return []
+    }
     logError('Error fetching liked posts:', likesError)
     const likesErrorMessage = (likesError as { message?: string })?.message
     throw likesError instanceof Error
@@ -1057,7 +1018,7 @@ export async function getUserLikedPosts(options?: {
 
   // 查询帖子详情，同时获取关联的排盘记录
   // 只查询已发布的帖子，排除草稿
-  const { data: posts, error: postsError } = await supabase
+  let postsQuery = supabase
     .from('posts')
     .select(`
       *,
@@ -1075,7 +1036,16 @@ export async function getUserLikedPosts(options?: {
     .in('status', ['published', 'archived'])  // 只显示已发布和已结案的帖子
     .order('created_at', { ascending: false })
 
+  if (options?.signal) {
+    postsQuery = postsQuery.abortSignal(options.signal)
+  }
+
+  const { data: posts, error: postsError } = await postsQuery
+
   if (postsError) {
+    if (postsError.message?.includes('AbortError') || postsError.details?.includes('AbortError')) {
+      return []
+    }
     logError('Error fetching posts:', postsError)
     const postsErrorMessage = (postsError as { message?: string })?.message
     throw postsError instanceof Error
@@ -1108,12 +1078,23 @@ export async function getUserLikedPosts(options?: {
   // 获取当前用户收藏的帖子ID列表
   const likedPostIds: string[] = postIds
   let favoritedPostIds: string[] = []
+  
+  let favoritesQuery = supabase
+    .from('post_favorites')
+    .select('post_id')
+    .eq('user_id', currentUser.id)
+    .in('post_id', postIds)
+
+  if (options?.signal) {
+    favoritesQuery = favoritesQuery.abortSignal(options.signal)
+  }
+
+  if (options?.signal?.aborted) {
+    return []
+  }
+
   const [favoritesResult] = await Promise.all([
-    supabase
-      .from('post_favorites')
-      .select('post_id')
-      .eq('user_id', currentUser.id)
-      .in('post_id', postIds),
+    favoritesQuery,
   ])
 
   favoritedPostIds = favoritesResult.data?.map(f => f.post_id) || []
@@ -1256,99 +1237,37 @@ export async function togglePostFavorite(postId: string): Promise<boolean> {
  * 获取帖子的评论列表
  */
 export async function getComments(postId: string): Promise<Comment[]> {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    throw new Error('Supabase client not initialized')
-  }
-
-  const { data, error } = await supabase
-    .from('comments')
-    .select('*')
-    .eq('post_id', postId)
-    .order('created_at', { ascending: true })
-
-  if (error) {
-    logError('Error fetching comments:', error)
-    throw error
-  }
-
-  if (!data || data.length === 0) {
-    return []
-  }
-
-  // 获取所有唯一的 user_id
-  const userIds = [...new Set(data.map((comment) => comment.user_id).filter(Boolean))]
-
-  // 批量查询用户信息
-  const profilesMap = new Map<string, { id: string; nickname: string | null; avatar_url: string | null }>()
-  if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .in('id', userIds)
-
-    if (profiles) {
-      profiles.forEach((profile) => {
-        profilesMap.set(profile.id, profile)
-      })
-    }
-  }
-
-  // 获取当前用户ID，用于检查是否已点赞
-  const currentUser = await getCurrentUser()
-  const userId = currentUser?.id
-
-  // 获取用户点赞的评论ID列表
-  let likedCommentIds: string[] = []
-  if (userId) {
-    const { data: likes } = await supabase
-      .from('comment_likes')
-      .select('comment_id')
-      .eq('user_id', userId)
-      .in('comment_id', data.map((c: CommentRow) => c.id))
-
-    likedCommentIds = likes?.map(l => l.comment_id) || []
-  }
-
-  // 格式化数据并创建评论映射（用于查找被回复的评论）
-  const commentMap = new Map<string, Comment>()
-  const allComments = data.map((comment: CommentRow) => {
-    const formattedComment: Comment = {
-      ...comment,
-      // 确保 is_adopted 字段被正确保留（对所有用户可见）
-      is_adopted: comment.is_adopted === true || !!comment.adopted_by,
-      adopted_at: comment.adopted_at || null,
-      adopted_by: comment.adopted_by || null,
-      author: profilesMap.get(comment.user_id) || null,
-      is_liked: likedCommentIds.includes(comment.id),
-      replies: [],
-    }
-    commentMap.set(comment.id, formattedComment)
-    return formattedComment
+  const res = await fetch(`/api/community/comments?postId=${encodeURIComponent(postId)}`, {
+    method: 'GET',
   })
 
-  // 为每个评论添加被回复评论的信息（微博模式）
-  allComments.forEach((comment) => {
-    if (comment.parent_id) {
-      const parentComment = commentMap.get(comment.parent_id)
-      if (parentComment) {
-        comment.reply_to = {
-          id: parentComment.id,
-          author: parentComment.author || null,
-        }
-      }
-    }
+  const json = await res.json().catch(() => ({} as any))
+  if (!res.ok) {
+    throw new Error(json?.error || '获取评论失败')
+  }
+
+  return (json?.comments || []) as Comment[]
+}
+
+/**
+ * 解锁评论内容
+ */
+export async function unlockContent(commentId: string): Promise<string> {
+  const res = await fetch('/api/unlock-content', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commentId }),
   })
 
-  // 返回所有评论的平铺列表
-  // 排序规则：已采纳的评论优先显示在最前面，然后按时间排序
-  return allComments.sort((a, b) => {
-    // 如果一个是已采纳，另一个不是，已采纳的排在前面
-    if (a.is_adopted === true && b.is_adopted !== true) return -1
-    if (a.is_adopted !== true && b.is_adopted === true) return 1
-    // 如果都是已采纳或都不是，按时间排序
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    if (res.status === 401) {
+      redirectToLogin()
+    }
+    throw new Error(json?.error || '解锁失败')
+  }
+
+  return json.content
 }
 
 /**
@@ -1868,13 +1787,14 @@ export async function saveDraft(input: CreatePostInput): Promise<Post> {
   }
 
   // 构建插入数据，只包含有值的字段
-  const insertData: Record<string, string | number | null | undefined> = {
+  const insertData: Record<string, string | number | boolean | null | undefined> = {
     user_id: currentUser.id,
     title: input.title || '未命名草稿',
     content: input.content || '',
     content_html: input.content_html || input.content || '',
     type: input.type || 'theory',
     method: input.method ?? null,
+    is_urgent: input.is_urgent ?? false,
   }
 
   // 只添加有值的可选字段
@@ -2021,6 +1941,7 @@ export async function updateDraft(
       bounty: updates.bounty,
       divination_record_id: updates.divination_record_id,
       method: updates.method,
+      is_urgent: updates.is_urgent,
     })
     .eq('id', draftId)
     .eq('user_id', currentUser.id)
@@ -2128,6 +2049,7 @@ export async function getUserDrafts(
   options?: {
     limit?: number
     offset?: number
+    signal?: AbortSignal
   }
 ): Promise<Post[]> {
   const supabase = getSupabaseClient()
@@ -2145,7 +2067,7 @@ export async function getUserDrafts(
     offset = 0,
   } = options || {}
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('posts')
     .select('*,divination_records(id,original_key,changed_key,lines,changing_flags,method,original_json,question,divination_time)')
     .eq('user_id', currentUser.id)
@@ -2153,7 +2075,16 @@ export async function getUserDrafts(
     .order('updated_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
+  if (options?.signal) {
+    query = query.abortSignal(options.signal)
+  }
+
+  const { data, error } = await query
+
   if (error) {
+    if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+      return []
+    }
     const message = typeof (error as any)?.message === 'string' ? (error as any).message : ''
     if (message.includes('Failed to fetch')) {
       console.warn('Error fetching drafts (network):', error)

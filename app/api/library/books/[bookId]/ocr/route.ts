@@ -136,6 +136,22 @@ function buildContentTextFromChapters(chapters: Array<{ chapter_title?: string |
   return parts.join('\n\n').trim()
 }
 
+/**
+ * @swagger
+ * /api/library/books/{bookId}/ocr:
+ *   post:
+ *     summary: POST /api/library/books/{bookId}/ocr
+ *     description: Auto-generated description for POST /api/library/books/{bookId}/ocr
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(_req: NextRequest, context: { params: Promise<{ bookId: string }> }) {
   try {
     console.log('[OCR Route] Request received')

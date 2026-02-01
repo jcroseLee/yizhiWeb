@@ -1,3 +1,4 @@
+import { log, LogLevel } from '@/lib/utils/logger'
 import { getCurrentUser } from './auth'
 import { getSupabaseClient } from './supabaseClient'
 
@@ -100,7 +101,7 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('exp, reputation, yi_coins, cash_balance, title_level, last_checkin_date, consecutive_checkin_days')
+      .select('exp, reputation, yi_coins, coin_paid, coin_free, cash_balance, title_level, last_checkin_date, consecutive_checkin_days')
       .eq('id', user.id)
       .single()
 
@@ -136,6 +137,8 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
     const exp = data.exp || 0
     const reputation = data.reputation || 0
     const titleLevel = data.title_level || 1
+    const coinPaid = (data as any).coin_paid || 0
+    const coinFree = (data as any).coin_free || 0
 
     return {
       exp,
@@ -143,7 +146,7 @@ export async function getUserGrowth(): Promise<UserGrowth | null> {
       level: calculateLevel(exp),
       titleLevel,
       titleName: getTitleName(titleLevel),
-      yiCoins: data.yi_coins || 0,
+      yiCoins: coinPaid + coinFree,
       cashBalance: parseFloat(data.cash_balance || '0'),
       lastCheckinDate: data.last_checkin_date,
       consecutiveCheckinDays: data.consecutive_checkin_days || 0,
@@ -211,113 +214,30 @@ export async function checkIn(): Promise<{ success: boolean; coins: number; exp:
   }
 
   try {
-    // 获取用户当前数据
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('last_checkin_date, consecutive_checkin_days, yi_coins, exp')
-      .eq('id', user.id)
-      .single()
+    const { data, error } = await supabase.rpc('handle_check_in', { user_id: user.id })
 
-    if (fetchError) {
-      console.error('Error fetching profile:', fetchError)
-      return { success: false, coins: 0, exp: 0, message: '获取用户信息失败' }
-    }
-
-    const today = new Date().toISOString().split('T')[0]
-    const lastCheckin = profile.last_checkin_date
-
-    // 检查今天是否已经签到
-    if (lastCheckin === today) {
-      return { success: false, coins: 0, exp: 0, message: '今日已签到，请明日再来' }
-    }
-
-    // 计算连续签到天数
-    let consecutiveDays = profile.consecutive_checkin_days || 0
-    if (lastCheckin) {
-      const lastDate = new Date(lastCheckin)
-      const todayDate = new Date(today)
-      const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24))
-      
-      if (diffDays === 1) {
-        // 连续签到
-        consecutiveDays += 1
-      } else {
-        // 中断了，重新开始
-        consecutiveDays = 1
-      }
-    } else {
-      // 首次签到
-      consecutiveDays = 1
-    }
-
-    // 计算签到奖励
-    // 易币：基础5-20，连续签到递增
-    const baseCoins = 5 + Math.floor(Math.random() * 16) // 5-20随机
-    const bonusCoins = Math.min(consecutiveDays * 2, 20) // 连续签到奖励，最多+20
-    const totalCoins = baseCoins + bonusCoins
-
-    // 修业值：签到+10，连续7天额外+50
-    let expGain = 10
-    if (consecutiveDays >= 7 && consecutiveDays % 7 === 0) {
-      expGain += 50 // 连续7天奖励
-    }
-
-    // 更新用户数据
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        last_checkin_date: today,
-        consecutive_checkin_days: consecutiveDays,
-        yi_coins: (profile.yi_coins || 0) + totalCoins,
-        exp: (profile.exp || 0) + expGain,
-      })
-      .eq('id', user.id)
-
-    if (updateError) {
-      console.error('Error updating profile:', updateError)
+    if (error) {
+      console.error('Error checking in:', error)
       return { success: false, coins: 0, exp: 0, message: '签到失败，请重试' }
     }
 
-    // 记录易币流水（必须成功，否则回滚）
-    const { error: transactionError } = await supabase
-      .from('coin_transactions')
-      .insert({
-        user_id: user.id,
-        amount: totalCoins,
-        type: 'check_in',
-        description: `每日签到奖励（连续${consecutiveDays}天）`,
-      })
-
-    if (transactionError) {
-      console.error('Error inserting coin transaction:', transactionError)
-      // 如果流水记录失败，回滚易币余额更新
-      await supabase
-        .from('profiles')
-        .update({
-          yi_coins: profile.yi_coins || 0,
-        })
-        .eq('id', user.id)
-      return { success: false, coins: 0, exp: 0, message: '签到失败：无法记录交易流水，请重试' }
+    const result = data as {
+      success: boolean
+      coins: number
+      exp: number
+      consecutive_days: number
+      message: string
     }
 
-    // 记录每日任务（失败不影响签到成功）
-    await supabase
-      .from('daily_tasks_log')
-      .upsert({
-        user_id: user.id,
-        date: today,
-        task_type: 'login',
-        completed: true,
-        completed_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,date,task_type',
-      })
+    if (!result.success) {
+      return { success: false, coins: 0, exp: 0, message: result.message }
+    }
 
-    const message = consecutiveDays >= 7 && consecutiveDays % 7 === 0
-      ? `连续签到${consecutiveDays}天！获得${totalCoins}易币和${expGain}修业值（含连续奖励）`
-      : `签到成功！获得${totalCoins}易币和${expGain}修业值（连续${consecutiveDays}天）`
+    const message = result.consecutive_days >= 7 && result.consecutive_days % 7 === 0
+      ? `连续签到${result.consecutive_days}天！获得${result.coins}易币和${result.exp}修业值（含连续奖励）`
+      : `签到成功！获得${result.coins}易币和${result.exp}修业值（连续${result.consecutive_days}天）`
 
-    return { success: true, coins: totalCoins, exp: expGain, message }
+    return { success: true, coins: result.coins, exp: result.exp, message }
   } catch (error) {
     console.error('Error checking in:', error)
     return { success: false, coins: 0, exp: 0, message: '签到失败，请重试' }
@@ -644,6 +564,8 @@ export async function consumeYiCoins(amount: number, type: string, description?:
     return { success: false, message: '系统错误' }
   }
 
+  log(LogLevel.INFO, 'consumeYiCoins started', { userId: user.id, amount, type, description, relatedId })
+
   try {
     // 检查余额
     const { data: profile } = await supabase
@@ -653,6 +575,7 @@ export async function consumeYiCoins(amount: number, type: string, description?:
       .single()
 
     if (!profile || (profile.yi_coins || 0) < amount) {
+      log(LogLevel.WARN, 'consumeYiCoins insufficient balance', { userId: user.id, amount, balance: profile?.yi_coins })
       return { success: false, message: '易币余额不足' }
     }
 
@@ -663,7 +586,7 @@ export async function consumeYiCoins(amount: number, type: string, description?:
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Error consuming yi_coins:', updateError)
+      log(LogLevel.ERROR, 'consumeYiCoins update profile error', { userId: user.id, error: updateError })
       return { success: false, message: '操作失败，请重试' }
     }
 
@@ -677,10 +600,12 @@ export async function consumeYiCoins(amount: number, type: string, description?:
         description,
         related_id: relatedId,
       })
+    
+    log(LogLevel.INFO, 'consumeYiCoins success', { userId: user.id, amount, type })
 
     return { success: true, message: '操作成功' }
   } catch (error) {
-    console.error('Error consuming yi coins:', error)
+    log(LogLevel.ERROR, 'consumeYiCoins exception', { userId: user.id, error })
     return { success: false, message: '操作失败，请重试' }
   }
 }
@@ -711,6 +636,8 @@ export async function transferYiCoins(
     return { success: false, message: '不能转账给自己' }
   }
 
+  log(LogLevel.INFO, 'transferYiCoins started', { fromUserId, toUserId, amount, type, description, relatedId })
+
   try {
     // 使用数据库函数执行转账（绕过 RLS 限制）
     const { data, error } = await supabase.rpc('transfer_yi_coins', {
@@ -723,7 +650,7 @@ export async function transferYiCoins(
     })
 
     if (error) {
-      console.error('Error calling transfer_yi_coins function:', error)
+      log(LogLevel.ERROR, 'transferYiCoins RPC error', { fromUserId, toUserId, error })
       return { success: false, message: `转账失败: ${error.message || '请重试'}` }
     }
 
@@ -732,7 +659,10 @@ export async function transferYiCoins(
       const result = data as any
       if ('success' in result) {
         if (result.success === true) {
-          console.log('Transfer successful:', {
+          log(LogLevel.INFO, 'transferYiCoins success', {
+            fromUserId,
+            toUserId,
+            amount,
             from_balance: result.from_balance,
             to_balance: result.to_balance,
           })
@@ -741,7 +671,7 @@ export async function transferYiCoins(
             message: (result.message as string) || '转账成功',
           }
         } else {
-          console.error('Transfer failed:', result.message)
+          log(LogLevel.WARN, 'transferYiCoins failed', { fromUserId, toUserId, message: result.message })
           return {
             success: false,
             message: (result.message as string) || '转账失败',
@@ -750,10 +680,10 @@ export async function transferYiCoins(
       }
     }
 
-    console.error('Unexpected response format from transfer_yi_coins:', data)
+    log(LogLevel.ERROR, 'transferYiCoins unexpected response', { data })
     return { success: false, message: '转账失败：服务器返回格式错误' }
   } catch (error: any) {
-    console.error('Error transferring yi coins:', error)
+    log(LogLevel.ERROR, 'transferYiCoins exception', { fromUserId, toUserId, error })
     return { success: false, message: `转账失败: ${error.message || '请重试'}` }
   }
 }

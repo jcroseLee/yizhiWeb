@@ -18,6 +18,22 @@ const getAllowedHosts = () => {
   return Array.from(out)
 }
 
+/**
+ * @swagger
+ * /api/library/pdf/resolve:
+ *   get:
+ *     summary: GET /api/library/pdf/resolve
+ *     description: Auto-generated description for GET /api/library/pdf/resolve
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url)
   const rawUrl = requestUrl.searchParams.get('url')

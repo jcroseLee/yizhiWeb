@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/wechat-bind-phone:
+ *   post:
+ *     summary: POST /api/wechat-bind-phone
+ *     description: Auto-generated description for POST /api/wechat-bind-phone
+ *     tags:
+ *       - Wechat-bind-phone
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   console.log('wechat-bind-phone function invoked.')
 

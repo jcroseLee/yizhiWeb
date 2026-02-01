@@ -14,7 +14,7 @@ export default function ConditionalLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname()
-  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password' || pathname === '/reset-password'
+  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password' || pathname === '/reset-password' || pathname === '/docs' 
   const isHomePage = pathname === '/'
   const isReaderPage = pathname.startsWith('/library/reader/')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)

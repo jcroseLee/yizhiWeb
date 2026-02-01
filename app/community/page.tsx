@@ -135,6 +135,8 @@ function convertPostForCard(post: Post): Parameters<typeof PostCard>[0]['post'] 
     baziPillars: baziInfo?.pillars,
     coverImage: post.cover_image_url || undefined,
     status: post.status,
+    isUrgent: !!post.is_urgent,
+    isSticky: post.sticky_until ? new Date(post.sticky_until) > new Date() : false,
   }
 }
 
@@ -331,7 +333,7 @@ export default function CommunityPage() {
                             key={channel.id}
                             onClick={() => setActiveChannel(channel.id)}
                             className={`
-                              relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-300 flex-shrink-0
+                              relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-300 shrink-0
                               ${isActive 
                                 ? 'text-stone-900 font-bold bg-stone-100' 
                                 : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50'}
@@ -360,7 +362,7 @@ export default function CommunityPage() {
                             </span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="z-30 min-w-[6.25rem] bg-white border border-stone-100 shadow-sm">
+                        <DropdownMenuContent align="end" className="z-30 min-w-25 bg-white border border-stone-100 shadow-sm">
                           <DropdownMenuItem onClick={() => setSortBy('newest')} className="text-xs cursor-pointer">最新发布</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setSortBy('hottest')} className="text-xs cursor-pointer">最多点赞</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setSortBy('viewed')} className="text-xs cursor-pointer">最多浏览</DropdownMenuItem>
@@ -436,7 +438,7 @@ export default function CommunityPage() {
                    <div className="absolute -right-3 -bottom-3 opacity-10 group-hover:opacity-20 transition-opacity">
                      <Compass className="w-16 h-16" />
                    </div>
-                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[5rem]">
+                   <div className="relative z-10 flex flex-col h-full justify-between min-h-20">
                      <Compass className="w-6 h-6 mb-2 text-amber-400 group-hover:rotate-12 transition-transform" />
                      <div>
                        <div className="text-sm font-bold">在线排盘</div>
@@ -451,7 +453,7 @@ export default function CommunityPage() {
                    <div className="absolute -right-3 -bottom-3 text-stone-100 group-hover:text-stone-200 transition-colors">
                      <BookOpen className="w-16 h-16" />
                    </div>
-                   <div className="relative z-10 flex flex-col h-full justify-between min-h-[5rem]">
+                   <div className="relative z-10 flex flex-col h-full justify-between min-h-20">
                      <BookOpen className="w-6 h-6 mb-2 text-[#C82E31] group-hover:scale-110 transition-transform" />
                      <div>
                        <div className="text-sm font-bold">古籍查询</div>

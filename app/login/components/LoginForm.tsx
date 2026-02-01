@@ -17,7 +17,7 @@ interface LoginFormProps {
   onSwitchToRegister?: () => void
 }
 
-type AuthProvider = 'google' | 'github' | 'twitter' | 'facebook' | 'notion' | 'linkedin' | 'alipay' | 'wechat' | 'instagram'
+type AuthProvider = 'google' | 'github' | 'twitter' | 'facebook' | 'notion' | 'linkedin' | 'wechat' | 'instagram'
 
 export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const router = useRouter()
@@ -64,16 +64,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     const err = searchParams.get('error')
     if (!err) return
     const map: Record<string, string> = {
-      alipay_not_configured: '支付宝登录暂不可用，请稍后重试',
-      insecure_base_url: '当前环境回调地址不安全，请使用HTTPS访问',
-      alipay_invalid_callback: '支付宝登录回调参数异常，请重试',
-      alipay_csrf: '登录状态校验失败，请重试',
-      alipay_token_exchange_failed: '支付宝授权失败，请重试',
-      alipay_token_invalid: '支付宝授权信息无效，请重试',
-      alipay_login_failed: '支付宝登录失败，请稍后重试',
       supabase_not_configured: '认证服务未配置',
-      supabase_link_failed: '登录初始化失败，请重试',
-      supabase_session_failed: '登录会话建立失败，请重试',
       too_many_attempts: '登录异常次数过多，请稍后再试',
     }
     setError(map[err] || '登录失败，请稍后重试')
@@ -373,14 +364,6 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
   const handleSocialLogin = async (provider: AuthProvider | string) => {
     try {
-      if (provider === 'alipay') {
-        const redirect = searchParams.get('redirect') || '/'
-        const url = new URL('/api/auth/alipay/start', window.location.origin)
-        url.searchParams.set('redirect', redirect)
-        window.location.href = url.toString()
-        return
-      }
-
       const supabase = createClient()
       if (!supabase) {
         setError('认证服务未配置，请联系管理员')
@@ -390,7 +373,6 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
       // 映射一些自定义 provider string 到 Supabase 支持的
       const providerMap: Record<string, string> = {
         'twitter': 'twitter',
-        'alipay': 'alipay',
         'wechat': 'wechat',
         'instagram': 'instagram',
       }
@@ -414,7 +396,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     { name: 'X', icon: <XIcon className="w-5 h-5" />, provider: 'twitter', bg: 'hover:bg-white/10' },
     { name: 'Facebook', icon: <FacebookIcon className="w-5 h-5" />, provider: 'facebook', bg: 'hover:bg-blue-600/20' },
     { name: 'Instagram', icon: <InstagramIcon className="w-5 h-5" />, provider: 'instagram', bg: 'hover:bg-pink-600/20' },
-    { name: '支付宝', icon: <AlipayIcon className="w-5 h-5 text-[#1677FF]" />, provider: 'alipay', bg: 'hover:bg-blue-500/10' },
+    { name: '支付宝', icon: <AlipayIcon className="w-5 h-5" />, provider: 'alipay', bg: 'hover:bg-yellow-500/10' },
     { name: '微信', icon: <WeChatIcon className="w-5 h-5 text-[#07C160]" />, provider: 'wechat', bg: 'hover:bg-green-500/10' },
   ]
 

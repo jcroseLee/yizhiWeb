@@ -237,6 +237,9 @@ function MessagesPageContent() {
   const urlParamProcessedRef = useRef<string | null>(null)
   const activeChatIdRef = useRef<string | null>(null)
   const activeChatTypeRef = useRef<'private' | 'social' | 'system'>('private')
+  const notificationsAbortControllerRef = useRef<AbortController | null>(null)
+  const conversationsAbortControllerRef = useRef<AbortController | null>(null)
+  const messagesAbortControllerRef = useRef<AbortController | null>(null)
 
   // --- 初始化与数据加载 (保持不变) ---
   useEffect(() => { getCurrentUser().then(setUser) }, [])
@@ -247,35 +250,80 @@ function MessagesPageContent() {
   }, [activeChatId, activeChatType])
 
   const loadConversations = useCallback(async () => {
+    if (conversationsAbortControllerRef.current) {
+      conversationsAbortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    conversationsAbortControllerRef.current = controller
+
     try {
-      const data = await getConversations()
-      setConversations(data)
-    } catch (error) { console.error(error) }
+      const data = await getConversations(50, 0, controller.signal)
+      if (!controller.signal.aborted) {
+        setConversations(data)
+      }
+    } catch (error: any) { 
+      if (
+        (error instanceof Error && error.name === 'AbortError') ||
+        error?.message?.includes('AbortError') ||
+        error?.details?.includes('AbortError')
+      ) return
+      console.error(error) 
+    } finally {
+      if (conversationsAbortControllerRef.current === controller) {
+        conversationsAbortControllerRef.current = null
+      }
+    }
   }, [])
 
   const loadMessages = useCallback(async (otherUserId: string) => {
+    if (messagesAbortControllerRef.current) {
+      messagesAbortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    messagesAbortControllerRef.current = controller
+
     try {
-      const data = await getMessages(otherUserId)
+      const data = await getMessages(otherUserId, 50, 0, controller.signal)
+      if (controller.signal.aborted) return
       setMessages(data)
       await markMessagesAsRead(otherUserId)
       loadConversations()
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    } catch (error) { console.error(error) }
+    } catch (error: any) { 
+      if (
+        (error instanceof Error && error.name === 'AbortError') ||
+        error?.message?.includes('AbortError') ||
+        error?.details?.includes('AbortError')
+      ) return
+      console.error(error) 
+    } finally {
+      if (messagesAbortControllerRef.current === controller) {
+        messagesAbortControllerRef.current = null
+      }
+    }
   }, [loadConversations])
 
   const loadNotifications = useCallback(async () => {
     if (!user || notificationsLoading) return
     
+    if (notificationsAbortControllerRef.current) {
+      notificationsAbortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    notificationsAbortControllerRef.current = controller
+
     setNotificationsLoading(true)
     try {
       const socialTypes = ['like', 'comment', 'reply', 'follow']
       const systemTypes = ['system', 'report_resolved', 'report_rejected']
 
       const [social, system] = await Promise.all([
-        getNotifications(100, 0, false, socialTypes),
-        getNotifications(100, 0, false, systemTypes)
+        getNotifications(100, 0, false, socialTypes, controller.signal),
+        getNotifications(100, 0, false, systemTypes, controller.signal)
       ])
       
+      if (controller.signal.aborted) return
+
       setSocialNotifications(social)
       setSystemNotifications(system)
       setUnreadSocialCount(social.filter(n => !n.is_read).length)
@@ -295,7 +343,7 @@ function MessagesPageContent() {
       if (postIds.size > 0) {
         const posts = await Promise.all(
           Array.from(postIds).map(async (id) => {
-            try { return await getPost(id) } catch { return null }
+            try { return await getPost(id, { signal: controller.signal }) } catch { return null }
           })
         )
         setPostInfoMap(prev => {
@@ -331,17 +379,39 @@ function MessagesPageContent() {
           }
         }
       }
-    } catch (error) { 
+    } catch (error: any) { 
+      if (
+        (error instanceof Error && error.name === 'AbortError') ||
+        error?.message?.includes('AbortError') ||
+        error?.details?.includes('AbortError')
+      ) return
       // 使用统一的错误日志函数，避免记录空错误对象
       logError('Failed to load notifications:', error)
     } finally {
-      setNotificationsLoading(false)
+      if (notificationsAbortControllerRef.current === controller) {
+        notificationsAbortControllerRef.current = null
+        setNotificationsLoading(false)
+      }
     }
   }, [user, notificationsLoading])
 
   useEffect(() => {
     if (user) { loadConversations(); loadNotifications(); }
   }, [user, loadConversations, loadNotifications])
+
+  useEffect(() => {
+    return () => {
+      if (conversationsAbortControllerRef.current) {
+        conversationsAbortControllerRef.current.abort()
+      }
+      if (notificationsAbortControllerRef.current) {
+        notificationsAbortControllerRef.current.abort()
+      }
+      if (messagesAbortControllerRef.current) {
+        messagesAbortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return

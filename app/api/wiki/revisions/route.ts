@@ -2,6 +2,22 @@ import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+/**
+ * @swagger
+ * /api/wiki/revisions:
+ *   post:
+ *     summary: POST /api/wiki/revisions
+ *     description: Auto-generated description for POST /api/wiki/revisions
+ *     tags:
+ *       - Wiki
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: Request) {
   try {
     const json = await request.json()

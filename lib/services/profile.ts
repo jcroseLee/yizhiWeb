@@ -54,6 +54,8 @@ export interface UserProfile {
   level?: number
   last_checkin_date?: string | null
   consecutive_checkin_days?: number
+  income?: number
+  charm?: number
 }
 
 export interface UserStats {
@@ -98,8 +100,18 @@ const pendingProfileWithGrowthRequests = new Map<string, Promise<{
  * 获取用户资料
  * 优化：添加请求去重机制，避免并发请求
  */
-export async function getUserProfile(): Promise<UserProfile | null> {
-  const user = await getCurrentUser()
+export async function getUserProfile(options?: { supabase?: SupabaseClient; signal?: AbortSignal }): Promise<UserProfile | null> {
+  const supabase = options?.supabase || getSupabaseClient()
+  if (!supabase) return null
+
+  let user = null
+  if (options?.supabase) {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } else {
+    user = await getCurrentUser()
+  }
+
   if (!user) return null
 
   // 请求去重：如果已经有相同的请求在进行中，直接返回该请求的Promise
@@ -108,18 +120,31 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     return pendingProfileRequests.get(requestKey)!
   }
 
-  const supabase = getSupabaseClient()
-  if (!supabase) return null
-
   const requestPromise = (async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
+      
+      if (options?.signal) {
+        // @ts-expect-error abortSignal exists on the builder but types are missing
+        query = query.abortSignal(options.signal)
+      }
+
+      const { data, error } = await query
 
       if (error) {
+        // 如果是中止错误，不记录日志
+        if (
+          (error instanceof Error && error.name === 'AbortError') ||
+          error?.message?.includes('AbortError') ||
+          error?.details?.includes('AbortError')
+        ) {
+          return null
+        }
+
         // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
         // 静默处理，不记录日志
         if (error.code === 'PGRST116' || 
@@ -164,9 +189,8 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       if (data) {
         data.coin_paid = data.coin_paid || 0
         data.coin_free = data.coin_free || 0
-        if (data.yi_coins === undefined || data.yi_coins === null) {
-          data.yi_coins = data.coin_paid + data.coin_free
-        }
+        // 优先使用双轨制余额之和
+        data.yi_coins = data.coin_paid + data.coin_free
       }
 
       return data
@@ -226,8 +250,8 @@ export async function getUserProfile(): Promise<UserProfile | null> {
  * 获取指定用户的资料（用于查看其他用户的个人主页）
  * @param userId 用户ID
  */
-export async function getUserProfileById(userId: string): Promise<UserProfile | null> {
-  const supabase = getSupabaseClient()
+export async function getUserProfileById(userId: string, options?: { supabase?: SupabaseClient; signal?: AbortSignal }): Promise<UserProfile | null> {
+  const supabase = options?.supabase || getSupabaseClient()
   if (!supabase) {
     console.error('getUserProfileById: Supabase client not available')
     return null
@@ -247,13 +271,29 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
 
   const requestPromise = (async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
+      if (options?.signal) {
+        // @ts-expect-error abortSignal exists on the builder but types are missing
+        query = query.abortSignal(options.signal)
+      }
+
+      const { data, error } = await query
+
       if (error) {
+        // 如果是中止错误，不记录日志
+        if (
+          (error instanceof Error && error.name === 'AbortError') ||
+          error?.message?.includes('AbortError') ||
+          error?.details?.includes('AbortError')
+        ) {
+          return null
+        }
+
         // 更详细的错误日志
         console.error('Error fetching user profile by id:', {
           userId,
@@ -281,9 +321,8 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
       if (data) {
         data.coin_paid = data.coin_paid || 0
         data.coin_free = data.coin_free || 0
-        if (data.yi_coins === undefined || data.yi_coins === null) {
-          data.yi_coins = data.coin_paid + data.coin_free
-        }
+        // 优先使用双轨制余额之和
+        data.yi_coins = data.coin_paid + data.coin_free
       }
 
       return data as UserProfile
@@ -314,7 +353,7 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
  * 优化版本：一次性获取所有字段，避免多次查询profiles表
  * 添加请求去重机制
  */
-export async function getUserProfileWithGrowth(): Promise<{
+export async function getUserProfileWithGrowth(signal?: AbortSignal): Promise<{
   profile: UserProfile | null
   growth: {
     exp: number
@@ -337,130 +376,37 @@ export async function getUserProfileWithGrowth(): Promise<{
     return pendingProfileWithGrowthRequests.get(requestKey)!
   }
 
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    return { profile: null, growth: null }
-  }
-
   const requestPromise = (async () => {
     try {
-      // 一次性查询所有需要的字段（*已经包含所有字段，不需要重复指定）
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (error) {
-        // 如果是"未找到"错误（PGRST116）或 406 错误，这是正常的（用户可能还没有profile记录）
-        // 静默处理，不记录日志
-        if (error.code === 'PGRST116' || 
-            (error as { status?: number }).status === 406 ||
-            error.message?.includes('JSON object requested, multiple') || 
-            error.message?.includes('0 rows') ||
-            error.message?.includes('Not Acceptable')) {
-          // Profile 不存在是正常情况，静默返回 null
+      // 改为调用服务端 API 获取数据，禁止前端直接查询数据库
+      const response = await fetch('/api/user/profile', {
+        headers: {
+          'Cache-Control': 'no-cache', // 确保获取最新数据
+        },
+        signal
+      })
+      
+      if (!response.ok) {
+        // 如果未授权或出错，返回空
+        if (response.status === 401) {
           return { profile: null, growth: null }
         }
         
-        // 记录详细的错误信息（仅当不是空对象时）
-        const errorDetails = {
-          code: error.code || 'UNKNOWN',
-          message: error.message || 'Unknown error',
-          details: error.details || null,
-          hint: error.hint || null,
-          userId: user.id,
-          errorType: error.constructor?.name || typeof error,
-          errorString: String(error),
-        }
-        
-        // 只有当错误信息不是完全为空时才记录
-        const hasActualError = errorDetails.code !== 'UNKNOWN' || 
-                              errorDetails.message !== 'Unknown error' ||
-                              errorDetails.details !== null ||
-                              errorDetails.hint !== null
-        
-        if (hasActualError) {
-          console.error('Error fetching profile with growth:', errorDetails)
-        }
-        
+        console.error('Failed to fetch profile API:', response.status, response.statusText)
         return { profile: null, growth: null }
       }
 
-      const coinPaid = data.coin_paid || 0
-      const coinFree = data.coin_free || 0
-      const totalCoins = (data.yi_coins !== undefined && data.yi_coins !== null) ? data.yi_coins : (coinPaid + coinFree)
-
-      const profile: UserProfile = {
-        id: data.id,
-        nickname: data.nickname,
-        avatar_url: data.avatar_url,
-        motto: data.motto,
-        role: data.role,
-        created_at: data.created_at,
-        exp: data.exp,
-        reputation: data.reputation,
-        yi_coins: totalCoins,
-        coin_paid: coinPaid,
-        coin_free: coinFree,
-        cash_balance: data.cash_balance,
-        title_level: data.title_level,
-        level: data.level,
-        last_checkin_date: data.last_checkin_date,
-        consecutive_checkin_days: data.consecutive_checkin_days,
-      }
-
-      const growth = {
-        exp: data.exp || 0,
-        reputation: data.reputation || 0,
-        yiCoins: totalCoins,
-        cashBalance: parseFloat(data.cash_balance || '0'),
-        titleLevel: data.title_level || 1,
-        lastCheckinDate: data.last_checkin_date,
-        consecutiveCheckinDays: data.consecutive_checkin_days || 0,
-      }
-
-      return { profile, growth }
-    } catch (error) {
-      // 处理意外的错误（非 Supabase 错误）
-      let errorInfo: unknown
+      const data = await response.json()
       
-      if (error instanceof Error) {
-        errorInfo = {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        }
-      } else if (typeof error === 'object' && error !== null) {
-        // 尝试序列化错误对象
-        try {
-          errorInfo = {
-            type: typeof error,
-            stringified: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-            raw: error,
-          }
-        } catch (stringifyError) {
-          // 如果序列化失败，使用更安全的方法
-          errorInfo = {
-            type: typeof error,
-            constructor: error.constructor?.name,
-            keys: Object.keys(error),
-            toString: String(error),
-            raw: error,
-          }
-        }
-      } else {
-        errorInfo = { 
-          raw: error,
-          type: typeof error,
-          stringified: String(error),
-        }
+      if (data.error) {
+        console.error('API returned error:', data.error)
+        return { profile: null, growth: null }
       }
-      
-      console.error('Unexpected error fetching profile with growth:', {
-        userId: user.id,
-        error: errorInfo,
-      })
+
+      return data
+    } catch (error: any) {
+      if (error.name === 'AbortError') return { profile: null, growth: null }
+      console.error('Unexpected error fetching profile with growth:', error)
       return { profile: null, growth: null }
     } finally {
       // 请求完成后移除
@@ -579,7 +525,7 @@ export async function updateUserProfile(updates: {
 /**
  * 获取用户统计数据
  */
-export async function getUserStats(userId?: string): Promise<UserStats> {
+export async function getUserStats(userId?: string, signal?: AbortSignal): Promise<UserStats> {
   const supabase = getSupabaseClient()
   if (!supabase) {
     return {
@@ -608,31 +554,56 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
   }
 
   try {
-    // 获取发布案例数（发布的帖子数）
-    const { count: publishedCases } = await supabase
+    let postsQuery = supabase
       .from('posts')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact' })
       .eq('user_id', targetUserId)
 
-    // 获取参与推演数（推演记录数）
-    const { count: participatedDeductions } = await supabase
+    let participatedQuery = supabase
       .from('divination_records')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', targetUserId)
 
-    // 获取获赞同数（用户收到的点赞数）
-    const { data: posts } = await supabase
-      .from('posts')
-      .select('id')
-      .eq('user_id', targetUserId)
+    if (signal) {
+      postsQuery = postsQuery.abortSignal(signal)
+      participatedQuery = participatedQuery.abortSignal(signal)
+    }
 
+    if (signal?.aborted) {
+      return {
+        publishedCases: 0,
+        participatedDeductions: 0,
+        likesReceived: 0,
+        accuracyRate: 0,
+        verifiedCases: 0,
+      }
+    }
+
+    const [postsResponse, participatedResponse] = await Promise.all([
+      // 获取发布案例数（发布的帖子数）和帖子ID（用于计算点赞数）
+      postsQuery,
+      // 获取参与推演数（推演记录数）
+      participatedQuery
+    ])
+
+    const publishedCases = postsResponse.count || 0
+    const participatedDeductions = participatedResponse.count || 0
+
+    // 获取获赞同数（用户收到的点赞数）
     let likesReceived = 0
-    if (posts && posts.length > 0) {
-      const postIds = posts.map(p => p.id)
-      const { count } = await supabase
+    if (postsResponse.data && postsResponse.data.length > 0) {
+      const postIds = postsResponse.data.map(p => p.id)
+      // 分批查询点赞数，避免 URL 过长
+      let likesQuery = supabase
         .from('post_likes')
         .select('*', { count: 'exact', head: true })
         .in('post_id', postIds)
+
+      if (signal) {
+        likesQuery = likesQuery.abortSignal(signal)
+      }
+
+      const { count } = await likesQuery
       likesReceived = count || 0
     }
 
@@ -647,22 +618,34 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
     // 如果字段不存在，直接返回 0
     try {
       // 尝试查询所有记录，然后检查是否有 verification_result 字段
-      const { data: allRecords, error: queryError } = await supabase
+      let checkQuery = supabase
         .from('divination_records')
         .select('*')
         .eq('user_id', targetUserId)
         .limit(1)
+
+      if (signal) {
+        checkQuery = checkQuery.abortSignal(signal)
+      }
+
+      const { data: allRecords, error: queryError } = await checkQuery
 
       // 如果查询成功且第一条记录存在 verification_result 字段
       if (!queryError && allRecords && allRecords.length > 0) {
         const firstRecord = allRecords[0] as { verification_result?: unknown }
         if ('verification_result' in firstRecord) {
           // 字段存在，查询所有有验证结果的记录
-          const { data: verifiedRecords } = await supabase
+          let verifiedQuery = supabase
             .from('divination_records')
             .select('verification_result')
             .eq('user_id', targetUserId)
             .not('verification_result', 'is', null)
+
+          if (signal) {
+            verifiedQuery = verifiedQuery.abortSignal(signal)
+          }
+
+          const { data: verifiedRecords } = await verifiedQuery
 
           if (verifiedRecords && verifiedRecords.length > 0) {
             verifiedCases = verifiedRecords.length
@@ -685,7 +668,20 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
       accuracyRate,
       verifiedCases: verifiedCases || 0,
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      return {
+        publishedCases: 0,
+        participatedDeductions: 0,
+        likesReceived: 0,
+        accuracyRate: 0,
+        verifiedCases: 0,
+      }
+    }
     console.error('Error fetching user stats:', error)
     return {
       publishedCases: 0,
@@ -700,7 +696,7 @@ export async function getUserStats(userId?: string): Promise<UserStats> {
 /**
  * 获取用户关注统计数据（关注数、粉丝数、总发帖数）
  */
-export async function getUserFollowStats(userId?: string): Promise<UserFollowStats> {
+export async function getUserFollowStats(userId?: string, signal?: AbortSignal): Promise<UserFollowStats> {
   const supabase = getSupabaseClient()
   if (!supabase) {
     return {
@@ -725,30 +721,56 @@ export async function getUserFollowStats(userId?: string): Promise<UserFollowSta
   }
 
   try {
-    // 获取关注数（我关注的人数）
-    const { count: followingCount } = await supabase
-      .from('user_follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('follower_id', targetUserId)
+    if (signal?.aborted) {
+      return {
+        followingCount: 0,
+        followersCount: 0,
+        postsCount: 0,
+      }
+    }
 
-    // 获取粉丝数（关注我的人数）
-    const { count: followersCount } = await supabase
-      .from('user_follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('following_id', targetUserId)
+    const queries = [
+      // 获取关注数（我关注的人数）
+      supabase
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', targetUserId),
+      // 获取粉丝数（关注我的人数）
+      supabase
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', targetUserId),
+      // 获取总发帖数
+      supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', targetUserId)
+    ]
 
-    // 获取总发帖数
-    const { count: postsCount } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', targetUserId)
+    if (signal) {
+      queries.forEach(q => q.abortSignal(signal))
+    }
+
+    const [followingResult, followersResult, postsResult] = await Promise.all(queries)
 
     return {
-      followingCount: followingCount || 0,
-      followersCount: followersCount || 0,
-      postsCount: postsCount || 0,
+      followingCount: followingResult.count || 0,
+      followersCount: followersResult.count || 0,
+      postsCount: postsResult.count || 0,
     }
-  } catch (error) {
+  } catch (error: any) {
+    // 如果是中止错误，不记录日志
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      return {
+        followingCount: 0,
+        followersCount: 0,
+        postsCount: 0,
+      }
+    }
     console.error('Error fetching user follow stats:', error)
     return {
       followingCount: 0,
@@ -923,7 +945,7 @@ export async function getFollowersUsers(limit: number = 50, offset: number = 0):
  * 返回过去52周每周的活动次数
  * @param userId 用户ID，如果不提供则使用当前登录用户
  */
-export async function getDailyActivityData(userId?: string): Promise<Array<{ week: number; date: string; count: number }>> {
+export async function getDailyActivityData(userId?: string, signal?: AbortSignal): Promise<Array<{ week: number; date: string; count: number }>> {
   const supabase = getSupabaseClient()
   if (!supabase) return []
 
@@ -941,29 +963,46 @@ export async function getDailyActivityData(userId?: string): Promise<Array<{ wee
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - weeksAgo * 7)
 
-      // 获取用户的推演记录（按创建日期分组）
-    const { data: records } = await supabase
+    let recordsQuery = supabase
       .from('divination_records')
       .select('created_at')
       .eq('user_id', targetUserId)
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true })
 
-    // 获取用户的帖子（按创建日期分组）
-    const { data: posts } = await supabase
+    let postsQuery = supabase
       .from('posts')
       .select('created_at')
       .eq('user_id', targetUserId)
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true })
 
-    // 获取用户的评论（按创建日期分组）
-    const { data: comments } = await supabase
+    let commentsQuery = supabase
       .from('comments')
       .select('created_at')
       .eq('user_id', targetUserId)
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true })
+
+    if (signal) {
+      recordsQuery = recordsQuery.abortSignal(signal)
+      postsQuery = postsQuery.abortSignal(signal)
+      commentsQuery = commentsQuery.abortSignal(signal)
+    }
+
+    if (signal?.aborted) {
+      return []
+    }
+
+    const [
+      { data: records },
+      { data: posts },
+      { data: comments }
+    ] = await Promise.all([
+      recordsQuery,
+      postsQuery,
+      commentsQuery
+    ])
 
     // 合并所有活动数据
     const allActivities: Array<{ date: string; count: number }> = []
@@ -1030,7 +1069,8 @@ export async function getDailyActivityData(userId?: string): Promise<Array<{ wee
     }
 
     return weeklyData
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'AbortError') return []
     console.error('Error fetching daily activity data:', error)
     return []
   }

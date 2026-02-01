@@ -1,5 +1,6 @@
 import { logError } from '../utils/errorLogger'
 import { getCurrentUser } from './auth'
+import { getUnreadNotificationCount } from './notifications'
 import { getSupabaseClient } from './supabaseClient'
 
 // -----------------------------------------------------------------------------
@@ -71,7 +72,8 @@ interface ConversationRow {
  */
 export async function getConversations(
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  signal?: AbortSignal
 ): Promise<Conversation[]> {
   const user = await getCurrentUser()
   if (!user) {
@@ -85,13 +87,24 @@ export async function getConversations(
 
   try {
     // 调用 RPC 函数获取会话列表
-    const { data, error } = await supabase.rpc('get_dm_conversations', {
+    let query = supabase.rpc('get_dm_conversations', {
       uid: user.id,
       p_limit: limit,
       p_offset: offset,
     })
 
+    if (signal) {
+      query = query.abortSignal(signal)
+    }
+
+    const { data, error } = await query
+
     if (error) {
+      // Check if it's an abort error returned by Supabase
+      if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+        throw error
+      }
+
       // 如果错误对象为空或没有有用信息，提供更多上下文
       const hasErrorInfo = error && (
         error.message || 
@@ -127,10 +140,16 @@ export async function getConversations(
       .filter((id): id is string => !!id)
 
     if (userIds.length > 0) {
-      const { data: profiles, error: profileError } = await supabase
+      let profileQuery = supabase
         .from('profiles')
         .select('id, nickname, avatar_url')
         .in('id', userIds)
+
+      if (signal) {
+        profileQuery = profileQuery.abortSignal(signal)
+      }
+
+      const { data: profiles, error: profileError } = await profileQuery
 
       if (!profileError && profiles) {
         const profileMap = new Map(
@@ -145,7 +164,14 @@ export async function getConversations(
     }
 
     return conversations as unknown as Conversation[]
-  } catch (error) {
+  } catch (error: any) {
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      throw error
+    }
     logError('Error in getConversations:', error)
     throw error
   }
@@ -200,7 +226,8 @@ export async function setConversationSetting(
 export async function getMessages(
   otherUserId: string,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  signal?: AbortSignal
 ): Promise<Message[]> {
   const user = await getCurrentUser()
   if (!user) {
@@ -213,10 +240,15 @@ export async function getMessages(
   }
 
   try {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+
     // 获取消息，包括发送者和接收者都是当前用户或对方的消息
-    const { data, error } = await supabase
+    // 使用 joined query 一次性获取发送者信息，避免二次查询
+    let query = supabase
       .from('messages')
-      .select('*')
+      .select('*, sender:profiles!messages_sender_id_fkey(id, nickname, avatar_url)')
       .or(
         `and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`
       )
@@ -224,7 +256,16 @@ export async function getMessages(
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
+    if (signal) {
+      query = query.abortSignal(signal)
+    }
+
+    const { data, error } = await query
+
     if (error) {
+      if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+        throw error
+      }
       logError('Error fetching messages:', error)
       throw error
     }
@@ -233,27 +274,12 @@ export async function getMessages(
       return []
     }
 
-    // 获取发送者信息
-    const senderIds = [...new Set(data.map((msg) => msg.sender_id))]
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, nickname, avatar_url')
-      .in('id', senderIds)
-
-    if (!profileError && profiles) {
-      const profileMap = new Map(
-        profiles.map((p) => [p.id, { id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }])
-      )
-
-      return data
-        .map((msg) => ({
-          ...msg,
-          sender: profileMap.get(msg.sender_id),
-        }))
-        .reverse() // 反转顺序，使最早的消息在前
-    }
-
-    return data.reverse()
+    return data
+      .map((msg: any) => ({
+        ...msg,
+        sender: msg.sender || null,
+      }))
+      .reverse() // 反转顺序，使最早的消息在前
   } catch (error) {
     logError('Error in getMessages:', error)
     throw error
@@ -490,7 +516,7 @@ export function subscribeToMessages(
 /**
  * 获取总未读消息数（私信 + 系统消息 + 互动消息）
  */
-export async function getTotalUnreadCount(): Promise<number> {
+export async function getTotalUnreadCount(signal?: AbortSignal): Promise<number> {
   const user = await getCurrentUser()
   if (!user) {
     return 0
@@ -503,32 +529,23 @@ export async function getTotalUnreadCount(): Promise<number> {
 
   try {
     // 获取私信未读数
-    const conversations = await getConversations(100, 0)
+    const conversations = await getConversations(100, 0, signal)
     const dmUnreadCount = conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0)
 
     // 获取通知未读数（系统消息 + 互动消息）
-    const { count: notificationUnreadCount, error } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false)
-
-    if (error) {
-      // 如果是网络错误（可能是广告拦截器拦截了 notifications 请求），仅记录警告
-      const isNetworkError = 
-        (error.message && error.message.includes('Failed to fetch')) ||
-        (error.details && error.details.includes('Failed to fetch'))
-
-      if (isNetworkError) {
-        console.warn('Failed to fetch notifications unread count (possible AdBlocker or network issue):', error)
-      } else {
-        logError('Error getting notification unread count:', error)
-      }
-      return dmUnreadCount
-    }
+    const notificationUnreadCount = await getUnreadNotificationCount(signal)
 
     return dmUnreadCount + (notificationUnreadCount || 0)
-  } catch (error) {
+  } catch (error: any) {
+    // 处理中止错误
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      return 0
+    }
+
     // 处理可能的网络错误
     const errorMsg = error instanceof Error ? error.message : String(error)
     if (errorMsg.includes('Failed to fetch')) {

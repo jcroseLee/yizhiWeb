@@ -1,5 +1,6 @@
-import { getAdminContext } from '@/lib/api/admin-auth'
+import { getAdminContext, requirePermission } from '@/lib/api/admin-auth'
 import { corsHeaders } from '@/lib/api/cors'
+import dayjs from 'dayjs'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const LEVEL_CONFIG = [
@@ -58,7 +59,7 @@ function isMissingTableError(error: any) {
   const msg = typeof error?.message === 'string' ? error.message : ''
   const details = typeof error?.details === 'string' ? error.details : ''
   const hay = `${msg} ${details}`.toLowerCase()
-  return error?.code === '42p01' || hay.includes('does not exist') || hay.includes('relation') && hay.includes('does not exist')
+  return error?.code === '42p01' || hay.includes('does not exist') || (hay.includes('relation') && hay.includes('does not exist'))
 }
 
 export async function OPTIONS() {
@@ -78,102 +79,121 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       return NextResponse.json({ error: ctx.error }, { headers: { ...corsHeaders }, status: ctx.status })
     }
 
+    requirePermission(ctx, '/users')
+
     const { userId } = await params
     if (!userId) {
       return NextResponse.json({ error: 'Missing userId' }, { headers: { ...corsHeaders }, status: 400 })
     }
 
-    let exp = 0
-    let reputation = 0
-    let titleLevel: number | null = null
-
-    const { data: growthRow, error: growthError } = await ctx.supabase
+    // 1. Basic Info
+    const { data: profile, error: profileError } = await ctx.supabase
       .from('profiles')
-      .select('exp, reputation, title_level')
+      .select('*')
       .eq('id', userId)
-      .maybeSingle()
+      .single()
 
-    if (growthError) {
-      const allow =
-        isMissingColumnError(growthError, 'exp') ||
-        isMissingColumnError(growthError, 'reputation') ||
-        isMissingColumnError(growthError, 'title_level')
-      if (!allow) {
-        return NextResponse.json({ error: growthError.message }, { headers: { ...corsHeaders }, status: 500 })
-      }
-    } else if (growthRow) {
-      exp = Number(growthRow.exp || 0)
-      reputation = Number(growthRow.reputation || 0)
-      titleLevel = growthRow.title_level ?? null
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { headers: { ...corsHeaders }, status: 500 })
     }
 
+    const exp = Number(profile.exp || 0)
+    const reputation = Number(profile.reputation || 0)
+    const titleLevel = profile.title_level ?? calculateTitleLevel(reputation)
     const level = calculateLevel(exp)
-    const resolvedTitleLevel = titleLevel ?? calculateTitleLevel(reputation)
-    const titleName = getTitleName(resolvedTitleLevel)
+    const titleName = getTitleName(titleLevel)
 
-    const [postsCountRes, divinationCountRes, followingCountRes, followersCountRes] = await Promise.all([
-      ctx.supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
-      ctx.supabase.from('divination_records').select('*', { count: 'exact', head: true }).eq('user_id', userId),
-      ctx.supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId),
+    // 2. Parallel Fetching for Stats and Lists
+    const thirtyDaysAgo = dayjs().subtract(30, 'day').toISOString()
+
+    const [
+      followersRes,
+      followingRes,
+      postsCountRes,
+      closedCasesRes,
+      postLikesRes,
+      commentLikesRes,
+      coinBatchesRes,
+      activityPostsRes,
+      activityCommentsRes
+    ] = await Promise.all([
+      // Counts
       ctx.supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', userId),
+      ctx.supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId),
+      ctx.supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      
+      // Closed Cases: count case_metadata entries for this user's posts
+      // Using explicit foreign key or standard join logic
+      ctx.supabase.from('case_metadata').select('post_id, posts!inner(user_id)', { count: 'exact', head: true }).eq('posts.user_id', userId),
+
+      // Likes
+      ctx.supabase.from('post_likes').select('post_id, posts!inner(user_id)', { count: 'exact', head: true }).eq('posts.user_id', userId),
+      ctx.supabase.from('comment_likes').select('comment_id, comments!inner(user_id)', { count: 'exact', head: true }).eq('comments.user_id', userId),
+
+      // Coin Expiry
+      ctx.supabase.from('coin_free_batches').select('expire_at').eq('user_id', userId).eq('is_depleted', false).order('expire_at', { ascending: true }).limit(1),
+
+      // Activity Data (Last 30 days) - minimal fetch
+      ctx.supabase.from('posts').select('created_at').eq('user_id', userId).gt('created_at', thirtyDaysAgo),
+      ctx.supabase.from('comments').select('created_at').eq('user_id', userId).gt('created_at', thirtyDaysAgo)
     ])
 
-    const postsCount = postsCountRes.error
-      ? isMissingTableError(postsCountRes.error)
-        ? 0
-        : null
-      : postsCountRes.count || 0
-    const divinationRecordsCount = divinationCountRes.error
-      ? isMissingTableError(divinationCountRes.error)
-        ? 0
-        : null
-      : divinationCountRes.count || 0
-    const followingCount = followingCountRes.error
-      ? isMissingTableError(followingCountRes.error)
-        ? 0
-        : null
-      : followingCountRes.count || 0
-    const followersCount = followersCountRes.error
-      ? isMissingTableError(followersCountRes.error)
-        ? 0
-        : null
-      : followersCountRes.count || 0
-
-    const countErrors = [
-      postsCountRes.error && !isMissingTableError(postsCountRes.error) ? postsCountRes.error.message : null,
-      divinationCountRes.error && !isMissingTableError(divinationCountRes.error) ? divinationCountRes.error.message : null,
-      followingCountRes.error && !isMissingTableError(followingCountRes.error) ? followingCountRes.error.message : null,
-      followersCountRes.error && !isMissingTableError(followersCountRes.error) ? followersCountRes.error.message : null,
-    ].filter(Boolean)
-
-    if (countErrors.length > 0) {
-      return NextResponse.json({ error: countErrors[0] }, { headers: { ...corsHeaders }, status: 500 })
+    // Process Stats
+    const stats = {
+      followersCount: followersRes.count || 0,
+      followingCount: followingRes.count || 0,
+      postsCount: postsCountRes.count || 0,
+      closedCasesCount: closedCasesRes.count || 0,
+      likedCount: (postLikesRes.count || 0) + (commentLikesRes.count || 0),
     }
 
-    return NextResponse.json(
-      {
-        user_id: userId,
-        growth: {
-          level,
-          exp,
-          reputation,
-          title_level: resolvedTitleLevel,
-          title_name: titleName,
-        },
-        counts: {
-          posts: postsCount,
-          divination_records: divinationRecordsCount,
-          following: followingCount,
-          followers: followersCount,
-        },
+    // Process Coin Expiry
+    const giftCoinExpiry = coinBatchesRes.data?.[0]?.expire_at || null
+
+    // Process Activity Data
+    const activityMap: Record<string, number> = {}
+    const today = dayjs()
+    for (let i = 0; i < 30; i++) {
+      activityMap[today.subtract(i, 'day').format('YYYY-MM-DD')] = 0
+    }
+
+    const processActivity = (items: any[] | null) => {
+      items?.forEach(item => {
+        const date = dayjs(item.created_at).format('YYYY-MM-DD')
+        if (activityMap[date] !== undefined) {
+          activityMap[date]++
+        }
+      })
+    }
+    processActivity(activityPostsRes.data)
+    processActivity(activityCommentsRes.data)
+
+    const activityData = Object.entries(activityMap)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf())
+
+    return NextResponse.json({
+      user: {
+        ...profile,
+        level,
+        title_level: titleLevel,
+        title_name: titleName,
       },
-      { headers: { ...corsHeaders }, status: 200 }
-    )
-  } catch (e) {
+      stats,
+      giftCoinExpiry,
+      // transactions: transactionsRes.data || [], // REMOVED
+      // posts: postsRes.data || [], // REMOVED
+      // comments: commentsRes.data || [], // REMOVED
+      // gifts: giftsRes.data || [], // REMOVED
+      activityData
+    }, { headers: { ...corsHeaders }, status: 200 })
+
+  } catch (e: any) {
+    console.error('Error in user summary:', e)
+    const status = e.status || 500
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Unknown error' },
-      { headers: { ...corsHeaders }, status: 500 }
+      { headers: { ...corsHeaders }, status }
     )
   }
 }
-

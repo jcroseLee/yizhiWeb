@@ -34,6 +34,22 @@ function getSupabaseUploadConfig() {
   return { supabaseUrl, serviceRoleKey }
 }
 
+/**
+ * @swagger
+ * /api/library/books/{bookId}/slices:
+ *   post:
+ *     summary: POST /api/library/books/{bookId}/slices
+ *     description: Auto-generated description for POST /api/library/books/{bookId}/slices
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: NextRequest, context: { params: Promise<{ bookId: string }> }) {
   const params = await context.params
   const rawBookId = params.bookId

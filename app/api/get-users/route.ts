@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/get-users:
+ *   get:
+ *     summary: GET /api/get-users
+ *     description: Auto-generated description for GET /api/get-users
+ *     tags:
+ *       - Get-users
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(request: NextRequest) {
   console.log('get-users function invoked.')
 
@@ -46,7 +62,7 @@ export async function GET(request: NextRequest) {
       profile = profileWithLevel
     }
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403

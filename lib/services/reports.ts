@@ -1,4 +1,4 @@
-import { getCurrentUser } from './auth'
+import { getCurrentUser, getSession } from './auth'
 import { getSupabaseClient } from './supabaseClient'
 
 export type ReportReasonCategory = 
@@ -218,103 +218,30 @@ export async function resolveReport(
     return { success: false, message: '请先登录' }
   }
 
-  const supabase = getSupabaseClient()
-  if (!supabase) {
-    return { success: false, message: '系统错误' }
-  }
-
   try {
-    // 检查是否为管理员
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'admin') {
-      return { success: false, message: '无权限操作' }
+    const session = await getSession()
+    if (!session?.access_token) {
+      return { success: false, message: '请先登录' }
     }
 
-    // 获取举报详情
-    const { data: report } = await supabase
-      .from('reports')
-      .select('*')
-      .eq('id', reportId)
-      .single()
+    const adminAction = action === 'resolve' ? 'hide_content' : 'ignore'
 
-    if (!report) {
-      return { success: false, message: '举报记录不存在' }
-    }
+    const res = await fetch('/api/admin/resolve-report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        report_id: reportId,
+        action: adminAction,
+        note: adminNote || null,
+      }),
+    })
 
-    const newStatus = action === 'resolve' ? 'resolved' : 'rejected'
-
-    // 更新举报状态
-    const { error } = await supabase
-      .from('reports')
-      .update({
-        status: newStatus,
-        resolved_by: user.id,
-        resolved_at: new Date().toISOString(),
-        admin_note: adminNote || null
-      })
-      .eq('id', reportId)
-
-    if (error) {
-      console.error('Error resolving report:', error)
-      return { success: false, message: '处理失败：' + (error.message || '未知错误') }
-    }
-
-    // 处理后续逻辑（扣分、删除帖子、发通知）
-    try {
-      if (action === 'resolve') {
-        // 1. 举报通过：处理目标内容和作者
-        if (report.target_type === 'post') {
-          const isSevere = ['compliance', 'superstition'].includes(report.reason_category)
-          const postStatus = isSevere ? 'deleted' : 'hidden' // 严重违规直接删除，其他隐藏/折叠
-
-          // 更新帖子状态
-          await supabase.from('posts').update({ status: postStatus }).eq('id', report.target_id)
-
-          // 扣除作者信誉分
-          const { data: post } = await supabase.from('posts').select('user_id').eq('id', report.target_id).single()
-          if (post?.user_id) {
-            const deductAmount = isSevere ? 30 : 10
-            const { data: authorProfile } = await supabase.from('profiles').select('credit_score').eq('id', post.user_id).single()
-            if (authorProfile) {
-              const newScore = Math.max(0, (authorProfile.credit_score || 100) - deductAmount)
-              await supabase.from('profiles').update({ credit_score: newScore }).eq('id', post.user_id)
-            }
-          }
-        }
-      } else {
-        // 2. 举报驳回：扣除举报者信誉分（防止恶意举报）
-        const { data: reporterProfile } = await supabase.from('profiles').select('credit_score').eq('id', report.reporter_id).single()
-        if (reporterProfile) {
-          const newScore = Math.max(0, (reporterProfile.credit_score || 100) - 5)
-          await supabase.from('profiles').update({ credit_score: newScore }).eq('id', report.reporter_id)
-        }
-      }
-
-      // 3. 发送通知给举报者
-      // 注意：已迁移到数据库触发器 trigger_notify_reporter_on_report_resolution 处理
-      // 此处不再手动发送，避免重复
-      /*
-      await supabase.from('notifications').insert({
-        user_id: report.reporter_id,
-        type: action === 'resolve' ? 'report_resolved' : 'report_rejected',
-        related_id: report.target_id,
-        related_type: report.target_type,
-        actor_id: user.id,
-        content: action === 'resolve' 
-          ? `您举报的内容（${getReasonLabel(report.reason_category)}）已处理，感谢您维护社区环境。`
-          : `您举报的内容（${getReasonLabel(report.reason_category)}）经核实未违规，已驳回。`,
-        is_read: false
-      })
-      */
-
-    } catch (processError) {
-      console.error('Error processing report consequences:', processError)
-      // 不阻断主流程，仅记录错误
+    const json = await res.json().catch(() => null as any)
+    if (!res.ok) {
+      return { success: false, message: json?.error || '处理失败，请稍后重试' }
     }
 
     return { success: true, message: '处理成功' }

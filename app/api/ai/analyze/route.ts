@@ -1,4 +1,6 @@
 import { createSupabaseAdmin } from '@/lib/api/supabase-admin';
+import { AppError, createErrorResponse } from '@/lib/utils/errorHandler';
+import { log, LogLevel } from '@/lib/utils/logger';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 
@@ -31,111 +33,195 @@ const deepseek = createOpenAI({
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+/**
+ * @swagger
+ * /api/ai/analyze:
+ *   post:
+ *     summary: Analyze divination data
+ *     description: Analyzes divination data using AI, deducts coins for full analysis.
+ *     tags:
+ *       - AI
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - question
+ *               - guaData
+ *             properties:
+ *               question:
+ *                 type: string
+ *                 description: The question asked by the user.
+ *               background:
+ *                 type: string
+ *                 description: Background information.
+ *               guaData:
+ *                 type: object
+ *                 description: The divination data (Hexagrams, etc.).
+ *               idempotencyKey:
+ *                 type: string
+ *                 description: Key to ensure idempotency for payment.
+ *               mode:
+ *                 type: string
+ *                 enum: [preview, full]
+ *                 description: Analysis mode. 'preview' is free, 'full' costs coins.
+ *     responses:
+ *       200:
+ *         description: Successful stream of AI analysis.
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *       401:
+ *         description: Unauthorized.
+ *       400:
+ *         description: Invalid request body or parameters.
+ *       500:
+ *         description: Server error.
+ */
+/**
+ * @swagger
+ * /api/ai/analyze:
+ *   post:
+ *     summary: POST /api/ai/analyze
+ *     description: Auto-generated description for POST /api/ai/analyze
+ *     tags:
+ *       - Ai
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: Request) {
-  // 1. 验证配置
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server configuration error: Missing API Key' }), { status: 500 });
-  }
-
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
-
-  const token = authHeader.replace('Bearer ', '');
-  const supabase = createSupabaseAdmin();
-  const { data: authData, error: authError } = await supabase.auth.getUser(token);
-  const user = !authError ? authData.user : null;
-  if (!user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
-
-  let body;
   try {
-    body = await req.json();
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
-  }
-  const { question, background, guaData, idempotencyKey, mode } = body;
-  const analysisMode = mode === 'preview' || mode === 'full' ? mode : mode == null ? 'full' : null;
-  if (!analysisMode) {
-    return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
-  }
-
-  // 3. 扣费逻辑
-  let requestId: string | null = null;
-  let isReplay = false;
-
-  const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
-
-  if (analysisMode === 'full' && !skipAiPayment && user && supabase) {
-    const COST = 50;
-    // 使用 RPC 进行幂等扣费
-    const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`; // Fallback key
-
-    const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
-         p_user_id: user.id,
-         p_amount: COST,
-         p_idempotency_key: key,
-         p_description: `AI 详批：${question ? question.substring(0, 10) + '...' : '未知问题'}`
-    });
-
-    if (transactionError) {
-         console.error('Payment RPC Error:', transactionError);
-         return new Response(JSON.stringify({ error: '支付系统错误，请联系客服' }), { status: 500 });
+    // 1. 验证配置
+    if (!apiKey) {
+      throw new AppError(500, 'Server configuration error: Missing API Key', 'CONFIG_ERROR');
     }
 
-    if (!transactionResult.success) {
-         // 如果是重复请求且状态为 failed/refunded，RPC 返回 false
-         // 或者余额不足
-         const msg = transactionResult.message === 'Insufficient balance' ? '余额不足，请先充值' : transactionResult.message;
-         return new Response(JSON.stringify({ error: msg }), { status: 402 });
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
     }
 
-    requestId = transactionResult.request_id;
-    isReplay = transactionResult.is_replay;
-    
-    if (isReplay) {
-        // 如果是重放请求，尝试获取已有的结果
-        if (requestId && supabase) {
-            const { data: existingRequest } = await supabase
-                .from('ai_analysis_requests')
-                .select('result_payload, status')
-                .eq('id', requestId)
-                .single();
-            
-            // 如果已经有结果，直接返回缓存的结果
-            if (existingRequest?.result_payload?.content) {
-                return new Response(existingRequest.result_payload.content, {
-                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-                });
-            }
-            
-            // 如果还在处理中，或者没有结果，阻止重复调用 AI
-            if (existingRequest?.status === 'processing') {
-                 return new Response(JSON.stringify({ error: 'AI 正在分析中，请稍候...' }), { status: 429 });
-            } else {
-                 return new Response(JSON.stringify({ error: '请求已提交，请查看历史记录或稍后重试' }), { status: 409 });
-            }
-        }
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createSupabaseAdmin();
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    const user = !authError ? authData.user : null;
+    if (!user) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
     }
-  }
 
-  // 4. 执行 AI 分析
-  try {
-    const promptContext = constructPrompt(question, background, guaData);
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      throw new AppError(400, 'Invalid JSON body', 'INVALID_JSON');
+    }
+    const { question, background, guaData, idempotencyKey, mode } = body;
+    const analysisMode = mode === 'preview' || mode === 'full' ? mode : mode == null ? 'full' : null;
+    if (!analysisMode) {
+      throw new AppError(400, 'Invalid mode', 'INVALID_MODE');
+    }
 
-    console.log('Calling DeepSeek API...');
+    // 3. 扣费逻辑
+    let requestId: string | null = null;
+    let isReplay = false;
 
-    // 使用 streamText
-    const result = await streamText({
-      model: deepseek.chat('deepseek-chat'), // 强制使用 chat 模式
-      messages: [
-        {
-          role: 'system',
-          content:
-            analysisMode === 'preview'
-              ? `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
+    const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
+
+    if (analysisMode === 'full' && !skipAiPayment && user && supabase) {
+      // 3. 扣除易币
+      const COST = 50; // 50 易币
+      
+      // 幂等性处理:
+      // 如果客户端提供了 idempotencyKey，则使用该 Key 确保同一请求不重复扣费
+      // 如果未提供，则生成一个基于时间戳的临时 Key
+      const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`;
+
+      log(LogLevel.INFO, 'AI analyze payment start', { userId: user.id, amount: COST, idempotencyKey: key })
+
+      // 调用幂等扣费 RPC `consume_yi_coins_idempotent`
+      // 该 RPC 内部逻辑:
+      // 1. 检查 idempotency_key 是否已存在
+      //    - 若存在且成功: 返回之前的 success 结果 (is_replay=true)
+      //    - 若存在但失败: 允许重试
+      // 2. 执行扣费 (双轨制: 优先扣 Free Coins)
+      // 3. 记录交易和幂等键
+      const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
+           p_user_id: user.id,
+           p_amount: COST,
+           p_idempotency_key: key,
+           p_description: `AI 详批：${question ? question.substring(0, 10) + '...' : '未知问题'}`
+      });
+
+      if (transactionError) {
+           console.error('Payment RPC Error:', transactionError);
+           log(LogLevel.ERROR, 'AI analyze payment RPC error', { userId: user.id, error: transactionError })
+           throw new AppError(500, '支付系统错误，请联系客服', 'PAYMENT_ERROR');
+      }
+
+      if (!transactionResult.success) {
+           // 如果是重复请求且状态为 failed/refunded，RPC 返回 false
+           // 或者余额不足
+           const msg = transactionResult.message === 'Insufficient balance' ? '余额不足，请先充值' : transactionResult.message;
+           log(LogLevel.WARN, 'AI analyze payment failed', { userId: user.id, message: msg, result: transactionResult })
+           throw new AppError(402, msg, 'PAYMENT_FAILED');
+      }
+
+      log(LogLevel.INFO, 'AI analyze payment success', { userId: user.id, requestId: transactionResult.request_id, isReplay: transactionResult.is_replay })
+
+      requestId = transactionResult.request_id;
+      isReplay = transactionResult.is_replay;
+      
+      if (isReplay) {
+          // 如果是重放请求，尝试获取已有的结果
+          if (requestId && supabase) {
+              const { data: existingRequest } = await supabase
+                  .from('ai_analysis_requests')
+                  .select('result_payload, status')
+                  .eq('id', requestId)
+                  .single();
+              
+              // 如果已经有结果，直接返回缓存的结果
+              if (existingRequest?.result_payload?.content) {
+                  return new Response(existingRequest.result_payload.content, {
+                    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                  });
+              }
+              
+              // 如果还在处理中，或者没有结果，阻止重复调用 AI
+              if (existingRequest?.status === 'processing') {
+                   throw new AppError(429, 'AI 正在分析中，请稍候...', 'PROCESSING');
+              } else {
+                   throw new AppError(409, '请求已提交，请查看历史记录或稍后重试', 'DUPLICATE_REQUEST');
+              }
+          }
+      }
+    }
+
+    // 4. 执行 AI 分析
+    try {
+      const promptContext = constructPrompt(question, background, guaData);
+
+      console.log('Calling DeepSeek API...');
+
+      // 使用 streamText
+      const result = streamText({
+        model: deepseek.chat('deepseek-chat'), // 强制使用 chat 模式
+        messages: [
+          {
+            role: 'system',
+            content:
+              analysisMode === 'preview'
+                ? `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
 分析风格：
 1. **严谨客观**：依据五行生克、旺衰、动变推导。
 2. **结构清晰**：按【用神->旺衰->动变->吉凶->建议】步骤。
@@ -143,77 +229,70 @@ export async function POST(req: Request) {
 输出要求：
 1. 仅输出“预览版”，内容尽量精炼。
 2. 总长度控制在约 20% 的详批量级（建议 400-600 字）。`
-              : `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
+                : `你是一位精通《增删卜易》与《卜筮正宗》的易学研究者。
             分析风格：
             1. **严谨客观**：依据五行生克、旺衰、动变推导。
             2. **结构清晰**：按【用神->旺衰->动变->吉凶->建议】步骤。
             3. **格式要求**：使用 Markdown，重点加粗。`
-        },
-        { role: 'user', content: promptContext }
-      ],
-      temperature: 0.3,
-      maxOutputTokens: analysisMode === 'preview' ? 900 : undefined,
-       onFinish: async ({ text }) => {
-         if (analysisMode === 'full' && requestId && supabase) {
-             // 保存结果并标记完成
-             await supabase.from('ai_analysis_requests').update({
-                 status: 'completed',
-                 result_payload: { content: text },
-                 updated_at: new Date().toISOString()
-             }).eq('id', requestId);
+          },
+          { role: 'user', content: promptContext }
+        ],
+        temperature: 0.3,
+        maxOutputTokens: analysisMode === 'preview' ? 900 : undefined,
+         onFinish: async ({ text }) => {
+           if (analysisMode === 'full' && requestId && supabase) {
+               // 保存结果并标记完成
+               await supabase.from('ai_analysis_requests').update({
+                   status: 'completed',
+                   result_payload: { content: text },
+                   updated_at: new Date().toISOString()
+               }).eq('id', requestId);
+           }
          }
-       }
-    });
+      });
 
-    console.log('StreamText Result Keys:', Object.keys(result));
-    
-    // 返回流式响应
-    return result.toTextStreamResponse();
+      console.log('StreamText Result Keys:', Object.keys(result));
+      
+      // 返回流式响应
+      return result.toTextStreamResponse();
 
-  } catch (error) {
-    console.error('AI Analysis Error:', error);
+    } catch (error) {
+      console.error('AI Analysis Error:', error);
 
-    // 失败退款逻辑
-    // 只要有 requestId，且 AI 分析失败，就尝试退款。
-    // 即使是重放请求 (isReplay=true)，如果本次尝试失败了，说明用户最终没有得到结果。
-    // 为了防止"白扣"（扣了钱没给结果），我们执行退款。
-    // RPC `refund_ai_analysis` 内部有状态检查，防止重复退款。
-    // 虽然存在极端竞态（原请求成功但连接断开，重试请求失败导致退款），
-    // 但优先保障用户资金安全是首要原则。
-    if (analysisMode === 'full') {
-      if (requestId && supabase) {
-        await supabase.rpc('refund_ai_analysis', {
-          p_request_id: requestId,
-          p_reason: error instanceof Error ? error.message : String(error),
-        });
-      } else if (supabase && user && !requestId) {
-        const COST = 50;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('yi_coins')
-          .eq('id', user.id)
-          .single();
-
-        if (profile) {
-          await supabase
-            .from('profiles')
-            .update({ yi_coins: (profile.yi_coins || 0) + COST })
-            .eq('id', user.id);
-
-          await supabase.from('coin_transactions').insert({
-            user_id: user.id,
-            amount: COST,
-            type: 'refund',
-            description: `AI Analysis Refund: ${error instanceof Error ? error.message : String(error)}`,
+      // 失败退款逻辑
+      // 只要有 requestId，且 AI 分析失败，就尝试退款。
+      // 即使是重放请求 (isReplay=true)，如果本次尝试失败了，说明用户最终没有得到结果。
+      // 为了防止"白扣"（扣了钱没给结果），我们执行退款。
+      // RPC `refund_ai_analysis` 内部有状态检查，防止重复退款。
+      // 虽然存在极端竞态（原请求成功但连接断开，重试请求失败导致退款），
+      // 但优先保障用户资金安全是首要原则。
+      if (analysisMode === 'full') {
+        if (requestId && supabase) {
+          await supabase.rpc('refund_ai_analysis', {
+            p_request_id: requestId,
+            p_reason: error instanceof Error ? error.message : String(error),
           });
+        } else if (supabase && user && !requestId) {
+          const COST = 50;
+          // 使用 grant_free_coins 退款（作为赠币，有效期365天）
+          // 这样符合双轨制逻辑，会增加 coin_free 并创建新的 coin_free_batch
+          const { error: refundError } = await supabase.rpc('grant_free_coins', {
+            p_user_id: user.id,
+            p_amount: COST,
+            p_source_type: 'AI_ANALYSIS_REFUND',
+            p_validity_days: 365
+          });
+
+          if (refundError) {
+               console.error('Fallback Refund Error:', refundError);
+          }
         }
       }
-    }
 
-    return new Response(JSON.stringify({ 
-      error: 'AI 服务暂时繁忙，请重试',
-      details: error instanceof Error ? error.message : String(error)
-    }), { status: 500 });
+      throw new AppError(500, 'AI 服务暂时繁忙，请重试', 'AI_SERVICE_ERROR');
+    }
+  } catch (error) {
+    return createErrorResponse(error);
   }
 }
 

@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/ai/feedback:
+ *   post:
+ *     summary: POST /api/ai/feedback
+ *     description: Auto-generated description for POST /api/ai/feedback
+ *     tags:
+ *       - Ai
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)

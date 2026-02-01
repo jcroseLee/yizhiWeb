@@ -118,6 +118,22 @@ function extractTradeStatus(queryResult: any) {
   return status ? String(status) : null
 }
 
+/**
+ * @swagger
+ * /api/v1/wallet/recharge/sync:
+ *   post:
+ *     summary: POST /api/v1/wallet/recharge/sync
+ *     description: Auto-generated description for POST /api/v1/wallet/recharge/sync
+ *     tags:
+ *       - V1
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: Request) {
   const supabase = await createClient()
   let {

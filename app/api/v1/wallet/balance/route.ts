@@ -3,6 +3,22 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+/**
+ * @swagger
+ * /api/v1/wallet/balance:
+ *   get:
+ *     summary: GET /api/v1/wallet/balance
+ *     description: Auto-generated description for GET /api/v1/wallet/balance
+ *     tags:
+ *       - V1
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(request: Request) {
   const supabase = await createClient()
   let {

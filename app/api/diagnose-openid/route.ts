@@ -11,6 +11,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/diagnose-openid:
+ *   post:
+ *     summary: POST /api/diagnose-openid
+ *     description: Auto-generated description for POST /api/diagnose-openid
+ *     tags:
+ *       - Diagnose-openid
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization') || request.headers.get('authorization')

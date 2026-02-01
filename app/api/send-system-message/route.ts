@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/send-system-message:
+ *   post:
+ *     summary: POST /api/send-system-message
+ *     description: Auto-generated description for POST /api/send-system-message
+ *     tags:
+ *       - Send-system-message
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   console.log('send-system-message function invoked.')
 
@@ -39,7 +55,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403

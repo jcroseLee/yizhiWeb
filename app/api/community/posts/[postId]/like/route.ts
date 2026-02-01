@@ -6,6 +6,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/community/posts/{postId}/like:
+ *   post:
+ *     summary: POST /api/community/posts/{postId}/like
+ *     description: Auto-generated description for POST /api/community/posts/{postId}/like
+ *     tags:
+ *       - Community
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const { postId } = await params

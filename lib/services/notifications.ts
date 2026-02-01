@@ -35,7 +35,8 @@ export async function getNotifications(
   limit: number = 50,
   offset: number = 0,
   unreadOnly: boolean = false,
-  types?: string[]
+  types?: string[],
+  signal?: AbortSignal
 ): Promise<Notification[]> {
   const user = await getCurrentUser()
   if (!user) {
@@ -48,9 +49,13 @@ export async function getNotifications(
   }
 
   try {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+
     let query = supabase
       .from('notifications')
-      .select('*')
+      .select('*, actor:profiles!notifications_actor_id_profiles_fkey(id, nickname, avatar_url)')
       .eq('user_id', user.id)
 
     if (unreadOnly) {
@@ -66,9 +71,18 @@ export async function getNotifications(
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
+    if (signal) {
+      query = query.abortSignal(signal)
+    }
+
     const { data, error } = await query
 
     if (error) {
+      // Check if it's an abort error returned by Supabase
+      if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+        throw error
+      }
+
       // 检查错误对象是否有实际内容
       const hasErrorContent = error && (
         error.message || 
@@ -91,31 +105,21 @@ export async function getNotifications(
       return []
     }
 
-    // 获取操作者信息
-    const actorIds = data
-      .map((notif) => notif.actor_id)
-      .filter((id): id is string => id !== null)
-
-    if (actorIds.length > 0) {
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, nickname, avatar_url')
-        .in('id', actorIds)
-
-      if (!profileError && profiles) {
-        const profileMap = new Map(
-          profiles.map((p) => [p.id, { id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }])
-        )
-
-        return data.map((notif) => ({
-          ...notif,
-          actor: notif.actor_id ? profileMap.get(notif.actor_id) : undefined,
-        }))
-      }
+    // Map null actor to undefined to match interface strictly if needed, 
+    // or just return data as is if the interface allows null.
+    // We'll clean it up to be safe.
+    return data.map((n: any) => ({
+      ...n,
+      actor: n.actor || undefined
+    })) as Notification[]
+  } catch (error: any) {
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      throw error
     }
-
-    return data
-  } catch (error) {
     logError('Error in getNotifications:', error)
     throw error
   }
@@ -124,7 +128,7 @@ export async function getNotifications(
 /**
  * 获取未读通知数量
  */
-export async function getUnreadNotificationCount(): Promise<number> {
+export async function getUnreadNotificationCount(signal?: AbortSignal): Promise<number> {
   const user = await getCurrentUser()
   if (!user) {
     return 0
@@ -136,19 +140,42 @@ export async function getUnreadNotificationCount(): Promise<number> {
   }
 
   try {
-    const { count, error } = await supabase
+    if (signal?.aborted) {
+      return 0
+    }
+
+    let query = supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('is_read', false)
 
+    if (signal) {
+      query = query.abortSignal(signal)
+    }
+
+    const { count, error } = await query
+
     if (error) {
+      // Check if it's an abort error returned by Supabase
+      if (error.message?.includes('AbortError') || error.details?.includes('AbortError')) {
+        return 0
+      }
+
       logError('Error getting unread notification count:', error)
       return 0
     }
 
     return count || 0
-  } catch (error) {
+  } catch (error: any) {
+    // 如果是中止错误，不记录日志
+    if (
+      (error instanceof Error && error.name === 'AbortError') ||
+      error?.message?.includes('AbortError') ||
+      error?.details?.includes('AbortError')
+    ) {
+      return 0
+    }
     logError('Error in getUnreadNotificationCount:', error)
     return 0
   }

@@ -12,6 +12,22 @@ function pickDeviceType(raw: unknown): string | null {
   return null
 }
 
+/**
+ * @swagger
+ * /api/analytics:
+ *   post:
+ *     summary: POST /api/analytics
+ *     description: Auto-generated description for POST /api/analytics
+ *     tags:
+ *       - Analytics
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)

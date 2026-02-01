@@ -1,5 +1,6 @@
 import { corsHeaders } from '@/lib/api/cors'
 import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function OPTIONS() {
@@ -8,9 +9,27 @@ export async function OPTIONS() {
 
 // 生成6位随机验证码
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  const randomBytes = crypto.randomBytes(3)
+  const code = (randomBytes.readUIntBE(0, 3) % 900000) + 100000
+  return code.toString()
 }
 
+/**
+ * @swagger
+ * /api/sms/send-code:
+ *   post:
+ *     summary: POST /api/sms/send-code
+ *     description: Auto-generated description for POST /api/sms/send-code
+ *     tags:
+ *       - Sms
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

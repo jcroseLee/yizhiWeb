@@ -42,6 +42,22 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   return null
 }
 
+/**
+ * @swagger
+ * /api/library/archive:
+ *   post:
+ *     summary: POST /api/library/archive
+ *     description: Auto-generated description for POST /api/library/archive
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('authorization')

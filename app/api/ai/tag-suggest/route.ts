@@ -41,6 +41,22 @@ function parseJsonArray(text: string): string[] {
   return []
 }
 
+/**
+ * @swagger
+ * /api/ai/tag-suggest:
+ *   post:
+ *     summary: POST /api/ai/tag-suggest
+ *     description: Auto-generated description for POST /api/ai/tag-suggest
+ *     tags:
+ *       - Ai
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: Request) {
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'Missing API Key' }), { status: 500 })

@@ -2,6 +2,22 @@ import { createSupabaseAdmin } from '@/lib/api/supabase-admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+/**
+ * @swagger
+ * /api/library/unarchive:
+ *   post:
+ *     summary: POST /api/library/unarchive
+ *     description: Auto-generated description for POST /api/library/unarchive
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: Request) {
   try {
     // 1. 验证用户身份 (优先使用 Cookie)

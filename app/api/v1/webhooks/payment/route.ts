@@ -106,6 +106,22 @@ async function creditRechargeFallback(admin: any, userId: string, coinsAmount: n
 
 // 这是一个模拟的支付回调接口
 // 在真实环境中，这里应该验证支付平台的签名
+/**
+ * @swagger
+ * /api/v1/webhooks/payment:
+ *   post:
+ *     summary: POST /api/v1/webhooks/payment
+ *     description: Auto-generated description for POST /api/v1/webhooks/payment
+ *     tags:
+ *       - V1
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get('content-type') || ''

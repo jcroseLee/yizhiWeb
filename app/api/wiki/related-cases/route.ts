@@ -1,6 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+/**
+ * @swagger
+ * /api/wiki/related-cases:
+ *   get:
+ *     summary: GET /api/wiki/related-cases
+ *     description: Auto-generated description for GET /api/wiki/related-cases
+ *     tags:
+ *       - Wiki
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tagsParam = searchParams.get('tags')

@@ -1,11 +1,33 @@
 import { corsHeaders } from '@/lib/api/cors'
 import { createSupabaseAdmin, findUserByPhone } from '@/lib/api/supabase-admin'
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+function generateTempPassword(): string {
+  return crypto.randomBytes(16).toString('base64url')
+}
+
+
+/**
+ * @swagger
+ * /api/sms/login:
+ *   post:
+ *     summary: POST /api/sms/login
+ *     description: Auto-generated description for POST /api/sms/login
+ *     tags:
+ *       - Sms
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -106,7 +128,7 @@ export async function POST(request: NextRequest) {
       // 用户已存在，但我们需要密码来登录
       // 由于 Supabase 不支持无密码登录，我们需要一个临时密码
       // 这里我们生成一个临时密码并更新用户密码
-      userPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12)
+      userPassword = generateTempPassword()
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         existingUser.id,
         {
@@ -135,7 +157,7 @@ export async function POST(request: NextRequest) {
       requiresPasswordReset = true
     } else {
       // 用户不存在，创建新用户（自动注册）
-      userPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12)
+      userPassword = generateTempPassword()
       const { data: newUser, error: createError } =
         await supabaseAdmin.auth.admin.createUser({
           phone: normalizedPhone,

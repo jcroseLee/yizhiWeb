@@ -14,7 +14,7 @@ import { AlertTriangle, Bell, ChevronDown, FileText, LogOut, Menu, Search, User,
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 interface NavItem {
@@ -51,6 +51,7 @@ export default function Navigation() {
   const [session, setSession] = useState<Session | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [totalUnreadCount, setTotalUnreadCount] = useState(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // 计算应该展开的主导航项（基于当前路径）
   const shouldExpandItem = useMemo(() => {
@@ -129,11 +130,33 @@ export default function Navigation() {
       setTotalUnreadCount(0)
       return
     }
+
+    // Cancel previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
-      const count = await getTotalUnreadCount()
-      setTotalUnreadCount(count)
-    } catch (error) {
+      const count = await getTotalUnreadCount(controller.signal)
+      if (!controller.signal.aborted) {
+        setTotalUnreadCount(count)
+      }
+    } catch (error: any) {
+      if (
+        (error instanceof Error && error.name === 'AbortError') ||
+        error?.message?.includes('AbortError') ||
+        error?.details?.includes('AbortError')
+      ) {
+        return
+      }
       console.error('Error loading unread count:', error)
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null
+      }
     }
   }, [session])
 
@@ -186,6 +209,9 @@ export default function Navigation() {
       clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
   }, [session, loadUnreadCount])
 

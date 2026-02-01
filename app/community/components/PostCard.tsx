@@ -2,6 +2,12 @@
 
 import GuaBlock from '@/lib/components/GuaBlock'
 import { Avatar, AvatarFallback, AvatarImage } from '@/lib/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/lib/components/ui/dropdown-menu'
 import UserHoverCard from '@/lib/components/UserHoverCard'
 import { HEXAGRAM_FULL_NAMES } from '@/lib/constants/liuyaoConstants'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -16,12 +22,15 @@ import {
   Flame,
   Heart,
   MessageSquare,
-  Swords
+  MoreHorizontal,
+  Swords,
+  TrendingUp
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import BaZiThumbnail from './BaZiThumbnail'
+import BoostPostDialog from './BoostPostDialog'
 
 // -----------------------------------------------------------------------------
 // 工具函数 (提取纯文本/卦象信息)
@@ -236,6 +245,8 @@ export interface Post {
   isLiked?: boolean
   isFavorited?: boolean
   status?: string
+  isUrgent?: boolean
+  isSticky?: boolean
 }
 
 // 优化：为不同类型配置图标、颜色和背景风格
@@ -287,11 +298,14 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
   const [liked, setLiked] = useState(!!post.isLiked)
   const [favorited, setFavorited] = useState(!!post.isFavorited)
   const [isAuthed, setIsAuthed] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [showBoostDialog, setShowBoostDialog] = useState(false)
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser()
       setIsAuthed(!!user)
+      if (user) setCurrentUserId(user.id)
     }
     void run()
   }, [])
@@ -370,6 +384,37 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
       {/* 链接覆盖层 */}
       <Link href={`/community/${post.id}`} className="absolute inset-0 z-0" aria-label={`查看帖子: ${post.title}`} />
       
+      {/* 更多操作菜单 (仅作者可见) */}
+      {currentUserId === post.author.id && (
+        <div className="absolute top-4 right-4 z-20">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild className='cursor-pointer'>
+              <button className="p-1 text-stone-300 hover:text-stone-600 rounded-full hover:bg-stone-100 transition-colors">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-white">
+              <DropdownMenuItem onClick={() => setShowBoostDialog(true)} className="cursor-pointer gap-2">
+                <TrendingUp className="w-4 h-4" />
+                <span>置顶推广</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      {/* 置顶弹窗 */}
+      <BoostPostDialog 
+        post={post} 
+        open={showBoostDialog} 
+        onOpenChange={setShowBoostDialog}
+        onSuccess={() => {
+          toast({ title: '置顶成功', description: '您的帖子将在首页置顶展示' })
+          // Optional: trigger refresh
+          window.location.reload()
+        }}
+      />
+
       {/* 主布局：左文右图 */}
       <div className="relative z-10 flex gap-5">
         
@@ -378,6 +423,21 @@ export default function PostCard({ post, showStatus = false }: { post: Post; sho
           
           {/* 1. 顶部元信息行：类型 + 状态 + 悬赏 */}
           <div className="flex items-center gap-2 mb-2">
+            {/* 置顶标记 */}
+            {post.isSticky && (
+               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] font-medium leading-none bg-[#C82E31] text-white shadow-xs">
+                 <span>置顶</span>
+               </div>
+            )}
+            
+            {/* 加急标记 */}
+            {post.isUrgent && (
+               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] font-medium leading-none bg-orange-100 text-orange-700 border border-orange-200">
+                 <Flame className="w-3 h-3 fill-orange-500" />
+                 <span>急</span>
+               </div>
+            )}
+
             {/* 类型胶囊 */}
             <div className={cn(
               "flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] font-medium border leading-none",

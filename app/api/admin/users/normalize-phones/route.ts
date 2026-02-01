@@ -1,5 +1,5 @@
 import { corsHeaders } from '@/lib/api/cors'
-import { getAdminContext } from '@/lib/api/admin-auth'
+import { getAdminContext, requirePermission } from '@/lib/api/admin-auth'
 import { NextResponse, type NextRequest } from 'next/server'
 
 type NormalizePhoneResult = {
@@ -22,6 +22,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/admin/users/normalize-phones:
+ *   post:
+ *     summary: POST /api/admin/users/normalize-phones
+ *     description: Auto-generated description for POST /api/admin/users/normalize-phones
+ *     tags:
+ *       - Admin
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
@@ -34,6 +50,9 @@ export async function POST(req: NextRequest) {
     if (!ctx.ok) {
       return NextResponse.json({ error: ctx.error }, { headers: { ...corsHeaders }, status: ctx.status })
     }
+    
+    requirePermission(ctx, '/users')
+
     if (ctx.adminLevel !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden' }, { headers: { ...corsHeaders }, status: 403 })
     }
@@ -105,10 +124,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ...result, dry_run: dryRun }, { headers: { ...corsHeaders }, status: 200 })
-  } catch (e) {
+  } catch (e: any) {
+    const status = e.status || 500
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Unknown error' },
-      { headers: { ...corsHeaders }, status: 500 }
+      { headers: { ...corsHeaders }, status }
     )
   }
 }

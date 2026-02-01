@@ -1,5 +1,6 @@
 import { createSupabaseAdmin } from '@/lib/api/supabase-admin';
 import { type BaZiPillar, type BaZiResult } from '@/lib/utils/bazi';
+import { AppError, createErrorResponse } from '@/lib/utils/errorHandler';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 
@@ -29,181 +30,210 @@ const deepseek = createOpenAI({
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+/**
+ * @swagger
+ * /api/ai/analyze-bazi:
+ *   post:
+ *     summary: POST /api/ai/analyze-bazi
+ *     description: Auto-generated description for POST /api/ai/analyze-bazi
+ *     tags:
+ *       - Ai
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: Request) {
-  // 1. 验证配置
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server configuration error: Missing API Key' }), { status: 500 });
-  }
-
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
-
-  const token = authHeader.replace('Bearer ', '');
-  const supabase = createSupabaseAdmin();
-  const { data: authData, error: authError } = await supabase.auth.getUser(token);
-  const user = !authError ? authData.user : null;
-  if (!user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
-
-  let body;
   try {
-    body = await req.json();
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
-  }
-  const { name, gender, dateISO, result, idempotencyKey, mode } = body;
-  const analysisMode = mode === 'preview' || mode === 'full' ? mode : mode == null ? 'full' : null;
-  if (!analysisMode) {
-    return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
-  }
-
-  if (!result || !result.pillars || !Array.isArray(result.pillars)) {
-    return new Response(JSON.stringify({ error: 'Invalid BaZi data: missing pillars' }), { status: 400 });
-  }
-
-  // 3. 扣费逻辑
-  let requestId: string | null = null;
-  let isReplay = false;
-
-  const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
-
-  if (analysisMode === 'full' && !skipAiPayment && user && supabase) {
-    const COST = 50;
-    const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`;
-
-    const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
-         p_user_id: user.id,
-         p_amount: COST,
-         p_idempotency_key: key,
-         p_description: `AI 八字详批：${name || '未知姓名'}`
-    });
-
-    if (transactionError) {
-         console.error('Payment RPC Error:', transactionError);
-         return new Response(JSON.stringify({ error: '支付系统错误，请联系客服' }), { status: 500 });
+    // 1. 验证配置
+    if (!apiKey) {
+      throw new AppError(500, 'Server configuration error: Missing API Key', 'CONFIG_ERROR');
     }
 
-    if (!transactionResult.success) {
-         const msg = transactionResult.message === 'Insufficient balance' ? '余额不足，请先充值' : transactionResult.message;
-         return new Response(JSON.stringify({ error: msg }), { status: 402 });
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
     }
 
-    requestId = transactionResult.request_id;
-    isReplay = transactionResult.is_replay;
-    
-    if (isReplay) {
-        if (requestId && supabase) {
-            const { data: existingRequest } = await supabase
-                .from('ai_analysis_requests')
-                .select('result_payload, status')
-                .eq('id', requestId)
-                .single();
-            
-            if (existingRequest?.result_payload?.content) {
-                return new Response(existingRequest.result_payload.content, {
-                  headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-                });
-            }
-            
-            if (existingRequest?.status === 'processing') {
-                 return new Response(JSON.stringify({ error: 'AI 正在分析中，请稍候...' }), { status: 429 });
-            } else {
-                 return new Response(JSON.stringify({ error: '请求已提交，请查看历史记录或稍后重试' }), { status: 409 });
-            }
-        }
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createSupabaseAdmin();
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    const user = !authError ? authData.user : null;
+    if (!user) {
+      throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
     }
-  }
 
-  // 4. 执行 AI 分析
-  try {
-    const promptContext = constructBaZiPrompt(name, gender, dateISO, result);
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      throw new AppError(400, 'Invalid JSON body', 'INVALID_JSON');
+    }
+    const { name, gender, dateISO, result, idempotencyKey, mode } = body;
+    const analysisMode = mode === 'preview' || mode === 'full' ? mode : mode == null ? 'full' : null;
+    if (!analysisMode) {
+      throw new AppError(400, 'Invalid mode', 'INVALID_MODE');
+    }
 
-    console.log('Calling DeepSeek API for BaZi analysis...');
+    if (!result || !result.pillars || !Array.isArray(result.pillars)) {
+      throw new AppError(400, 'Invalid BaZi data: missing pillars', 'INVALID_DATA');
+    }
 
-    const result_stream = await streamText({
-      model: deepseek.chat('deepseek-chat'),
-      messages: [
-        {
-          role: 'system',
-          content:
-            analysisMode === 'preview'
-              ? `你是一位精通《三命通会》、《穷通宝鉴》与《滴天髓》的八字命理研究者。
-分析风格：
-1. **严谨客观**：依据五行生克、十神关系、格局旺衰推导。
-2. **结构清晰**：按【命局分析->五行旺衰->十神格局->大运流年->性格特征->事业财运->感情婚姻->健康建议】步骤。
-3. **格式要求**：使用 Markdown，重点加粗，分段落清晰。
-4. **实证导向**：结合具体干支组合，避免空泛套话。
-5. 不要写“由 DeepSeek 生成”等字样。
-输出要求：
-1. 仅输出“预览版”，内容尽量精炼。
-2. 总长度控制在约 20% 的详批量级（建议 400-600 字）。`
-              : `你是一位精通《三命通会》、《穷通宝鉴》与《滴天髓》的八字命理研究者。
-分析风格：
-1. **严谨客观**：依据五行生克、十神关系、格局旺衰推导。
-2. **结构清晰**：按【命局分析->五行旺衰->十神格局->大运流年->性格特征->事业财运->感情婚姻->健康建议】步骤。
-3. **格式要求**：使用 Markdown，重点加粗，分段落清晰。
-4. **实证导向**：结合具体干支组合，避免空泛套话。
-5. 不要写“由 DeepSeek 生成”等字样。`
-        },
-        { role: 'user', content: promptContext }
-      ],
-      temperature: 0.3,
-      maxOutputTokens: analysisMode === 'preview' ? 1000 : undefined,
-       onFinish: async ({ text }) => {
-         if (analysisMode === 'full' && requestId && supabase) {
-             await supabase.from('ai_analysis_requests').update({
-                 status: 'completed',
-                 result_payload: { content: text },
-                 updated_at: new Date().toISOString()
-             }).eq('id', requestId);
-         }
-       }
-    });
+    // 3. 扣费逻辑
+    let requestId: string | null = null;
+    let isReplay = false;
 
-    console.log('StreamText Result Keys:', Object.keys(result_stream));
-    
-    return result_stream.toTextStreamResponse();
+    const skipAiPayment = process.env.SKIP_AI_PAYMENT === 'false';
 
-  } catch (error) {
-    console.error('AI BaZi Analysis Error:', error);
+    if (analysisMode === 'full' && !skipAiPayment && user && supabase) {
+      // 3. 扣除易币
+      const COST = 50; // 50 易币
+      
+      // 幂等性处理:
+      // 如果客户端提供了 idempotencyKey，则使用该 Key 确保同一请求不重复扣费
+      // 如果未提供，则生成一个基于时间戳的临时 Key
+      const key = idempotencyKey || `auto-${Date.now()}-${Math.random()}`;
 
-    if (analysisMode === 'full') {
-      if (requestId && supabase) {
-        await supabase.rpc('refund_ai_analysis', {
-          p_request_id: requestId,
-          p_reason: error instanceof Error ? error.message : String(error),
-        });
-      } else if (supabase && user && !requestId) {
-        const COST = 50;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('yi_coins')
-          .eq('id', user.id)
-          .single();
+      // 调用幂等扣费 RPC `consume_yi_coins_idempotent`
+      // 该 RPC 内部逻辑:
+      // 1. 检查 idempotency_key 是否已存在
+      //    - 若存在且成功: 返回之前的 success 结果 (is_replay=true)
+      //    - 若存在但失败: 允许重试
+      // 2. 执行扣费 (双轨制: 优先扣 Free Coins)
+      // 3. 记录交易和幂等键
+      const { data: transactionResult, error: transactionError } = await supabase.rpc('consume_yi_coins_idempotent', {
+           p_user_id: user.id,
+           p_amount: COST,
+           p_idempotency_key: key,
+           p_description: `AI 八字详批：${name || '未知姓名'}`
+      });
 
-        if (profile) {
-          await supabase
-            .from('profiles')
-            .update({ yi_coins: (profile.yi_coins || 0) + COST })
-            .eq('id', user.id);
+      if (transactionError) {
+           console.error('Payment RPC Error:', transactionError);
+           throw new AppError(500, '支付系统错误，请联系客服', 'PAYMENT_ERROR');
+      }
 
-          await supabase.from('coin_transactions').insert({
-            user_id: user.id,
-            amount: COST,
-            type: 'refund',
-            description: `AI BaZi Analysis Refund: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
+      if (!transactionResult.success) {
+           const msg = transactionResult.message === 'Insufficient balance' ? '余额不足，请先充值' : transactionResult.message;
+           throw new AppError(402, msg, 'PAYMENT_FAILED');
+      }
+
+      requestId = transactionResult.request_id;
+      isReplay = transactionResult.is_replay;
+      
+      if (isReplay) {
+          if (requestId && supabase) {
+              const { data: existingRequest } = await supabase
+                  .from('ai_analysis_requests')
+                  .select('result_payload, status')
+                  .eq('id', requestId)
+                  .single();
+              
+              if (existingRequest?.result_payload?.content) {
+                  return new Response(existingRequest.result_payload.content, {
+                    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                  });
+              }
+              
+              if (existingRequest?.status === 'processing') {
+                   throw new AppError(429, 'AI 正在分析中，请稍候...', 'PROCESSING');
+              } else {
+                   throw new AppError(409, '请求已提交，请查看历史记录或稍后重试', 'DUPLICATE_REQUEST');
+              }
+          }
       }
     }
 
-    return new Response(JSON.stringify({ 
-      error: 'AI 服务暂时繁忙，请重试',
-      details: error instanceof Error ? error.message : String(error)
-    }), { status: 500 });
+    // 4. 执行 AI 分析
+    try {
+      const promptContext = constructBaZiPrompt(name, gender, dateISO, result);
+
+      console.log('Calling DeepSeek API for BaZi analysis...');
+
+      const result_stream = streamText({
+        model: deepseek.chat('deepseek-chat'),
+        messages: [
+          {
+            role: 'system',
+            content:
+              analysisMode === 'preview'
+                ? `你是一位精通《三命通会》、《穷通宝鉴》与《滴天髓》的八字命理研究者。
+  分析风格：
+  1. **严谨客观**：依据五行生克、十神关系、格局旺衰推导。
+  2. **结构清晰**：按【命局分析->五行旺衰->十神格局->大运流年->性格特征->事业财运->感情婚姻->健康建议】步骤。
+  3. **格式要求**：使用 Markdown，重点加粗，分段落清晰。
+  4. **实证导向**：结合具体干支组合，避免空泛套话。
+  5. 不要写“由 DeepSeek 生成”等字样。
+  输出要求：
+  1. 仅输出“预览版”，内容尽量精炼。
+  2. 总长度控制在约 20% 的详批量级（建议 400-600 字）。`
+                : `你是一位精通《三命通会》、《穷通宝鉴》与《滴天髓》的八字命理研究者。
+  分析风格：
+  1. **严谨客观**：依据五行生克、十神关系、格局旺衰推导。
+  2. **结构清晰**：按【命局分析->五行旺衰->十神格局->大运流年->性格特征->事业财运->感情婚姻->健康建议】步骤。
+  3. **格式要求**：使用 Markdown，重点加粗，分段落清晰。
+  4. **实证导向**：结合具体干支组合，避免空泛套话。
+  5. 不要写“由 DeepSeek 生成”等字样。`
+          },
+          { role: 'user', content: promptContext }
+        ],
+        temperature: 0.3,
+        maxOutputTokens: analysisMode === 'preview' ? 1000 : undefined,
+         onFinish: async ({ text }) => {
+           if (analysisMode === 'full' && requestId && supabase) {
+               await supabase.from('ai_analysis_requests').update({
+                   status: 'completed',
+                   result_payload: { content: text },
+                   updated_at: new Date().toISOString()
+               }).eq('id', requestId);
+           }
+         }
+      });
+
+      console.log('StreamText Result Keys:', Object.keys(result_stream));
+      
+      return result_stream.toTextStreamResponse();
+
+    } catch (error) {
+      console.error('AI BaZi Analysis Error:', error);
+
+      if (analysisMode === 'full') {
+        if (requestId && supabase) {
+          await supabase.rpc('refund_ai_analysis', {
+            p_request_id: requestId,
+            p_reason: error instanceof Error ? error.message : String(error),
+          });
+        } else if (supabase && user && !requestId) {
+          const COST = 50;
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('yi_coins')
+            .eq('id', user.id)
+            .single();
+
+          if (profile) {
+            await supabase
+              .from('profiles')
+              .update({ yi_coins: (profile.yi_coins || 0) + COST })
+              .eq('id', user.id);
+
+            await supabase.from('coin_transactions').insert({
+              user_id: user.id,
+              amount: COST,
+              type: 'refund',
+              description: `AI BaZi Analysis Refund: ${error instanceof Error ? error.message : String(error)}`,
+            });
+          }
+        }
+      }
+
+      throw new AppError(500, 'AI 服务暂时繁忙，请重试', 'AI_SERVICE_ERROR');
+    }
+  } catch (error) {
+    return createErrorResponse(error);
   }
 }
 

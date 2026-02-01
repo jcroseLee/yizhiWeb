@@ -136,23 +136,29 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
 
   // Load Data
   useEffect(() => {
+    const controller = new AbortController()
+
     const loadData = async () => {
       try {
         setLoading(true)
         const userId = resolvedParams.id
         const user = await getCurrentUser()
+        if (controller.signal.aborted) return
         setCurrentUser(user)
 
         const [profileData, statsData, followStatsData, activityDataResult, postsData] = await Promise.all([
-          getUserProfileById(userId),
-          getUserStats(userId),
-          getUserFollowStats(userId),
-          getDailyActivityData(userId),
-          getUserPosts({ userId, limit: 20 }),
+          getUserProfileById(userId, { signal: controller.signal }),
+          getUserStats(userId, controller.signal),
+          getUserFollowStats(userId, controller.signal),
+          getDailyActivityData(userId, controller.signal),
+          getUserPosts({ userId, limit: 20, signal: controller.signal }),
         ])
+
+        if (controller.signal.aborted) return
 
         if (user && user.id !== userId) {
           const followingStatus = await isFollowingUser(userId)
+          if (controller.signal.aborted) return
           setIsFollowing(followingStatus)
         }
 
@@ -167,14 +173,18 @@ export default function UserPublicProfile({ params }: UserPublicProfileProps) {
         setFollowStats(followStatsData)
         setActivityData(activityDataResult)
         setPosts(postsData)
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return
         console.error('Error loading user profile:', error)
         toast({ title: '加载失败', variant: 'destructive' })
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
     loadData()
+    return () => controller.abort()
   }, [resolvedParams.id, router, toast])
 
   useEffect(() => {

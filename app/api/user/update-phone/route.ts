@@ -7,6 +7,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/user/update-phone:
+ *   post:
+ *     summary: POST /api/user/update-phone
+ *     description: Auto-generated description for POST /api/user/update-phone
+ *     tags:
+ *       - User
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   try {
     // 1. 获取当前用户

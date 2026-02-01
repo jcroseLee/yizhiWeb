@@ -1,23 +1,23 @@
 'use client'
 
 import {
-    Activity,
-    ArrowDown,
-    ArrowUp,
-    Award,
-    BookOpen,
-    CalendarCheck,
-    CheckCircle2,
-    CheckSquare,
-    Circle,
-    Clock,
-    Coins,
-    Edit2,
-    HelpCircle,
-    Loader2,
-    Trash2,
-    TrendingUp,
-    X
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  Award,
+  BookOpen,
+  CalendarCheck,
+  CheckCircle2,
+  CheckSquare,
+  Circle,
+  Clock,
+  Coins,
+  Edit2,
+  HelpCircle,
+  Loader2,
+  Trash2,
+  TrendingUp,
+  X
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -39,14 +39,14 @@ import { useToast } from '@/lib/hooks/use-toast'
 import { getCurrentUser } from '@/lib/services/auth'
 import { deleteDraft, deletePost, getUserDrafts, getUserFavoritePosts, getUserLikedPosts, getUserPosts, type Post } from '@/lib/services/community'
 import {
-    calculateLevel,
-    checkIn,
-    getCoinTransactions,
-    getTitleName,
-    getUserGrowth,
-    hasCheckedInToday,
-    LEVEL_CONFIG,
-    type CoinTransaction
+  calculateLevel,
+  checkIn,
+  getCoinTransactions,
+  getTitleName,
+  getUserGrowth,
+  hasCheckedInToday,
+  LEVEL_CONFIG,
+  type CoinTransaction
 } from '@/lib/services/growth'
 import { deleteDivinationRecord, deleteDivinationRecords, getDailyActivityData, getDivinationRecordById, getFollowersUsers, getFollowingUsers, getUserDivinationRecords, getUserFollowStats, getUserProfileWithGrowth, getUserStats, toggleFollowUser, type DivinationRecord, type UserFollowStats, type UserProfile, type UserStats } from '@/lib/services/profile'
 import { ActivityHeatmap } from './components/ActivityHeatmap'
@@ -239,6 +239,34 @@ function ProfilePageContent() {
   // 排盘记录子菜单状态
   const [divinationTab, setDivinationTab] = useState<'all' | 'bazi' | '6yao' | 'qimen'>('all')
 
+  const loadPostsForTab = async (tabToLoad = postTab, signal?: AbortSignal) => {
+    if (loadingPosts) return
+    // Check cache for non-mine tabs
+    if (tabToLoad !== 'mine' && loadedTabsRef.current.has(tabToLoad)) return
+    
+    // For 'mine', we might want to check if userPosts is empty to avoid re-fetching
+    if (tabToLoad === 'mine' && userPosts.length > 0) return
+
+    setLoadingPosts(true)
+    try {
+      if (tabToLoad === 'mine') {
+          const posts = await getUserPosts({ limit: 50, signal })
+          setUserPosts(posts)
+      }
+      else if (tabToLoad === 'fav') { const posts = await getUserFavoritePosts({ limit: 50, signal }); setFavoritePosts(posts); loadedTabsRef.current.add('fav') }
+      else if (tabToLoad === 'liked') { const posts = await getUserLikedPosts({ limit: 50, signal }); setLikedPosts(posts); loadedTabsRef.current.add('liked') }
+      else if (tabToLoad === 'draft') { const posts = await getUserDrafts({ limit: 50, signal }); setDraftPosts(posts); loadedTabsRef.current.add('draft') }
+    } catch (error: any) { 
+      if (error.name === 'AbortError') return
+      console.error(error); 
+      toast({ title: '加载失败', variant: 'destructive' }) 
+    } finally { 
+      if (!signal?.aborted) {
+        setLoadingPosts(false) 
+      }
+    }
+  }
+
   // Handle URL tab param
   useEffect(() => {
     const tab = searchParams.get('tab')
@@ -250,28 +278,33 @@ function ProfilePageContent() {
     }
   }, [searchParams])
 
-  // Data fetching (保持不变)
+  // Data fetching
   useEffect(() => {
+    const controller = new AbortController()
+
     const init = async () => {
       setLoading(true)
       try {
         const currentUser = await getCurrentUser()
+        if (controller.signal.aborted) return
+
         if (!currentUser) {
           router.push(`/login?redirect=${encodeURIComponent('/profile')}`)
           return
         }
         setUserPhone(currentUser.phone || null)
         
-        const [profileWithGrowth, statsData, postsData, divinationData, transactions, dailyActivity, followStatsData] = await Promise.all([
-          getUserProfileWithGrowth(),
-          getUserStats(),
-          getUserPosts({ limit: 50 }),
-          getUserDivinationRecords(50),
-          getCoinTransactions(100),
-          getDailyActivityData(),
-          getUserFollowStats()
+        // 1. 首屏核心数据：并行获取
+        // 仅获取渲染页面框架所需的最小数据集
+        const [profileWithGrowth, statsData, followStatsData, dailyActivity] = await Promise.all([
+          getUserProfileWithGrowth(controller.signal),
+          getUserStats(undefined, controller.signal),
+          getUserFollowStats(undefined, controller.signal),
+          getDailyActivityData(undefined, controller.signal),
         ])
         
+        if (controller.signal.aborted) return
+
         setProfile(profileWithGrowth.profile)
         if (profileWithGrowth.growth) {
           const { exp, reputation, yiCoins, titleLevel } = profileWithGrowth.growth
@@ -291,27 +324,55 @@ function ProfilePageContent() {
           }
         }
         setStats(statsData)
-        setUserPosts(postsData)
-        setDivinationRecords(divinationData)
-        setCoinTransactions(transactions)
-        setActivityData(dailyActivity)
         setFollowStats(followStatsData)
+        setActivityData(dailyActivity)
         
-        try {
-          const [favPosts, likedPostsData, draftsData] = await Promise.all([
-            getUserFavoritePosts({ limit: 50 }),
-            getUserLikedPosts({ limit: 50 }),
-            getUserDrafts({ limit: 50 })
-          ])
-          setFavoritePosts(favPosts)
-          setLikedPosts(likedPostsData)
-          setDraftPosts(draftsData)
-          loadedTabsRef.current.add('fav'); loadedTabsRef.current.add('liked'); loadedTabsRef.current.add('draft')
-        } catch (error) { console.error(error) }
-      } catch (e) { console.error(e) } finally { setLoading(false) }
+        // 核心数据加载完毕，解除全屏 Loading
+        setLoading(false)
+
+        // 2. 次要数据：非阻塞式加载（可以在后台静默加载，或者等用户点击 Tab 再加载）
+        // 这里我们选择预加载默认 Tab (Notes) 的数据
+        if (activeMainTab === 'notes') {
+          loadPostsForTab(undefined, controller.signal)
+        }
+      } catch (e: any) { 
+        if (e.name === 'AbortError') return
+        console.error(e) 
+        setLoading(false)
+      }
     }
     init()
+    return () => controller.abort()
   }, [router])
+
+  // 按需加载数据：监听 Tab 变化
+  useEffect(() => {
+    if (activeMainTab === 'notes') {
+      loadPostsForTab()
+    } else if (activeMainTab === 'divinations' && divinationRecords.length === 0) {
+      loadDivinationRecords()
+    } else if (activeMainTab === 'wallet' && coinTransactions.length === 0) {
+      loadWalletData()
+    } else if (activeMainTab === 'follows') {
+       // Follows data is loaded by sub-tab logic or initial logic
+       if (followTab === 'following' && followingUsers.length === 0) loadFollowsData('following')
+       if (followTab === 'followers' && followersUsers.length === 0) loadFollowsData('followers')
+    }
+  }, [activeMainTab])
+
+  const loadDivinationRecords = async () => {
+    try {
+      const records = await getUserDivinationRecords(50)
+      setDivinationRecords(records)
+    } catch (e) { console.error(e) }
+  }
+
+  const loadWalletData = async () => {
+    try {
+      const transactions = await getCoinTransactions(100)
+      setCoinTransactions(transactions)
+    } catch (e) { console.error(e) }
+  }
 
   const refreshWalletData = async () => {
     try {
@@ -435,16 +496,9 @@ function ProfilePageContent() {
   }
 
   useEffect(() => {
-    const loadPostsForTab = async () => {
-      if (postTab === 'mine' || loadingPosts || loadedTabsRef.current.has(postTab)) return
-      setLoadingPosts(true)
-      try {
-        if (postTab === 'fav') { const posts = await getUserFavoritePosts({ limit: 50 }); setFavoritePosts(posts); loadedTabsRef.current.add('fav') }
-        else if (postTab === 'liked') { const posts = await getUserLikedPosts({ limit: 50 }); setLikedPosts(posts); loadedTabsRef.current.add('liked') }
-        else if (postTab === 'draft') { const posts = await getUserDrafts({ limit: 50 }); setDraftPosts(posts); loadedTabsRef.current.add('draft') }
-      } catch (error) { console.error(error); toast({ title: '加载失败', variant: 'destructive' }) } finally { setLoadingPosts(false) }
-    }
-    loadPostsForTab()
+    const controller = new AbortController()
+    loadPostsForTab(postTab, controller.signal)
+    return () => controller.abort()
   }, [postTab])
 
   // Handlers (保持不变)
@@ -590,8 +644,8 @@ function ProfilePageContent() {
           {/* 1. 顶部身份卡片 (重构：更轻量，更有呼吸感) */}
           <div className="glass-card rounded-2xl p-6 lg:p-10 relative overflow-hidden group">
             {/* 背景装饰：淡彩晕染 */}
-            <div className="hidden lg:block absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-amber-50/80 to-transparent rounded-bl-full opacity-60 pointer-events-none blur-3xl" />
-            <div className="hidden lg:block absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-stone-100/80 to-transparent rounded-tr-full opacity-40 pointer-events-none blur-3xl" />
+            <div className="hidden lg:block absolute top-0 right-0 w-80 h-80 bg-linear-to-bl from-amber-50/80 to-transparent rounded-bl-full opacity-60 pointer-events-none blur-3xl" />
+            <div className="hidden lg:block absolute bottom-0 left-0 w-64 h-64 bg-linear-to-tr from-stone-100/80 to-transparent rounded-tr-full opacity-40 pointer-events-none blur-3xl" />
             
             <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative z-10 items-center lg:items-start">
               
@@ -599,7 +653,7 @@ function ProfilePageContent() {
                 <div className="flex flex-col items-center shrink-0 gap-4">
                   <div className="relative group/avatar">
                     {/* 光环装饰 */}
-                    <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-[#C82E31]/20 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity blur-md" />
+                    <div className="absolute -inset-1 rounded-full bg-linear-to-br from-[#C82E31]/20 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity blur-md" />
                     <Avatar className={`w-24 h-24 lg:w-28 lg:h-28 border-[0.25rem] shadow-xl cursor-pointer transition-transform hover:scale-105 relative z-10 ${getAvatarStyle(growth?.level || 1)}`}>
                       <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
                       <AvatarFallback className="bg-stone-100 text-stone-400 text-4xl font-serif">{profile.nickname?.charAt(0) || '易'}</AvatarFallback>
@@ -711,7 +765,7 @@ function ProfilePageContent() {
           {/* 2. 统计概览 (Bento Grid 风格) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
             <Card className="glass-card rounded-2xl border-none shadow-sm col-span-1 group hover:-translate-y-1 transition-transform duration-300">
-              <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[8.75rem]">
+              <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-35">
                 <CircularProgress value={stats.accuracyRate} label="实证准确率" totalVerified={stats.verifiedCases} />
               </CardContent>
             </Card>
@@ -889,7 +943,7 @@ function ProfilePageContent() {
 
                   return (
                     <>
-                      <div className={`sticky top-[3.75rem] lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
+                      <div className={`sticky top-15 lg:top-0 z-30 mb-6 rounded-xl border transition-all duration-300 ${
                         isSelectMode 
                           ? 'bg-red-50/95 border-red-200 shadow-md p-3' 
                           : 'bg-white/60 border-stone-100 shadow-sm p-4 backdrop-blur-md'
@@ -1020,7 +1074,7 @@ function ProfilePageContent() {
                 </div>
 
                 {/* 关注列表渲染逻辑保持不变，容器样式微调 */}
-                <div className="min-h-[18.75rem]">
+                <div className="min-h-75">
                     {followTab === 'following' && (
                         /* ... same content ... */
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

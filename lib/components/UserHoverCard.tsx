@@ -9,7 +9,7 @@ import { calculateLevel, getTitleName } from '@/lib/services/growth'
 import { getUserFollowStats, getUserProfileById, getUserStats, isFollowingUser, toggleFollowUser } from '@/lib/services/profile'
 import { Loader2, MessageSquare, UserPlus } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface UserHoverCardProps {
   userId?: string
@@ -30,12 +30,26 @@ export default function UserHoverCard({ userId, nickname, avatar, children }: Us
   const [isFollowing, setIsFollowing] = useState(false)
   const [isFollowingLoading, setIsFollowingLoading] = useState(false)
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   useEffect(() => {
     getCurrentUser().then(setCurrentUser)
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [])
 
   const loadUserInfo = useCallback(async () => {
     if (!userId || userInfo || loading) return
+    
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setLoading(true)
     try {
       // 如果 currentUser 还没加载，先加载它
@@ -45,12 +59,17 @@ export default function UserHoverCard({ userId, nickname, avatar, children }: Us
         setCurrentUser(user)
       }
       
+      if (controller.signal.aborted) return
+
       const [profile, stats, followStats, followStatus] = await Promise.all([
-        getUserProfileById(userId),
-        getUserStats(userId),
-        getUserFollowStats(userId),
+        getUserProfileById(userId, { signal: controller.signal }),
+        getUserStats(userId, controller.signal),
+        getUserFollowStats(userId, controller.signal),
         user && user.id !== userId ? isFollowingUser(userId).catch(() => false) : Promise.resolve(false)
       ])
+
+      if (controller.signal.aborted) return
+
       if (profile) {
         setUserInfo({
           profile: {
@@ -65,10 +84,14 @@ export default function UserHoverCard({ userId, nickname, avatar, children }: Us
         })
         setIsFollowing(followStatus)
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') return
       console.error('Failed to load user info:', error)
     } finally {
-      setLoading(false)
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null
+        setLoading(false)
+      }
     }
   }, [userId, userInfo, loading, currentUser])
 

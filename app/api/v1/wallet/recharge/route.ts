@@ -3,6 +3,7 @@ import { createRechargeOrder } from '@/lib/services/wallet'
 import { createWechatPayOrder, getWechatPayConfig, type WechatPayScene } from '@/lib/services/wechatpay'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { log, LogLevel } from '@/lib/utils/logger'
 import { NextResponse } from 'next/server'
 
 type RechargeOrder = {
@@ -28,6 +29,22 @@ function getRequestBaseUrl(request: Request) {
   return 'http://localhost:3000'
 }
 
+/**
+ * @swagger
+ * /api/v1/wallet/recharge:
+ *   post:
+ *     summary: POST /api/v1/wallet/recharge
+ *     description: Auto-generated description for POST /api/v1/wallet/recharge
+ *     tags:
+ *       - V1
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: Request) {
   const supabase = await createClient()
   let {
@@ -92,6 +109,8 @@ export async function POST(request: Request) {
 
     const paymentMethod = paymentMethodRaw as 'WECHAT' | 'ALIPAY'
 
+    log(LogLevel.INFO, 'Recharge request started', { userId: user.id, amountCny, paymentMethod })
+
     const formatOrdersSchemaError = (err: unknown) => {
       const e = err as { message?: unknown; code?: unknown }
       const msg = typeof e?.message === 'string' ? e.message : ''
@@ -115,6 +134,7 @@ export async function POST(request: Request) {
     } catch (err: unknown) {
       const e = err as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
       console.error('createRechargeOrder error:', e)
+      log(LogLevel.ERROR, 'createRechargeOrder error', { userId: user.id, error: e })
 
       const schemaError = formatOrdersSchemaError(e)
       if (schemaError) {
@@ -153,6 +173,7 @@ export async function POST(request: Request) {
         } catch (err2: unknown) {
           const e2 = err2 as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
           console.error('createRechargeOrder error (service role):', e2)
+          log(LogLevel.ERROR, 'createRechargeOrder error (service role)', { userId: user.id, error: e2 })
           const schemaError2 = formatOrdersSchemaError(e2)
           if (schemaError2) {
             return NextResponse.json(
@@ -341,9 +362,12 @@ export async function POST(request: Request) {
       }
     }
 
+    log(LogLevel.INFO, 'Recharge request success', { userId: user.id, outTradeNo: order.out_trade_no })
+
     return NextResponse.json({ ...order, paymentUrl, wechatPay })
   } catch (error) {
     console.error('Recharge error:', error)
+    log(LogLevel.ERROR, 'Recharge unhandled error', { userId: user?.id, error })
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

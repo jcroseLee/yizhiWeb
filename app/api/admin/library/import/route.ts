@@ -481,6 +481,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/admin/library/import:
+ *   post:
+ *     summary: POST /api/admin/library/import
+ *     description: Auto-generated description for POST /api/admin/library/import
+ *     tags:
+ *       - Admin
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')

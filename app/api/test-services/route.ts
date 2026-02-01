@@ -3,6 +3,22 @@ import { NextResponse } from 'next/server';
 import { createCustomTag, getTags, setPostTags } from '@/lib/services/community';
 import { createClient } from '@/lib/supabase/server';
 
+/**
+ * @swagger
+ * /api/test-services:
+ *   get:
+ *     summary: GET /api/test-services
+ *     description: Auto-generated description for GET /api/test-services
+ *     tags:
+ *       - Test-services
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET() {
   const results: Record<string, any> = {};
   const supabase = await createClient();

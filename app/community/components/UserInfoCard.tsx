@@ -26,12 +26,22 @@ export default function UserInfoCard() {
   } | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
+    let timer: NodeJS.Timeout
+
     const loadUserInfo = async () => {
       try {
-        const profile = await getUserProfile()
+        if (controller.signal.aborted) return
+        const profile = await getUserProfile({ signal: controller.signal })
+        if (controller.signal.aborted) return
+
         if (profile) {
-          const growth = await getUserGrowth()
-          const followStats = await getUserFollowStats()
+          const growth = await getUserGrowth() // getUserGrowth doesn't support signal yet, but it's okay
+          if (controller.signal.aborted) return
+
+          const followStats = await getUserFollowStats(undefined, controller.signal)
+          if (controller.signal.aborted) return
+
           setUser({
             id: profile.id,
             name: profile.nickname || '易学研习者',
@@ -45,11 +55,21 @@ export default function UserInfoCard() {
             }
           })
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return
         console.error('Failed to load user info:', error)
       }
     }
-    loadUserInfo()
+    
+    // Use a small delay to avoid React Strict Mode double-mount causing immediate abort
+    timer = setTimeout(() => {
+      loadUserInfo()
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [])
 
   if (!user) {

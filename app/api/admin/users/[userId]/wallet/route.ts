@@ -1,5 +1,5 @@
+import { getAdminContext, requirePermission } from '@/lib/api/admin-auth'
 import { corsHeaders } from '@/lib/api/cors'
-import { getAdminContext } from '@/lib/api/admin-auth'
 import { getWalletBalance } from '@/lib/services/wallet'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -7,6 +7,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/admin/users/{userId}/wallet:
+ *   get:
+ *     summary: GET /api/admin/users/{userId}/wallet
+ *     description: Auto-generated description for GET /api/admin/users/{userId}/wallet
+ *     tags:
+ *       - Admin
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   try {
     const authHeader = req.headers.get('authorization')
@@ -19,6 +35,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     if (!ctx.ok) {
       return NextResponse.json({ error: ctx.error }, { headers: { ...corsHeaders }, status: ctx.status })
     }
+
+    requirePermission(ctx, '/users')
 
     const { userId } = await params
     if (!userId) {
@@ -69,10 +87,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       },
       { headers: { ...corsHeaders }, status: 200 }
     )
-  } catch (e) {
+  } catch (e: any) {
+    const status = e.status || 500
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Unknown error' },
-      { headers: { ...corsHeaders }, status: 500 }
+      { headers: { ...corsHeaders }, status }
     )
   }
 }

@@ -28,6 +28,22 @@ function parseBoolean(value: string | null) {
   return null
 }
 
+/**
+ * @swagger
+ * /api/library/cases:
+ *   get:
+ *     summary: GET /api/library/cases
+ *     description: Auto-generated description for GET /api/library/cases
+ *     tags:
+ *       - Library
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams

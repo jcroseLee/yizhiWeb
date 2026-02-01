@@ -1,0 +1,102 @@
+
+/* 字体优化 */
+.font-serif-sc {
+  font-family: "Noto Serif SC", "Songti SC", "Source Han Serif SC", "SimSun", serif;
+}
+
+/* 文章排版优化 */
+.prose {
+  font-size: 1.05rem;
+  line-height: 1.85;
+  color: #3f3c3a; /* 更柔和的深灰色 */
+}
+.prose p {
+  margin-bottom: 1.6em;
+  text-align: justify;
+  letter-spacing: 0.01em;
+}
+.prose h1, .prose h2, .prose h3 {
+  font-family: "Noto Serif SC", serif;
+  color: #292524;
+  font-weight: 700;
+  margin-top: 2.2em;
+  margin-bottom: 1em;
+  letter-spacing: -0.01em;
+}
+.prose h2 {
+  font-size: 1.5rem;
+  position: relative;
+  padding-left: 1rem;
+  border-left: 4px solid #C82E31; /* 左侧红线装饰 */
+}
+.prose blockquote {
+  font-family: "Noto Serif SC", serif;
+  background: linear-gradient(to right, #f5f5f4, transparent);
+  border-left: none;
+  position: relative;
+  padding: 1.5rem 2rem;
+  color: #57534e;
+  font-style: italic;
+  margin: 2rem 0;
+  border-radius: 0.5rem;
+}
+.prose blockquote::before {
+  content: '"';
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  font-size: 3rem;
+  color: #e7e5e4;
+  font-family: serif;
+}
+.prose ul li::marker {
+  color: #C82E31;
+}
+
+/* 阴影与深度 */
+.card-shadow {
+  box-shadow: 
+    0 1px 2px -1px rgba(0, 0, 0, 0.05),
+    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+    0 0 0 1px rgba(0,0,0,0.02); /* 细微描边 */
+}
+.floating-bar-shadow {
+  box-shadow: 0 -4px 20px -5px rgba(0, 0, 0, 0.05);
+}
+
+/* 隐藏滚动条 */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 选中态 */
+::selection {
+  background: rgba(200, 46, 49, 0.1);
+  color: #C82E31;
+}
+
+/* 模糊内容容器：机密档案质感 */
+.secret-file-pattern {
+  background-color: #fafaf9;
+  background-image: radial-gradient(#e7e5e4 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* 模拟墨迹/文字块 */
+.blur-text-block {
+  display: inline-block;
+  height: 1em;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.2;
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+
+/* 尝试穿透优化 BlurredContent 内部的白色遮罩 (依赖结构，如有风险可移除) */
+.blur-lock-container > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 20px -5px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 8px;
+}

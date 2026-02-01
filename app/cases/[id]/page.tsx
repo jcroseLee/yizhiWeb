@@ -1,6 +1,7 @@
 'use client'
 
 import DOMPurify from 'isomorphic-dompurify'
+
 import { Bookmark, CheckCircle2, Loader2, Printer, ThumbsUp, Undo2, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -21,7 +22,20 @@ import { calculateLevel, getTitleName } from '@/lib/services/growth'
 import { getUserProfileById, getUserStats, isFollowingUser, toggleFollowUser } from '@/lib/services/profile'
 import { convertDivinationRecordToFullGuaData } from '@/lib/utils/divinationToFullGuaData'
 
+function sanitizeHtml(dirty: string) {
+  if (!dirty) return ''
+  return DOMPurify.sanitize(dirty)
+}
+
 type Accuracy = 'accurate' | 'inaccurate' | 'partial'
+
+function stripHtmlToText(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .trim()
+}
 
 type ApiDetail = {
   post: {
@@ -355,17 +369,19 @@ export default function CaseDetailPage() {
 
   const safeHtml = useMemo(() => {
     const raw = data?.post?.content_html || data?.post?.content || ''
-    const sanitized = DOMPurify.sanitize(raw)
+    const sanitized = sanitizeHtml(raw)
     const split = splitHtmlContent(sanitized)
     return {
       ...split,
-      backgroundHtml: filterBackgroundContent(split.backgroundHtml)
+      backgroundHtml: filterBackgroundContent(split.backgroundHtml),
+      backgroundText: stripHtmlToText(filterBackgroundContent(split.backgroundHtml)),
+      analysisText: stripHtmlToText(split.analysisHtml),
     }
   }, [data?.post?.content_html, data?.post?.content])
 
   const safeAdoptedCommentHtml = useMemo(() => {
     const raw = data?.adopted_comment?.content || ''
-    return DOMPurify.sanitize(raw)
+    return sanitizeHtml(raw)
   }, [data?.adopted_comment?.content])
 
   if (loading) {
@@ -444,10 +460,19 @@ export default function CaseDetailPage() {
                 {/* Background Section */}
                 <div className="mb-14">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-[0.1875rem] h-3.5 bg-stone-300"></div>
+                    <div className="w-1 h-3.5 bg-stone-300"></div>
                     <h3 className="text-xs sm:text-sm font-bold text-stone-400 uppercase tracking-widest">BACKGROUND / 背景</h3>
                   </div>
-                  <p className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8" dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml || '' }} />
+                  {safeHtml.backgroundHtml ? (
+                    <p
+                      className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8"
+                      dangerouslySetInnerHTML={{ __html: safeHtml.backgroundHtml || '' }}
+                    />
+                  ) : (
+                    <p className="text-base sm:text-lg text-stone-700 leading-relaxed sm:leading-loose text-justify font-serif-sc indent-8 whitespace-pre-wrap">
+                      {safeHtml.backgroundText || ''}
+                    </p>
+                  )}
                 </div>
 
                
@@ -476,13 +501,22 @@ export default function CaseDetailPage() {
                 )}
 
                 {/* Analysis Section */}
-                {safeHtml.analysisHtml ? (
+                {(safeHtml.analysisHtml || safeHtml.analysisText) ? (
                   <div className="mb-14">
                     <div className="flex items-center gap-3 mb-6">
-                      <div className="w-[0.1875rem] h-3.5 bg-[#C82E31]"></div>
+                      <div className="w-0.75 h-3.5 bg-[#C82E31]"></div>
                       <h3 className="text-xs font-bold text-[#C82E31] uppercase tracking-[0.15em] font-sans">ANALYSIS / 卦理推演</h3>
                     </div>
-                    <div className="prose prose-stone max-w-none text-stone-800 text-base sm:text-[1.0625rem] leading-[1.8] font-serif-sc text-justify" dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }} />
+                    {safeHtml.analysisHtml ? (
+                      <div
+                        className="prose prose-stone max-w-none text-stone-800 text-base sm:text-[1.0625rem] leading-[1.8] font-serif-sc text-justify"
+                        dangerouslySetInnerHTML={{ __html: safeHtml.analysisHtml }}
+                      />
+                    ) : (
+                      <div className="text-stone-800 text-base sm:text-[1.0625rem] leading-[1.8] font-serif-sc text-justify whitespace-pre-wrap">
+                        {safeHtml.analysisText}
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
@@ -553,7 +587,16 @@ export default function CaseDetailPage() {
                             {data.adopted_comment?.created_at ? new Date(data.adopted_comment.created_at).toLocaleString() : ''}
                           </span>
                         </div>
-                        <div className="text-sm sm:text-base text-stone-800 leading-relaxed prose prose-stone max-w-none" dangerouslySetInnerHTML={{ __html: safeAdoptedCommentHtml }} />
+                        {safeAdoptedCommentHtml ? (
+                          <div
+                            className="text-sm sm:text-base text-stone-800 leading-relaxed prose prose-stone max-w-none"
+                            dangerouslySetInnerHTML={{ __html: safeAdoptedCommentHtml }}
+                          />
+                        ) : (
+                          <div className="text-sm sm:text-base text-stone-800 leading-relaxed whitespace-pre-wrap">
+                            {stripHtmlToText(data.adopted_comment?.content || '')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>

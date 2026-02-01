@@ -50,6 +50,22 @@ function resolveCoinsAmount(order: any) {
   return null
 }
 
+/**
+ * @swagger
+ * /api/v1/wallet/recharge/mock:
+ *   post:
+ *     summary: POST /api/v1/wallet/recharge/mock
+ *     description: Auto-generated description for POST /api/v1/wallet/recharge/mock
+ *     tags:
+ *       - V1
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: Request) {
   // Only allow in development or if specifically enabled
   if (process.env.NODE_ENV === 'production' && !process.env.ENABLE_MOCK_PAYMENT) {

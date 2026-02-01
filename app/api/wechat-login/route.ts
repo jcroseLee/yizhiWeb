@@ -111,6 +111,22 @@ export async function OPTIONS() {
   return new NextResponse('ok', { headers: corsHeaders })
 }
 
+/**
+ * @swagger
+ * /api/wechat-login:
+ *   post:
+ *     summary: POST /api/wechat-login
+ *     description: Auto-generated description for POST /api/wechat-login
+ *     tags:
+ *       - Wechat-login
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
 export async function POST(request: NextRequest) {
   console.log('wechat-login function invoked.')
 

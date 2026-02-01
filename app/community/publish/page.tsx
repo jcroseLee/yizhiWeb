@@ -14,6 +14,7 @@ import {
 } from '@/lib/components/ui/dialog'
 import { Input } from '@/lib/components/ui/input'
 import { Label } from '@/lib/components/ui/label'
+import { Switch } from '@/lib/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/lib/components/ui/tabs'
 import { getHexagramResult } from '@/lib/constants/hexagrams'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -27,6 +28,7 @@ import {
   CircleDashed,
   Coins,
   FileText,
+  Flame,
   History,
   Image as ImageIcon,
   LayoutGrid,
@@ -41,76 +43,8 @@ import {
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { styles } from './styles'
 
-// -----------------------------------------------------------------------------
-// 样式定义
-// -----------------------------------------------------------------------------
-const styles = `
-  .input-clean {
-    background: transparent;
-    border: none;
-    outline: none;
-    box-shadow: none;
-  }
-  .input-clean:focus {
-    box-shadow: none;
-    outline: none;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar { width: 0.375rem; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e7e5e4; border-radius: 1.25rem; }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #d6d3d1; }
-
-  /* 核心修复：强制编辑器高度自适应（写文章模式） */
-  .rich-text-content {
-    min-height: 50vh !important;
-    height: auto !important;
-    overflow: visible !important;
-    border: none !important;
-  }
-
-  /* 移动端工具栏调整 */
-  .rich-text-content > div:first-child {
-    position: sticky !important;
-    top: 3.5rem !important; /* 移动端 Navbar 高度通常稍小 */
-    z-index: 30 !important;
-    background-color: rgba(255, 255, 255, 0.98) !important;
-    border-bottom: 0.0625rem solid #e7e5e4 !important;
-    margin: 0 !important;
-    padding: 0.5rem 0.25rem !important;
-    overflow-x: auto !important; /* 允许工具栏横向滚动 */
-  }
-  
-  @media (min-width: 64rem) {
-    .rich-text-content > div:first-child {
-      top: 4rem !important;
-    }
-  }
-
-  .rich-text-content > div:last-child {
-    min-height: 50vh !important;
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  .rich-text-content .ProseMirror {
-    min-height: 50vh !important;
-    height: auto !important; 
-    overflow: visible !important;
-    outline: none !important;
-    padding-bottom: 12.5rem !important;
-  }
-  
-  .rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
-    color: #a8a29e;
-    content: attr(data-placeholder);
-    float: left;
-    height: 0;
-    pointer-events: none;
-  }
-`
 
 // -----------------------------------------------------------------------------
 // 类型与工具 (保持不变)
@@ -177,7 +111,7 @@ const RecordCard = ({ data, onClick, isSelected = false, compact = false }: { da
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${isSelected ? 'bg-[#C82E31] text-white border-[#C82E31]' : 'bg-stone-100 text-stone-500 border-stone-200 group-hover:border-red-200 group-hover:text-red-600 group-hover:bg-red-50'}`}>{data.gua}</span>
             <span className="text-[0.625rem] text-stone-400 font-mono">{data.date}</span>
           </div>
-          <h4 className={`font-serif font-bold break-words whitespace-normal ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
+          <h4 className={`font-serif font-bold wrap-break-word whitespace-normal ${compact ? 'text-sm' : 'text-base'} text-stone-800 group-hover:text-[#C82E31] transition-colors`}>{data.title || '无标题求测'}</h4>
           <div className="mt-2 flex items-center text-xs text-stone-400 gap-2">
             <span className="flex items-center gap-1"><ScrollText className="w-3 h-3" /> {data.gua}</span>
           </div>
@@ -211,6 +145,7 @@ function PublishPageContent() {
   
   const [title, setTitle] = useState('')
   const [bounty, setBounty] = useState(0)
+  const [isUrgent, setIsUrgent] = useState(false)
   const [method, setMethod] = useState<DivinationMethodType>('liuyao')
   const [selectedTags, setSelectedTags] = useState<Tag[]>([])
   const [selectedRecord, setSelectedRecord] = useState<RecordDisplay | null>(null)
@@ -308,6 +243,7 @@ function PublishPageContent() {
             }
             setTitle(post.title)
             setBounty(post.bounty || 0)
+            setIsUrgent(!!post.is_urgent)
             setCoverImageUrl(post.cover_image_url || null)
             setIsDraft(post.status === 'draft')
             setMethod((post.method as DivinationMethodType) || (post.divination_record_id ? 'liuyao' : 'general'))
@@ -413,6 +349,7 @@ function PublishPageContent() {
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
         method,
+        is_urgent: isUrgent,
       }
       
       let post
@@ -479,6 +416,7 @@ function PublishPageContent() {
         divination_record_id: activeTab === 'divination' && selectedRecord ? selectedRecord.record.id : null,
         cover_image_url: coverImageUrl || null,
         method,
+        is_urgent: isUrgent,
       }
       
       let draft
@@ -520,7 +458,7 @@ function PublishPageContent() {
               >
                 <ArrowLeft className="h-5 w-5 text-stone-600" />
               </Button>
-              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-[7.5rem] lg:max-w-none">
+              <h1 className="text-base lg:text-lg font-serif font-bold text-stone-900 truncate max-w-30 lg:max-w-none">
                 {isEditMode ? '编辑帖子' : '发布内容'}
               </h1>
             </div>
@@ -661,7 +599,7 @@ function PublishPageContent() {
                         )}
                       </div>
                       
-                      <div className="space-y-3 flex-1 flex flex-col min-h-[18.75rem]">
+                      <div className="space-y-3 flex-1 flex flex-col min-h-75">
                         <Label className="text-sm font-bold text-stone-700 flex items-center gap-2">
                           <FileText className="w-4 h-4 text-stone-400" />{" "}
                           背景详情
@@ -671,7 +609,7 @@ function PublishPageContent() {
                             content={backgroundDesc}
                             onChange={(content) => setBackgroundDesc(content)}
                             placeholder="请详细描述事情起因、现状以及您最担心的点..."
-                            className="w-full h-full flex-1 border-none min-h-[12.5rem]"
+                            className="w-full h-full flex-1 border-none min-h-50"
                           />
                         </div>
                       </div>
@@ -709,9 +647,32 @@ function PublishPageContent() {
                         </div>
                       </div>
 
+                      {/* 加急选项 */}
+                      <div className="pt-4 border-t border-stone-100 shrink-0">
+                        <div className="bg-linear-to-r from-red-50 to-rose-50/50 rounded-xl p-1">
+                          <div className="bg-white/60 rounded-lg p-3 lg:p-4 flex items-center justify-between backdrop-blur-sm">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                              <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center transition-colors ${isUrgent ? "bg-red-100 text-red-600 shadow-sm" : "bg-stone-100 text-stone-400"}`}>
+                                <Flame className="h-4 w-4 lg:h-5 lg:w-5" />
+                              </div>
+                              <div>
+                                <div className="text-xs lg:text-sm font-bold text-stone-800">加急求测</div>
+                                <div className="text-[0.625rem] lg:text-xs text-stone-500 hidden sm:block">
+                                  {isUrgent ? "开启加急，帖子将标记为紧急状态" : "开启加急可获得更多关注"}
+                                </div>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={isUrgent}
+                              onCheckedChange={setIsUrgent}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       {/* 标签面板 */}
                       <div className="pt-4 border-t border-stone-100 shrink-0">
-                        <div className="bg-gradient-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
+                        <div className="bg-linear-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
                           <div className="bg-white/60 rounded-lg p-3 lg:p-4 backdrop-blur-sm">
                             <TagPanel
                               method={method}
@@ -816,9 +777,32 @@ function PublishPageContent() {
                         />
                       </div>
 
+                      {/* 加急选项 */}
+                      <div className="px-4 lg:px-10 pt-4 border-t border-stone-100 shrink-0">
+                        <div className="bg-linear-to-r from-red-50 to-rose-50/50 rounded-xl p-1">
+                          <div className="bg-white/60 rounded-lg p-3 lg:p-4 flex items-center justify-between backdrop-blur-sm">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                              <div className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center transition-colors ${isUrgent ? "bg-red-100 text-red-600 shadow-sm" : "bg-stone-100 text-stone-400"}`}>
+                                <Flame className="h-4 w-4 lg:h-5 lg:w-5" />
+                              </div>
+                              <div>
+                                <div className="text-xs lg:text-sm font-bold text-stone-800">加急发布</div>
+                                <div className="text-[0.625rem] lg:text-xs text-stone-500 hidden sm:block">
+                                  {isUrgent ? "开启加急，帖子将标记为紧急状态" : "开启加急可获得更多关注"}
+                                </div>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={isUrgent}
+                              onCheckedChange={setIsUrgent}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       {/* 标签面板 */}
                       <div className="px-4 lg:px-10 pt-4 pb-6 border-t border-stone-100 shrink-0">
-                        <div className="bg-gradient-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
+                        <div className="bg-linear-to-r from-stone-50 to-stone-100/50 rounded-xl p-1">
                           <div className="bg-white/60 rounded-lg p-3 lg:p-4 backdrop-blur-sm">
                             <TagPanel
                               method={method}
@@ -842,7 +826,7 @@ function PublishPageContent() {
             {/* 右侧助手 (移动端隐藏) */}
             <aside className="hidden lg:block w-80 shrink-0 space-y-6 sticky top-24">
               <Card className="border-none shadow-sm bg-white overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-stone-200 to-stone-300"></div>
+                <div className="h-1.5 bg-linear-to-r from-stone-200 to-stone-300"></div>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold text-stone-800 flex items-center p-2 gap-2">
                     <PenTool className="h-4 w-4 text-[#C82E31]" />{" "}
@@ -904,7 +888,7 @@ function PublishPageContent() {
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[60vh] lg:max-h-[31.25rem] overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-3 lg:p-4 min-h-[18.75rem]">
+            <div className="max-h-[60vh] lg:max-h-125 overflow-y-auto custom-scrollbar bg-[#FAFAF9] p-3 lg:p-4 min-h-75">
               {loadingRecords ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[#C82E31]" />
@@ -969,7 +953,7 @@ function PublishPageContent() {
 export default function PublishPageSimple() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-b from-stone-50 to-white flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 mx-auto border-4 border-stone-200 border-t-[#C82E31] rounded-full animate-spin" />
           <p className="text-stone-500">加载中...</p>
